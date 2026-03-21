@@ -1,16 +1,45 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState } from "react";
+import { Scale, Users, CalendarClock, DollarSign } from "lucide-react";
+import { AppSidebar } from "@/components/AppSidebar";
+import { DashboardHeader } from "@/components/DashboardHeader";
+import { StatCard } from "@/components/StatCard";
+import { RecentProcesses } from "@/components/RecentProcesses";
+import { UpcomingDeadlines } from "@/components/UpcomingDeadlines";
+import { QuickActions } from "@/components/QuickActions";
 
-// IMPORTANT: Fully REPLACE this with your own code
-const PlaceholderIndex = () => {
-  // PLACEHOLDER: Replace this entire return statement with the user's app.
-  // The inline background color is intentionally not part of the design system.
+const Index = () => {
+  const [activeItem, setActiveItem] = useState("dashboard");
+
   return (
-    <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: '#fcfbf8' }}>
-      <img data-lovable-blank-page-placeholder="REMOVE_THIS" src="/placeholder.svg" alt="Your app will live here!" />
+    <div className="flex min-h-screen bg-background">
+      <AppSidebar activeItem={activeItem} onNavigate={setActiveItem} />
+
+      <main className="flex-1 min-w-0">
+        <DashboardHeader />
+
+        <div className="p-6 md:p-8 space-y-6">
+          {/* Stats */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard icon={Scale} label="Processos Ativos" value={47} change="+3 este mês" changeType="positive" delay={0} />
+            <StatCard icon={Users} label="Clientes" value={128} change="+5 este mês" changeType="positive" delay={75} />
+            <StatCard icon={CalendarClock} label="Prazos esta Semana" value={8} change="2 urgentes" changeType="negative" delay={150} />
+            <StatCard icon={DollarSign} label="Honorários (mês)" value="R$ 45.200" change="+12%" changeType="positive" delay={225} />
+          </div>
+
+          {/* Main content */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <RecentProcesses />
+            </div>
+            <div className="space-y-6">
+              <UpcomingDeadlines />
+              <QuickActions />
+            </div>
+          </div>
+        </div>
+      </main>
     </div>
   );
 };
-
-const Index = PlaceholderIndex;
 
 export default Index;
