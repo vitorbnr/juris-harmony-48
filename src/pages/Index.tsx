@@ -6,17 +6,26 @@ import { StatCard } from "@/components/StatCard";
 import { RecentProcesses } from "@/components/RecentProcesses";
 import { UpcomingDeadlines } from "@/components/UpcomingDeadlines";
 import { QuickActions } from "@/components/QuickActions";
+import { ProcessosView } from "@/components/views/ProcessosView";
+import { ClientesView } from "@/components/views/ClientesView";
+import { PrazosView } from "@/components/views/PrazosView";
+import { DocumentosView } from "@/components/views/DocumentosView";
+import { ConfiguracoesView } from "@/components/views/ConfiguracoesView";
 
-const Index = () => {
-  const [activeItem, setActiveItem] = useState("dashboard");
-
-  return (
-    <div className="flex min-h-screen bg-background">
-      <AppSidebar activeItem={activeItem} onNavigate={setActiveItem} />
-
-      <main className="flex-1 min-w-0">
-        <DashboardHeader />
-
+const renderContent = (activeItem: string) => {
+  switch (activeItem) {
+    case "processos":
+      return <ProcessosView />;
+    case "clientes":
+      return <ClientesView />;
+    case "prazos":
+      return <PrazosView />;
+    case "documentos":
+      return <DocumentosView />;
+    case "configuracoes":
+      return <ConfiguracoesView />;
+    default:
+      return (
         <div className="p-6 md:p-8 space-y-6">
           {/* Stats */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -37,6 +46,20 @@ const Index = () => {
             </div>
           </div>
         </div>
+      );
+  }
+};
+
+const Index = () => {
+  const [activeItem, setActiveItem] = useState("dashboard");
+
+  return (
+    <div className="flex min-h-screen bg-background">
+      <AppSidebar activeItem={activeItem} onNavigate={setActiveItem} />
+
+      <main className="flex-1 min-w-0 flex flex-col">
+        <DashboardHeader activeItem={activeItem} />
+        {renderContent(activeItem)}
       </main>
     </div>
   );

@@ -2,16 +2,32 @@ import { Bell, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { usuarioAtual } from "@/data/mockData";
 
-export const DashboardHeader = () => {
+const sectionTitles: Record<string, { title: string; subtitle: string }> = {
+  dashboard: { title: `Bom dia, Dr. ${usuarioAtual.nome.split(" ")[1]}`, subtitle: "Aqui está o resumo do seu escritório hoje." },
+  processos: { title: "Processos", subtitle: "Gerencie todos os processos do escritório." },
+  clientes: { title: "Clientes", subtitle: "Carteira de clientes do escritório." },
+  prazos: { title: "Prazos & Tarefas", subtitle: "Acompanhe prazos processuais, audiências e tarefas." },
+  documentos: { title: "Documentos", subtitle: "Repositório central de arquivos e documentos." },
+  configuracoes: { title: "Configurações", subtitle: "Gerencie perfil, equipe e preferências do sistema." },
+};
+
+interface DashboardHeaderProps {
+  activeItem: string;
+}
+
+export const DashboardHeader = ({ activeItem }: DashboardHeaderProps) => {
+  const section = sectionTitles[activeItem] ?? sectionTitles.dashboard;
+
   return (
     <header className="flex items-center justify-between px-8 py-4 border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
       <div>
         <h2 className="font-heading text-2xl font-semibold text-foreground">
-          Bom dia, Dr. Viana
+          {section.title}
         </h2>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Aqui está o resumo do seu escritório hoje.
+          {section.subtitle}
         </p>
       </div>
 
@@ -29,7 +45,7 @@ export const DashboardHeader = () => {
         </Button>
         <Avatar className="h-9 w-9 border-2 border-primary/30">
           <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">
-            RV
+            {usuarioAtual.initials}
           </AvatarFallback>
         </Avatar>
       </div>
