@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Users, Plus, Search, Mail, Phone, Scale, X, LayoutGrid, List, ChevronRight, Building2, User } from "lucide-react";
+import { Users, Plus, Search, Mail, Phone, Scale, X, LayoutGrid, List, ChevronRight, Building2, User, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { clientes, getProcessosByCliente } from "@/data/mockData";
+import { clientes, getProcessosByCliente, unidades } from "@/data/mockData";
+import { useUnidade } from "@/context/UnidadeContext";
 import type { Cliente } from "@/types";
 
 // ─── Drawer de Detalhes ───────────────────────────────────────────────────────
@@ -97,13 +98,15 @@ export const ClientesView = () => {
   const [busca, setBusca] = useState("");
   const [modo, setModo] = useState<"grid" | "lista">("grid");
   const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null);
+  const { unidadeSelecionada } = useUnidade();
 
-  const clientesFiltrados = clientes.filter(c =>
-    !busca ||
-    c.nome.toLowerCase().includes(busca.toLowerCase()) ||
-    c.email.toLowerCase().includes(busca.toLowerCase()) ||
-    c.cpfCnpj.includes(busca)
-  );
+  const getUnidadeNome = (id: string) => unidades.find(u => u.id === id)?.nome ?? id;
+
+  const clientesFiltrados = clientes.filter(c => {
+    const matchBusca = !busca || c.nome.toLowerCase().includes(busca.toLowerCase()) || c.email.toLowerCase().includes(busca.toLowerCase()) || c.cpfCnpj.includes(busca);
+    const matchUnidade = unidadeSelecionada === "todas" || c.unidadeId === unidadeSelecionada;
+    return matchBusca && matchUnidade;
+  });
 
   return (
     <div className="p-6 md:p-8 space-y-6">
@@ -177,7 +180,12 @@ export const ClientesView = () => {
               </div>
               <div className="mt-3 pt-3 border-t border-border/60 flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">{c.advogadoResponsavel}</span>
-                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="flex items-center gap-1.5">
+                  <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                    <MapPin className="h-2.5 w-2.5" />{getUnidadeNome(c.unidadeId)}
+                  </span>
+                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
               </div>
             </div>
           ))}
@@ -236,7 +244,7 @@ export const ClientesView = () => {
       )}
 
       <p className="text-xs text-muted-foreground text-right">
-        {clientesFiltrados.length} de {clientes.length} clientes exibidos
+        {clientesFiltrados.length} de {clientes.length} clientes{unidadeSelecionada !== "todas" && ` (${getUnidadeNome(unidadeSelecionada)})`}
       </p>
 
       {clienteSelecionado && (

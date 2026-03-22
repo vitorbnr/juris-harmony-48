@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { Scale, Plus, Search, Filter, X, ChevronRight, CalendarClock, User, Gavel, AlertCircle, Clock, CheckCircle, Pause, Archive } from "lucide-react";
+import { Scale, Plus, Search, Filter, X, ChevronRight, CalendarClock, AlertCircle, Clock, CheckCircle, Pause, Archive, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useUnidade } from "@/context/UnidadeContext";
+import { unidades } from "@/data/mockData";
 import { processos } from "@/data/mockData";
 import type { Processo, StatusProcesso, TipoProcesso } from "@/types";
 
@@ -129,6 +131,7 @@ export const ProcessosView = () => {
   const [filtroStatus, setFiltroStatus] = useState<StatusProcesso | "Todos">("Todos");
   const [filtroTipo, setFiltroTipo] = useState<TipoProcesso | "Todos">("Todos");
   const [processoSelecionado, setProcessoSelecionado] = useState<Processo | null>(null);
+  const { unidadeSelecionada } = useUnidade();
 
   const todoStatus: Array<StatusProcesso | "Todos"> = ["Todos", "Em andamento", "Urgente", "Aguardando", "Suspenso", "Concluído", "Arquivado"];
 
@@ -136,8 +139,11 @@ export const ProcessosView = () => {
     const matchBusca = !busca || p.clienteNome.toLowerCase().includes(busca.toLowerCase()) || p.numero.includes(busca) || p.tipo.toLowerCase().includes(busca.toLowerCase());
     const matchStatus = filtroStatus === "Todos" || p.status === filtroStatus;
     const matchTipo = filtroTipo === "Todos" || p.tipo === filtroTipo;
-    return matchBusca && matchStatus && matchTipo;
+    const matchUnidade = unidadeSelecionada === "todas" || p.unidadeId === unidadeSelecionada;
+    return matchBusca && matchStatus && matchTipo && matchUnidade;
   });
+
+  const getUnidadeNome = (id: string) => unidades.find(u => u.id === id)?.nome ?? id;
 
   return (
     <div className="p-6 md:p-8 space-y-6">
@@ -227,7 +233,12 @@ export const ProcessosView = () => {
                     className="border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors cursor-pointer group"
                   >
                     <td className="px-5 py-4">
-                      <span className="font-mono text-xs text-primary">{p.numero.slice(0, 16)}…</span>
+                      <div className="flex flex-col gap-1">
+                        <span className="font-mono text-xs text-primary">{p.numero.slice(0, 16)}…</span>
+                        <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                          <MapPin className="h-2.5 w-2.5" />{getUnidadeNome(p.unidadeId)}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-2">
@@ -261,7 +272,7 @@ export const ProcessosView = () => {
       </div>
 
       <p className="text-xs text-muted-foreground text-right">
-        {processosFiltrados.length} de {processos.length} processos exibidos
+        {processosFiltrados.length} de {processos.length} processos{unidadeSelecionada !== "todas" && ` (${getUnidadeNome(unidadeSelecionada)})`}
       </p>
 
       {/* Drawer */}

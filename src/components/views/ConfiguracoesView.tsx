@@ -28,8 +28,8 @@ const papelConfig: Record<UserRole, { label: string; class: string }> = {
 
 const papelPermissoes: Record<UserRole, string[]> = {
   administrador: ["Acesso total ao sistema", "Criar e excluir usuários", "Ver logs de auditoria", "Gerenciar configurações", "Upload e download de documentos"],
-  advogado:      ["Criar e editar processos", "Gerenciar clientes", "Criar prazos e tarefas", "Upload de documentos vinculados", "Visualizar dados de casos"],
-  secretaria:    ["Visualizar documentos autorizados", "Agendar na agenda dos advogados", "Cadastrar clientes (básico)", "Visualizar prazos e agenda"],
+  advogado:      ["Criar e editar processos", "Gerenciar clientes", "Criar prazos e tarefas", "Upload e download de documentos", "Visualizar dados de casos"],
+  secretaria:    ["Visualizar documentos autorizados", "Agendar na agenda dos advogados", "Cadastrar clientes (básico)", "Visualizar prazos e agenda, Upload e download de documentos"],
 };
 
 const moduloLabel: Record<string, string> = {

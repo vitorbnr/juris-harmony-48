@@ -1,3 +1,12 @@
+// ─── Unidades ────────────────────────────────────────────────────────────────
+
+export interface Unidade {
+  id: string;
+  nome: string;
+  cidade: string;
+  estado: string;
+}
+
 // ─── Usuários ────────────────────────────────────────────────────────────────
 
 export type UserRole = "administrador" | "advogado" | "secretaria";
@@ -11,6 +20,7 @@ export interface Usuario {
   papel: UserRole;
   ativo: boolean;
   initials: string;
+  unidadeId: string;
 }
 
 // ─── Clientes ────────────────────────────────────────────────────────────────
@@ -30,6 +40,7 @@ export interface Cliente {
   processos: number;
   advogadoResponsavel: string;
   initials: string;
+  unidadeId: string;
 }
 
 // ─── Processos ───────────────────────────────────────────────────────────────
@@ -69,6 +80,7 @@ export interface Processo {
   valorCausa?: string;
   descricao?: string;
   movimentacoes?: Movimentacao[];
+  unidadeId: string;
 }
 
 export interface Movimentacao {
@@ -89,13 +101,14 @@ export interface Prazo {
   processoId?: string;
   processoNumero?: string;
   clienteNome?: string;
-  data: string; // "YYYY-MM-DD"
-  hora?: string; // "HH:mm"
+  data: string;
+  hora?: string;
   tipo: TipoPrazo;
   prioridade: PrioridadePrazo;
   concluido: boolean;
   advogadoId?: string;
   descricao?: string;
+  unidadeId?: string;
 }
 
 // ─── Documentos ──────────────────────────────────────────────────────────────
@@ -127,10 +140,81 @@ export interface Pasta {
   documentos: number;
 }
 
+// ─── Financeiro ──────────────────────────────────────────────────────────────
+
+export type TipoHonorario = "fixo" | "parcelado" | "recorrente" | "risco";
+export type StatusHonorario = "ativo" | "pago" | "em_atraso" | "pendente";
+
+export interface Honorario {
+  id: string;
+  clienteId: string;
+  clienteNome: string;
+  processoId?: string;
+  processoNumero?: string;
+  tipo: TipoHonorario;
+  valorTotal: number;
+  percentual?: number; // para tipo "risco"
+  parcelasPagas: number;
+  parcelasTotal: number;
+  valorParcela?: number;
+  status: StatusHonorario;
+  dataInicio: string;
+  proximoVencimento?: string;
+  unidadeId: string;
+}
+
+export type TipoCusta = "distribuicao" | "pericia" | "diligencia" | "certidao" | "publicacao" | "outros";
+
+export interface CustaProcessual {
+  id: string;
+  processoId: string;
+  processoNumero: string;
+  clienteNome: string;
+  descricao: string;
+  tipo: TipoCusta;
+  valor: number;
+  data: string;
+  pagoBy: string; // quem pagou
+  reembolsavel: boolean;
+  reembolsado: boolean;
+  unidadeId: string;
+}
+
+export type TipoLancamento = "entrada" | "saida";
+export type CategoriaLancamento =
+  | "honorario" | "custa" | "reembolso" | "salario"
+  | "aluguel" | "material" | "servico" | "outros";
+
+export interface LancamentoFinanceiro {
+  id: string;
+  tipo: TipoLancamento;
+  categoria: CategoriaLancamento;
+  descricao: string;
+  valor: number;
+  data: string;
+  vinculoId?: string; // processoId ou clienteId
+  unidadeId: string;
+}
+
+// ─── Notificações ─────────────────────────────────────────────────────────────
+
+export type TipoNotificacao = "prazo" | "sistema" | "financeiro" | "documento";
+
+export interface Notificacao {
+  id: string;
+  titulo: string;
+  descricao: string;
+  tipo: TipoNotificacao;
+  lida: boolean;
+  data: string;
+  hora: string;
+  link?: string; // seção para navegar ao clicar
+}
+
 // ─── Logs de Auditoria ───────────────────────────────────────────────────────
 
 export type TipoAcao = "acessou" | "criou" | "editou" | "excluiu" | "visualizou" | "fez_upload" | "baixou";
-export type ModuloLog = "processos" | "clientes" | "prazos" | "documentos" | "usuarios" | "sistema";
+export type ModuloLog = "processos" | "clientes" | "prazos" | "documentos" | "usuarios" | "sistema" | "financeiro";
 
 export interface LogAuditoria {
   id: string;

@@ -7,17 +7,19 @@ import {
   Settings2,
   ChevronLeft,
   ChevronRight,
+  DollarSign,
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { icon: LayoutDashboard, label: "Dashboard", id: "dashboard" },
-  { icon: Scale, label: "Processos", id: "processos" },
-  { icon: Users, label: "Clientes", id: "clientes" },
-  { icon: CalendarClock, label: "Prazos & Tarefas", id: "prazos" },
-  { icon: FileText, label: "Documentos", id: "documentos" },
+  { icon: LayoutDashboard, label: "Dashboard",     id: "dashboard" },
+  { icon: Scale,           label: "Processos",     id: "processos" },
+  { icon: Users,           label: "Clientes",      id: "clientes" },
+  { icon: CalendarClock,   label: "Prazos & Tarefas", id: "prazos" },
+  { icon: FileText,        label: "Documentos",    id: "documentos" },
+  { icon: DollarSign,      label: "Financeiro",    id: "financeiro" },
 ];
 
 interface AppSidebarProps {
@@ -38,26 +40,26 @@ export const AppSidebar = ({ activeItem, onNavigate }: AppSidebarProps) => {
       {/* Logo */}
       <div className={cn(
         "flex items-center border-b border-sidebar-border transition-all duration-300",
-        collapsed ? "justify-center px-0 py-6" : "px-5 py-6"
+        collapsed ? "justify-center px-0 py-4" : "px-4 py-4"
       )}>
         {collapsed ? (
           <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center shrink-0">
             <Scale className="h-5 w-5 text-primary-foreground" />
           </div>
         ) : (
-          <div className="flex flex-col items-center w-full gap-0.5">
-            <span
-              style={{ fontFamily: "'Cinzel', serif", letterSpacing: "0.08em" }}
-              className="text-sidebar-foreground text-2xl font-semibold leading-none"
-            >
-              VIANA
-            </span>
-            <span
-              style={{ fontFamily: "'Cinzel', serif", letterSpacing: "0.35em" }}
-              className="text-sidebar-primary text-[9px] font-medium uppercase"
-            >
-              ADVOCACIA
-            </span>
+          /* Logo real — invert+screen: branco vira preto (transparente no screen), cores aparecem */
+          <div className="w-full flex items-center justify-center px-3 py-2">
+            <img
+              src="/logo.png"
+              alt="Viana Advocacia"
+              style={{
+                width: "170px",
+                height: "auto",
+                display: "block",
+                filter: "invert(1) hue-rotate(180deg) brightness(1.1)",
+                mixBlendMode: "screen",
+              }}
+            />
           </div>
         )}
       </div>

@@ -30,34 +30,22 @@ const Login = () => {
         <div className="absolute top-6 left-6">
           <ThemeToggle />
         </div>
-        <div className="text-center space-y-6 max-w-md">
-          <div className="w-20 h-20 rounded-2xl bg-primary flex items-center justify-center mx-auto">
-            <Scale className="h-10 w-10 text-primary-foreground" />
-          </div>
-          <h1 className="font-heading text-4xl font-bold text-sidebar-foreground">
-            Viana Advocacia
-          </h1>
-          <p className="text-sidebar-muted text-lg leading-relaxed">
-            Gestão jurídica completa com segurança, organização e eficiência para o seu escritório.
-          </p>
-          <div className="flex items-center justify-center gap-8 pt-8 text-sidebar-muted text-sm">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-sidebar-foreground">128</p>
-              <p>Clientes</p>
-            </div>
-            <div className="w-px h-10 bg-sidebar-border" />
-            <div className="text-center">
-              <p className="text-2xl font-bold text-sidebar-foreground">47</p>
-              <p>Processos</p>
-            </div>
-            <div className="w-px h-10 bg-sidebar-border" />
-            <div className="text-center">
-              <p className="text-2xl font-bold text-sidebar-foreground">99%</p>
-              <p>Uptime</p>
-            </div>
-          </div>
-        </div>
+        {/* Logo real — invert+screen: branco vira preto (transparente no screen) */}
+        <img
+          src="/logo.png"
+          alt="Viana Advocacia"
+          style={{
+            width: "340px",
+            height: "auto",
+            display: "block",
+            filter: "invert(1) hue-rotate(180deg) brightness(1.1)",
+            mixBlendMode: "screen",
+          }}
+        />
+
+
       </div>
+
 
       {/* Painel direito com formulário */}
       <div className="flex-1 flex items-center justify-center p-6 sm:p-12">
