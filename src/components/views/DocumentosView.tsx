@@ -13,7 +13,17 @@ const tipoConfig: Record<string, { label: string; bg: string; text: string; char
   docx: { label: "DOCX", bg: "bg-blue-500/15",   text: "text-blue-400",   char: "DOC" },
   xlsx: { label: "XLSX", bg: "bg-green-500/15",  text: "text-green-400",  char: "XLS" },
   jpg:  { label: "JPG",  bg: "bg-purple-500/15", text: "text-purple-400", char: "IMG" },
+  jpeg: { label: "JPEG", bg: "bg-purple-500/15", text: "text-purple-400", char: "IMG" },
   png:  { label: "PNG",  bg: "bg-purple-500/15", text: "text-purple-400", char: "IMG" },
+  gif:  { label: "GIF",  bg: "bg-purple-500/15", text: "text-purple-400", char: "GIF" },
+  webp: { label: "WEBP", bg: "bg-purple-500/15", text: "text-purple-400", char: "IMG" },
+  svg:  { label: "SVG",  bg: "bg-purple-500/15", text: "text-purple-400", char: "SVG" },
+  mp4:  { label: "MP4",  bg: "bg-orange-500/15", text: "text-orange-400", char: "VID" },
+  mov:  { label: "MOV",  bg: "bg-orange-500/15", text: "text-orange-400", char: "VID" },
+  avi:  { label: "AVI",  bg: "bg-orange-500/15", text: "text-orange-400", char: "VID" },
+  mp3:  { label: "MP3",  bg: "bg-yellow-500/15", text: "text-yellow-400", char: "AUD" },
+  txt:  { label: "TXT",  bg: "bg-muted",         text: "text-muted-foreground", char: "TXT" },
+  csv:  { label: "CSV",  bg: "bg-green-500/15",  text: "text-green-400",  char: "CSV" },
   outro:{ label: "ARQ",  bg: "bg-muted",         text: "text-muted-foreground", char: "ARQ" },
 };
 
@@ -72,7 +82,7 @@ function UploadArea({ onClose }: { onClose: () => void }) {
                 <p className="text-foreground font-medium">Arraste arquivos aqui</p>
                 <p className="text-sm text-muted-foreground mt-1">ou clique para selecionar</p>
               </div>
-              <p className="text-xs text-muted-foreground">PDF, DOCX, XLSX, JPG, PNG — até 50MB por arquivo</p>
+              <p className="text-xs text-muted-foreground">PDF, DOCX, XLSX, JPG, PNG, GIF, MP4, MOV e outros — até 100MB por arquivo</p>
             </div>
           ) : (
             <div className="rounded-xl bg-primary/10 border border-primary/20 flex flex-col items-center gap-3 py-10">

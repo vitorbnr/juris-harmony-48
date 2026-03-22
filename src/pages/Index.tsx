@@ -11,7 +11,6 @@ import { ClientesView } from "@/components/views/ClientesView";
 import { PrazosView } from "@/components/views/PrazosView";
 import { DocumentosView } from "@/components/views/DocumentosView";
 import { ConfiguracoesView } from "@/components/views/ConfiguracoesView";
-import { FinanceiroView } from "@/components/views/FinanceiroView";
 import { UnidadeProvider } from "@/context/UnidadeContext";
 
 const renderContent = (activeItem: string, onNavigate: (id: string) => void) => {
@@ -24,8 +23,6 @@ const renderContent = (activeItem: string, onNavigate: (id: string) => void) => 
       return <PrazosView />;
     case "documentos":
       return <DocumentosView />;
-    case "financeiro":
-      return <FinanceiroView />;
     case "configuracoes":
       return <ConfiguracoesView />;
     default:

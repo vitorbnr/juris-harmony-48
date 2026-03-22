@@ -7,7 +7,6 @@ import {
   Settings2,
   ChevronLeft,
   ChevronRight,
-  DollarSign,
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { useState } from "react";
@@ -19,7 +18,6 @@ const navItems = [
   { icon: Users,           label: "Clientes",      id: "clientes" },
   { icon: CalendarClock,   label: "Prazos & Tarefas", id: "prazos" },
   { icon: FileText,        label: "Documentos",    id: "documentos" },
-  { icon: DollarSign,      label: "Financeiro",    id: "financeiro" },
 ];
 
 interface AppSidebarProps {
