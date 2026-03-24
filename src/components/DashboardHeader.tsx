@@ -1,22 +1,23 @@
-import { useState } from "react";
-import { Bell, Search, MapPin, ChevronDown, Check } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Bell, Search, MapPin, ChevronDown, Check, LogOut } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
-import { usuarioAtual, unidades, notificacoes as notificacoesMock } from "@/data/mockData";
+import { unidades } from "@/data/mockData";
 import { useUnidade } from "@/context/UnidadeContext";
+import { useAuth } from "@/context/AuthContext";
+import { notificacoesApi } from "@/services/api";
 import type { Notificacao } from "@/types";
 
-const sectionTitles: Record<string, { title: string; subtitle: string }> = {
-  dashboard:    { title: `Bom dia, Dr. ${usuarioAtual.nome.split(" ")[1]}`, subtitle: "Aqui está o resumo do seu escritório hoje." },
+const getSectionTitles = (userName: string): Record<string, { title: string; subtitle: string }> => ({
+  dashboard:    { title: `Bom dia, ${userName}`, subtitle: "Aqui está o resumo do seu escritório hoje." },
   processos:    { title: "Processos",          subtitle: "Gerencie todos os processos do escritório." },
   clientes:     { title: "Clientes",           subtitle: "Carteira de clientes do escritório." },
   prazos:       { title: "Prazos & Tarefas",   subtitle: "Acompanhe prazos processuais, audiências e tarefas." },
   documentos:   { title: "Documentos",         subtitle: "Repositório central de arquivos e documentos." },
-  financeiro:   { title: "Financeiro",         subtitle: "Honorários, custas processuais e fluxo de caixa." },
   configuracoes:{ title: "Configurações",      subtitle: "Gerencie perfil, equipe e preferências do sistema." },
-};
+});
 
 const tipoCor: Record<string, string> = {
   prazo:      "bg-red-500/15 text-red-400",
@@ -31,11 +32,22 @@ interface Props {
 }
 
 export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
+  const { user, logout } = useAuth();
+  const sectionTitles = getSectionTitles(user?.nome?.split(" ").slice(0, 2).join(" ") ?? "");
   const section = sectionTitles[activeItem] ?? sectionTitles.dashboard;
   const { unidadeSelecionada, setUnidadeSelecionada } = useUnidade();
   const [unidadeOpen, setUnidadeOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [notifs, setNotifs] = useState<Notificacao[]>(notificacoesMock);
+  const [notifs, setNotifs] = useState<Notificacao[]>([]);
+
+  useEffect(() => {
+    notificacoesApi.listar({ size: 10 })
+      .then((data) => {
+        const items = data.content ?? data;
+        setNotifs(Array.isArray(items) ? items : []);
+      })
+      .catch(() => setNotifs([]));
+  }, []);
 
   const naoLidas = notifs.filter(n => !n.lida).length;
   const unidadeLabel = unidadeSelecionada === "todas"
@@ -171,12 +183,15 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
           )}
         </div>
 
-        {/* Avatar */}
-        <Avatar className="h-9 w-9 border-2 border-primary/30 cursor-pointer">
+        {/* Avatar + Logout */}
+        <Avatar className="h-9 w-9 border-2 border-primary/30 cursor-pointer" title={user?.nome}>
           <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">
-            {usuarioAtual.initials}
+            {user?.initials ?? "??"}
           </AvatarFallback>
         </Avatar>
+        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={logout} title="Sair">
+          <LogOut className="h-4 w-4 text-muted-foreground" />
+        </Button>
       </div>
     </header>
   );

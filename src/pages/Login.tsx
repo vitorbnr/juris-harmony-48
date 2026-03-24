@@ -5,22 +5,31 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useAuth } from "@/context/AuthContext";
+import { toast } from "sonner";
 
 const Login = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // Simula login no frontend
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      await login(email, password);
+      toast.success("Login realizado com sucesso!");
       navigate("/");
-    }, 1000);
+    } catch (error: unknown) {
+      const axiosErr = error as { response?: { data?: { mensagem?: string } } };
+      const msg = axiosErr.response?.data?.mensagem || "E-mail ou senha inválidos";
+      toast.error(msg);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -30,7 +39,6 @@ const Login = () => {
         <div className="absolute top-6 left-6">
           <ThemeToggle />
         </div>
-        {/* Logo real — invert+screen: branco vira preto (transparente no screen) */}
         <img
           src="/logo.png"
           alt="Viana Advocacia"
@@ -42,10 +50,7 @@ const Login = () => {
             mixBlendMode: "screen",
           }}
         />
-
-
       </div>
-
 
       {/* Painel direito com formulário */}
       <div className="flex-1 flex items-center justify-center p-6 sm:p-12">
@@ -86,12 +91,9 @@ const Login = () => {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Senha</Label>
-                <button
-                  type="button"
-                  className="text-xs text-primary hover:underline font-medium"
-                >
-                  Esqueceu a senha?
-                </button>
+                <span className="text-xs text-muted-foreground">
+                  Fale com o administrador
+                </span>
               </div>
               <div className="relative">
                 <Input

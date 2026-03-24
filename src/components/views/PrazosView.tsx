@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CalendarClock, AlertCircle, Clock, CheckCircle, X, Scale, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { CalendarioPrazos } from "@/components/prazos/CalendarioPrazos";
-import { prazos as prazosMock, processos } from "@/data/mockData";
+import { prazosApi } from "@/services/api";
 import type { Prazo, TipoPrazo, PrioridadePrazo } from "@/types";
 
 // ─── Modal de Adição de Prazo ─────────────────────────────────────────────────
@@ -98,9 +98,6 @@ function AdicionarPrazoModal({ dataInicial, onClose }: { dataInicial?: string; o
               className="w-full h-10 px-3 rounded-md bg-secondary text-foreground text-sm border-none outline-none"
             >
               <option value="">Nenhum processo</option>
-              {processos.map(p => (
-                <option key={p.id} value={p.id}>{p.clienteNome} — {p.tipo}</option>
-              ))}
             </select>
           </div>
 
@@ -200,8 +197,21 @@ export const PrazosView = () => {
   const [dataSelecionada, setDataSelecionada] = useState<string | null>(null);
   const [modalAberto, setModalAberto] = useState(false);
   const [dataInicial, setDataInicial] = useState<string | undefined>();
+  const [prazos, setPrazos] = useState<Prazo[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const prazosFiltrados = prazosMock.filter(p => {
+  useEffect(() => {
+    setLoading(true);
+    prazosApi.listar()
+      .then((data) => {
+        const items = data.content ?? data;
+        setPrazos(Array.isArray(items) ? items : []);
+      })
+      .catch(() => setPrazos([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const prazosFiltrados = prazos.filter(p => {
     if (dataSelecionada) return p.data === dataSelecionada;
     if (filtro === "pendentes") return !p.concluido;
     if (filtro === "urgentes") return !p.concluido && p.prioridade === "alta";
@@ -219,10 +229,10 @@ export const PrazosView = () => {
   };
 
   const filtros: Array<{ id: Filtro; label: string; count: number }> = [
-    { id: "todos", label: "Todos", count: prazosMock.length },
-    { id: "pendentes", label: "Pendentes", count: prazosMock.filter(p => !p.concluido).length },
-    { id: "urgentes", label: "Urgentes", count: prazosMock.filter(p => !p.concluido && p.prioridade === "alta").length },
-    { id: "concluidos", label: "Concluídos", count: prazosMock.filter(p => p.concluido).length },
+    { id: "todos", label: "Todos", count: prazos.length },
+    { id: "pendentes", label: "Pendentes", count: prazos.filter(p => !p.concluido).length },
+    { id: "urgentes", label: "Urgentes", count: prazos.filter(p => !p.concluido && p.prioridade === "alta").length },
+    { id: "concluidos", label: "Concluídos", count: prazos.filter(p => p.concluido).length },
   ];
 
   return (
@@ -232,7 +242,7 @@ export const PrazosView = () => {
         {/* Calendário */}
         <div className="lg:col-span-2">
           <CalendarioPrazos
-            prazos={prazosMock}
+            prazos={prazos}
             onClickDia={handleClickDia}
             onAdicionar={() => handleAdicionar()}
           />

@@ -1,12 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Scale, Plus, Search, Filter, X, ChevronRight, CalendarClock, AlertCircle, Clock, CheckCircle, Pause, Archive, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useUnidade } from "@/context/UnidadeContext";
-import { unidades } from "@/data/mockData";
-import { processos } from "@/data/mockData";
+import { processosApi } from "@/services/api";
 import type { Processo, StatusProcesso, TipoProcesso } from "@/types";
 
 const statusConfig: Record<StatusProcesso, { label: string; class: string; icon: React.ElementType }> = {
@@ -131,19 +130,30 @@ export const ProcessosView = () => {
   const [filtroStatus, setFiltroStatus] = useState<StatusProcesso | "Todos">("Todos");
   const [filtroTipo, setFiltroTipo] = useState<TipoProcesso | "Todos">("Todos");
   const [processoSelecionado, setProcessoSelecionado] = useState<Processo | null>(null);
+  const [processos, setProcessos] = useState<Processo[]>([]);
+  const [loading, setLoading] = useState(true);
   const { unidadeSelecionada } = useUnidade();
+
+  useEffect(() => {
+    setLoading(true);
+    processosApi.listar()
+      .then((data) => {
+        const items = data.content ?? data;
+        setProcessos(Array.isArray(items) ? items : []);
+      })
+      .catch(() => setProcessos([]))
+      .finally(() => setLoading(false));
+  }, []);
 
   const todoStatus: Array<StatusProcesso | "Todos"> = ["Todos", "Em andamento", "Urgente", "Aguardando", "Suspenso", "Concluído", "Arquivado"];
 
   const processosFiltrados = processos.filter(p => {
-    const matchBusca = !busca || p.clienteNome.toLowerCase().includes(busca.toLowerCase()) || p.numero.includes(busca) || p.tipo.toLowerCase().includes(busca.toLowerCase());
+    const matchBusca = !busca || p.clienteNome?.toLowerCase().includes(busca.toLowerCase()) || p.numero?.includes(busca) || p.tipo?.toLowerCase().includes(busca.toLowerCase());
     const matchStatus = filtroStatus === "Todos" || p.status === filtroStatus;
     const matchTipo = filtroTipo === "Todos" || p.tipo === filtroTipo;
     const matchUnidade = unidadeSelecionada === "todas" || p.unidadeId === unidadeSelecionada;
     return matchBusca && matchStatus && matchTipo && matchUnidade;
   });
-
-  const getUnidadeNome = (id: string) => unidades.find(u => u.id === id)?.nome ?? id;
 
   return (
     <div className="p-6 md:p-8 space-y-6">
@@ -202,6 +212,12 @@ export const ProcessosView = () => {
         })}
       </div>
 
+      {loading && (
+        <div className="flex items-center justify-center py-20">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+        </div>
+      )}
+
       {/* Tabela */}
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         {processosFiltrados.length === 0 ? (
@@ -236,7 +252,7 @@ export const ProcessosView = () => {
                       <div className="flex flex-col gap-1">
                         <span className="font-mono text-xs text-primary">{p.numero.slice(0, 16)}…</span>
                         <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
-                          <MapPin className="h-2.5 w-2.5" />{getUnidadeNome(p.unidadeId)}
+                          <MapPin className="h-2.5 w-2.5" />{p.unidadeId ?? ""}
                         </span>
                       </div>
                     </td>
@@ -272,7 +288,7 @@ export const ProcessosView = () => {
       </div>
 
       <p className="text-xs text-muted-foreground text-right">
-        {processosFiltrados.length} de {processos.length} processos{unidadeSelecionada !== "todas" && ` (${getUnidadeNome(unidadeSelecionada)})`}
+        {processosFiltrados.length} de {processos.length} processos
       </p>
 
       {/* Drawer */}

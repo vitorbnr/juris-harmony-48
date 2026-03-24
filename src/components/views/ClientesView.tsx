@@ -1,19 +1,37 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Users, Plus, Search, Mail, Phone, Scale, X, LayoutGrid, List, ChevronRight, Building2, User, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { clientes, getProcessosByCliente, unidades } from "@/data/mockData";
+import { clientesApi } from "@/services/api";
 import { useUnidade } from "@/context/UnidadeContext";
-import type { Cliente } from "@/types";
+
+interface ClienteData {
+  id: string;
+  nome: string;
+  tipo: string;
+  cpfCnpj: string;
+  email: string;
+  telefone: string;
+  cidade: string;
+  estado: string;
+  dataCadastro: string;
+  advogadoNome: string;
+  unidadeId: string;
+  unidadeNome: string;
+  ativo: boolean;
+  totalProcessos?: number;
+}
+
+function getInitials(nome: string) {
+  return nome.split(" ").filter(Boolean).map(p => p[0]).slice(0, 2).join("").toUpperCase();
+}
 
 // ─── Drawer de Detalhes ───────────────────────────────────────────────────────
 
-function ClienteDrawer({ cliente, onClose }: { cliente: Cliente; onClose: () => void }) {
-  const processosDoCliente = getProcessosByCliente(cliente.id);
-
+function ClienteDrawer({ cliente, onClose }: { cliente: ClienteData; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
@@ -21,11 +39,13 @@ function ClienteDrawer({ cliente, onClose }: { cliente: Cliente; onClose: () => 
         <div className="flex items-center justify-between px-6 py-5 border-b border-border">
           <div className="flex items-center gap-3">
             <Avatar className="h-10 w-10 border-2 border-primary/20">
-              <AvatarFallback className="bg-primary/10 text-primary font-semibold">{cliente.initials}</AvatarFallback>
+              <AvatarFallback className="bg-primary/10 text-primary font-semibold">{getInitials(cliente.nome)}</AvatarFallback>
             </Avatar>
             <div>
               <p className="font-semibold text-foreground">{cliente.nome}</p>
-              <p className="text-xs text-muted-foreground capitalize">{cliente.tipo === "pessoa_fisica" ? "Pessoa Física" : "Pessoa Jurídica"}</p>
+              <p className="text-xs text-muted-foreground capitalize">
+                {cliente.tipo === "PESSOA_FISICA" ? "Pessoa Física" : "Pessoa Jurídica"}
+              </p>
             </div>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
@@ -43,7 +63,8 @@ function ClienteDrawer({ cliente, onClose }: { cliente: Cliente; onClose: () => 
                 { label: "Telefone", value: cliente.telefone },
                 { label: "Cidade / UF", value: `${cliente.cidade} — ${cliente.estado}` },
                 { label: "Cadastro", value: new Date(cliente.dataCadastro).toLocaleDateString("pt-BR") },
-                { label: "Advogado Responsável", value: cliente.advogadoResponsavel },
+                { label: "Advogado Responsável", value: cliente.advogadoNome || "—" },
+                { label: "Unidade", value: cliente.unidadeNome || "—" },
               ].map(({ label, value }) => (
                 <div key={label} className="flex justify-between items-start py-2 border-b border-border/50 last:border-0">
                   <span className="text-xs text-muted-foreground min-w-[140px]">{label}</span>
@@ -52,35 +73,6 @@ function ClienteDrawer({ cliente, onClose }: { cliente: Cliente; onClose: () => 
               ))}
             </div>
           </div>
-
-          {processosDoCliente.length > 0 && (
-            <div className="px-6 pb-6">
-              <h3 className="font-heading text-base font-semibold text-foreground mb-3">
-                Processos ({processosDoCliente.length})
-              </h3>
-              <div className="space-y-2">
-                {processosDoCliente.map(p => (
-                  <div key={p.id} className="rounded-lg border border-border bg-muted/30 p-3 hover:border-primary/30 transition-colors cursor-pointer">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-mono text-xs text-primary">{p.numero.slice(0, 16)}…</p>
-                        <p className="text-sm font-medium text-foreground mt-0.5">{p.tipo}</p>
-                      </div>
-                      <span className={cn(
-                        "text-xs px-2 py-0.5 rounded-full font-medium",
-                        p.status === "Em andamento" ? "bg-blue-500/15 text-blue-400" :
-                        p.status === "Urgente" ? "bg-red-500/15 text-red-400" :
-                        p.status === "Concluído" ? "bg-primary/15 text-primary" :
-                        "bg-muted text-muted-foreground"
-                      )}>
-                        {p.status}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="px-6 py-4 border-t border-border flex gap-2">
@@ -97,15 +89,28 @@ function ClienteDrawer({ cliente, onClose }: { cliente: Cliente; onClose: () => 
 export const ClientesView = () => {
   const [busca, setBusca] = useState("");
   const [modo, setModo] = useState<"grid" | "lista">("grid");
-  const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null);
+  const [clienteSelecionado, setClienteSelecionado] = useState<ClienteData | null>(null);
+  const [clientes, setClientes] = useState<ClienteData[]>([]);
+  const [loading, setLoading] = useState(true);
   const { unidadeSelecionada } = useUnidade();
 
-  const getUnidadeNome = (id: string) => unidades.find(u => u.id === id)?.nome ?? id;
+  useEffect(() => {
+    setLoading(true);
+    const params: Record<string, string> = {};
+    if (busca) params.busca = busca;
+    clientesApi.listar(params)
+      .then((data) => {
+        // handle paginated or array response
+        const items = data.content ?? data;
+        setClientes(Array.isArray(items) ? items : []);
+      })
+      .catch(() => setClientes([]))
+      .finally(() => setLoading(false));
+  }, [busca]);
 
   const clientesFiltrados = clientes.filter(c => {
-    const matchBusca = !busca || c.nome.toLowerCase().includes(busca.toLowerCase()) || c.email.toLowerCase().includes(busca.toLowerCase()) || c.cpfCnpj.includes(busca);
-    const matchUnidade = unidadeSelecionada === "todas" || c.unidadeId === unidadeSelecionada;
-    return matchBusca && matchUnidade;
+    if (unidadeSelecionada === "todas") return true;
+    return c.unidadeId === unidadeSelecionada;
   });
 
   return (
@@ -142,8 +147,17 @@ export const ClientesView = () => {
         </Button>
       </div>
 
-      {/* Grid */}
-      {modo === "grid" ? (
+      {/* Loading */}
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+        </div>
+      ) : clientesFiltrados.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+          <Users className="h-12 w-12 mb-3 opacity-30" />
+          <p className="text-sm">Nenhum cliente encontrado</p>
+        </div>
+      ) : modo === "grid" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {clientesFiltrados.map(c => (
             <div
@@ -153,36 +167,36 @@ export const ClientesView = () => {
             >
               <div className="flex items-start gap-3">
                 <Avatar className="h-11 w-11 border-2 border-primary/20 shrink-0">
-                  <AvatarFallback className="bg-primary/10 text-primary font-semibold text-sm">{c.initials}</AvatarFallback>
+                  <AvatarFallback className="bg-primary/10 text-primary font-semibold text-sm">{getInitials(c.nome)}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="font-semibold text-foreground truncate group-hover:text-primary transition-colors">{c.nome}</p>
-                    {c.tipo === "pessoa_juridica"
+                    {c.tipo === "PESSOA_JURIDICA"
                       ? <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                       : <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">{c.cpfCnpj}</p>
                 </div>
                 <Badge variant="outline" className="shrink-0 text-xs bg-accent text-foreground border-border">
-                  <Scale className="h-3 w-3 mr-1" />{c.processos}
+                  <Scale className="h-3 w-3 mr-1" />{c.totalProcessos ?? 0}
                 </Badge>
               </div>
               <div className="mt-4 space-y-1.5">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Mail className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">{c.email}</span>
+                  <span className="truncate">{c.email || "—"}</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Phone className="h-3.5 w-3.5 shrink-0" />
-                  <span>{c.telefone}</span>
+                  <span>{c.telefone || "—"}</span>
                 </div>
               </div>
               <div className="mt-3 pt-3 border-t border-border/60 flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">{c.advogadoResponsavel}</span>
+                <span className="text-xs text-muted-foreground">{c.advogadoNome || "—"}</span>
                 <div className="flex items-center gap-1.5">
                   <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
-                    <MapPin className="h-2.5 w-2.5" />{getUnidadeNome(c.unidadeId)}
+                    <MapPin className="h-2.5 w-2.5" />{c.unidadeNome || "—"}
                   </span>
                   <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
@@ -214,23 +228,23 @@ export const ClientesView = () => {
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-2.5">
                       <Avatar className="h-8 w-8 border border-primary/15">
-                        <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">{c.initials}</AvatarFallback>
+                        <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">{getInitials(c.nome)}</AvatarFallback>
                       </Avatar>
                       <div>
                         <p className="font-medium text-foreground group-hover:text-primary transition-colors">{c.nome}</p>
-                        <p className="text-xs text-muted-foreground">{c.tipo === "pessoa_fisica" ? "Pessoa Física" : "Pessoa Jurídica"}</p>
+                        <p className="text-xs text-muted-foreground">{c.tipo === "PESSOA_FISICA" ? "Pessoa Física" : "Pessoa Jurídica"}</p>
                       </div>
                     </div>
                   </td>
                   <td className="px-5 py-3.5 text-muted-foreground hidden md:table-cell font-mono text-xs">{c.cpfCnpj}</td>
                   <td className="px-5 py-3.5 hidden lg:table-cell">
-                    <p className="text-sm text-foreground">{c.telefone}</p>
-                    <p className="text-xs text-muted-foreground">{c.email}</p>
+                    <p className="text-sm text-foreground">{c.telefone || "—"}</p>
+                    <p className="text-xs text-muted-foreground">{c.email || "—"}</p>
                   </td>
-                  <td className="px-5 py-3.5 text-muted-foreground hidden lg:table-cell">{c.advogadoResponsavel}</td>
+                  <td className="px-5 py-3.5 text-muted-foreground hidden lg:table-cell">{c.advogadoNome || "—"}</td>
                   <td className="px-5 py-3.5">
                     <span className="inline-flex items-center gap-1 text-xs font-medium bg-accent text-foreground px-2 py-1 rounded-full">
-                      <Scale className="h-3 w-3" />{c.processos}
+                      <Scale className="h-3 w-3" />{c.totalProcessos ?? 0}
                     </span>
                   </td>
                   <td className="px-3 py-3.5">
@@ -244,7 +258,7 @@ export const ClientesView = () => {
       )}
 
       <p className="text-xs text-muted-foreground text-right">
-        {clientesFiltrados.length} de {clientes.length} clientes{unidadeSelecionada !== "todas" && ` (${getUnidadeNome(unidadeSelecionada)})`}
+        {clientesFiltrados.length} clientes
       </p>
 
       {clienteSelecionado && (
