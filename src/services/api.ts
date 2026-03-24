@@ -47,6 +47,7 @@ export const prazosApi = {
     api.get("/prazos/calendario", { params: { inicio, fim } }).then(r => r.data),
   criar: (data: Record<string, unknown>) => api.post("/prazos", data).then(r => r.data),
   concluir: (id: string) => api.patch(`/prazos/${id}/concluir`).then(r => r.data),
+  excluir: (id: string) => api.delete(`/prazos/${id}`).then(r => r.data),
 };
 
 // ── Documentos ────────────────────────────────────────────────────────────
@@ -75,8 +76,6 @@ export const notificacoesApi = {
   marcarLida: (id: string) => api.patch(`/notificacoes/${id}/lida`).then(r => r.data),
 };
 
-// ── Dashboard ────────────────────────────────────────────────────────────
-
 export const dashboardApi = {
   get: () => api.get("/dashboard").then(r => r.data),
 };
@@ -95,4 +94,10 @@ export const usuariosApi = {
   criar: (data: Record<string, unknown>) => api.post("/usuarios", data).then(r => r.data),
   atualizar: (id: string, data: Record<string, unknown>) => api.put(`/usuarios/${id}`, data).then(r => r.data),
   desativar: (id: string) => api.patch(`/usuarios/${id}/desativar`).then(r => r.data),
+};
+
+// ── Logs Auditoria ────────────────────────────────────────────────────────
+export const logsApi = {
+  listar: (params?: Record<string, unknown>) =>
+    api.get("/logs", { params }).then(r => r.data),
 };

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { FileText, Search, Upload, Download, FolderOpen, Grid3x3, List, X, Cloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { documentosApi } from "@/services/api";
 import type { Documento } from "@/types";
@@ -43,6 +44,8 @@ function FileIcon({ tipo, size = "md" }: { tipo: string; size?: "sm" | "md" | "l
 function UploadArea({ onClose }: { onClose: () => void }) {
   const [dragging, setDragging] = useState(false);
   const [uploaded, setUploaded] = useState(false);
+  const [vinculoTipo, setVinculoTipo] = useState<"processo" | "cliente">("processo");
+  const [vinculoId, setVinculoId] = useState("");
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -74,12 +77,23 @@ function UploadArea({ onClose }: { onClose: () => void }) {
                 <Cloud className="h-6 w-6 text-primary" />
               </div>
               <p className="font-medium text-foreground">Arquivo recebido com sucesso!</p>
-              <p className="text-sm text-muted-foreground">(R2 upload será integrado com credenciais reais)</p>
+              <p className="text-sm text-muted-foreground">(R2 será integrado com credenciais reais)</p>
             </div>
           )}
+
+          <div className="space-y-2 pt-2 border-t border-border">
+            <Label>Vincular a</Label>
+            <div className="flex gap-2">
+              <select value={vinculoTipo} onChange={e => setVinculoTipo(e.target.value as "processo" | "cliente")} className="w-[120px] h-9 px-3 rounded-md bg-secondary text-foreground text-sm border-none outline-none">
+                <option value="processo">Processo</option>
+                <option value="cliente">Cliente</option>
+              </select>
+              <Input placeholder={`Buscar ou digitar ID do ${vinculoTipo}...`} className="flex-1 h-9 bg-secondary border-none" value={vinculoId} onChange={e => setVinculoId(e.target.value)} />
+            </div>
+          </div>
         </div>
         <div className="px-6 py-4 border-t border-border flex gap-2">
-          <Button className="flex-1" onClick={onClose} disabled={!uploaded}>Finalizar Upload</Button>
+          <Button className="flex-1" onClick={onClose} disabled={!uploaded || !vinculoId}>Finalizar Upload</Button>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
         </div>
       </div>

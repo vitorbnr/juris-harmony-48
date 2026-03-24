@@ -80,7 +80,7 @@ const Login = () => {
               <Input
                 id="email"
                 type="email"
-                placeholder="seu@email.com"
+                placeholder=""
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -92,14 +92,13 @@ const Login = () => {
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Senha</Label>
                 <span className="text-xs text-muted-foreground">
-                  Fale com o administrador
                 </span>
               </div>
               <div className="relative">
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
+                  placeholder=""
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -125,7 +124,6 @@ const Login = () => {
           </form>
 
           <p className="text-center text-xs text-muted-foreground pt-4">
-            Sistema protegido com criptografia de ponta a ponta
           </p>
 
           <div className="lg:hidden flex justify-center">

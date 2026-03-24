@@ -46,22 +46,22 @@ export interface Cliente {
 // ─── Processos ───────────────────────────────────────────────────────────────
 
 export type StatusProcesso =
-  | "Em andamento"
-  | "Aguardando"
-  | "Urgente"
-  | "Concluído"
-  | "Suspenso"
-  | "Arquivado";
+  | "EM_ANDAMENTO"
+  | "AGUARDANDO"
+  | "URGENTE"
+  | "CONCLUIDO"
+  | "SUSPENSO"
+  | "ARQUIVADO";
 
 export type TipoProcesso =
-  | "Cível"
-  | "Trabalhista"
-  | "Criminal"
-  | "Família"
-  | "Tributário"
-  | "Empresarial"
-  | "Previdenciário"
-  | "Administrativo";
+  | "CIVEL"
+  | "TRABALHISTA"
+  | "CRIMINAL"
+  | "FAMILIA"
+  | "TRIBUTARIO"
+  | "EMPRESARIAL"
+  | "PREVIDENCIARIO"
+  | "ADMINISTRATIVO";
 
 export interface Processo {
   id: string;

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Scale, Plus, Search, Filter, X, ChevronRight, CalendarClock, AlertCircle, Clock, CheckCircle, Pause, Archive, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,18 +6,20 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useUnidade } from "@/context/UnidadeContext";
 import { processosApi } from "@/services/api";
+import { NovoProcessoModal } from "@/components/modals/NovoProcessoModal";
+import { toast } from "sonner";
 import type { Processo, StatusProcesso, TipoProcesso } from "@/types";
 
 const statusConfig: Record<StatusProcesso, { label: string; class: string; icon: React.ElementType }> = {
-  "Em andamento": { label: "Em andamento", class: "bg-blue-500/15 text-blue-400 border-blue-500/20", icon: Clock },
-  "Aguardando":   { label: "Aguardando",   class: "bg-yellow-500/15 text-yellow-400 border-yellow-500/20", icon: Clock },
-  "Urgente":      { label: "Urgente",       class: "bg-red-500/15 text-red-400 border-red-500/20", icon: AlertCircle },
-  "Concluído":    { label: "Concluído",     class: "bg-primary/15 text-primary border-primary/20", icon: CheckCircle },
-  "Suspenso":     { label: "Suspenso",      class: "bg-orange-500/15 text-orange-400 border-orange-500/20", icon: Pause },
-  "Arquivado":    { label: "Arquivado",     class: "bg-muted text-muted-foreground border-border", icon: Archive },
+  "EM_ANDAMENTO": { label: "Em andamento", class: "bg-blue-500/15 text-blue-400 border-blue-500/20", icon: Clock },
+  "AGUARDANDO":   { label: "Aguardando",   class: "bg-yellow-500/15 text-yellow-400 border-yellow-500/20", icon: Clock },
+  "URGENTE":      { label: "Urgente",       class: "bg-red-500/15 text-red-400 border-red-500/20", icon: AlertCircle },
+  "CONCLUIDO":    { label: "Concluído",     class: "bg-primary/15 text-primary border-primary/20", icon: CheckCircle },
+  "SUSPENSO":     { label: "Suspenso",      class: "bg-orange-500/15 text-orange-400 border-orange-500/20", icon: Pause },
+  "ARQUIVADO":    { label: "Arquivado",     class: "bg-muted text-muted-foreground border-border", icon: Archive },
 };
 
-const tiposProcesso: TipoProcesso[] = ["Cível", "Trabalhista", "Criminal", "Família", "Tributário", "Empresarial", "Previdenciário", "Administrativo"];
+const tiposProcesso: TipoProcesso[] = ["CIVEL", "TRABALHISTA", "CRIMINAL", "FAMILIA", "TRIBUTARIO", "EMPRESARIAL", "PREVIDENCIARIO", "ADMINISTRATIVO"];
 
 // ─── Drawer de Detalhes ───────────────────────────────────────────────────────
 
@@ -115,8 +117,8 @@ function ProcessoDrawer({ processo, onClose }: { processo: Processo; onClose: ()
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-border flex gap-2">
-          <Button className="flex-1">Editar Processo</Button>
-          <Button variant="outline">Ver Documentos</Button>
+          <Button className="flex-1" onClick={() => toast.info("Edição de Processo estará disponível na release v1.1.0")}>Editar Processo</Button>
+          <Button variant="outline" onClick={() => toast.info("Navegando para Documentos...")}>Ver Documentos</Button>
         </div>
       </div>
     </div>
@@ -132,20 +134,27 @@ export const ProcessosView = () => {
   const [processoSelecionado, setProcessoSelecionado] = useState<Processo | null>(null);
   const [processos, setProcessos] = useState<Processo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [modalAberto, setModalAberto] = useState(false);
   const { unidadeSelecionada } = useUnidade();
 
-  useEffect(() => {
+  const carregarProcessos = useCallback(() => {
     setLoading(true);
-    processosApi.listar()
+    const params: Record<string, string> = { busca: busca || "" };
+    if (unidadeSelecionada && unidadeSelecionada !== "todas") {
+      params.unidadeId = unidadeSelecionada;
+    }
+    processosApi.listar(params)
       .then((data) => {
         const items = data.content ?? data;
         setProcessos(Array.isArray(items) ? items : []);
       })
       .catch(() => setProcessos([]))
       .finally(() => setLoading(false));
-  }, []);
+  }, [busca, unidadeSelecionada]);
 
-  const todoStatus: Array<StatusProcesso | "Todos"> = ["Todos", "Em andamento", "Urgente", "Aguardando", "Suspenso", "Concluído", "Arquivado"];
+  useEffect(() => { carregarProcessos(); }, [carregarProcessos]);
+
+  const todoStatus: Array<StatusProcesso | "Todos"> = ["Todos", "EM_ANDAMENTO", "URGENTE", "AGUARDANDO", "SUSPENSO", "CONCLUIDO", "ARQUIVADO"];
 
   const processosFiltrados = processos.filter(p => {
     const matchBusca = !busca || p.clienteNome?.toLowerCase().includes(busca.toLowerCase()) || p.numero?.includes(busca) || p.tipo?.toLowerCase().includes(busca.toLowerCase());
@@ -174,7 +183,7 @@ export const ProcessosView = () => {
           onChange={e => setFiltroStatus(e.target.value as StatusProcesso | "Todos")}
           className="h-10 px-3 rounded-md bg-secondary text-foreground text-sm border-none outline-none cursor-pointer"
         >
-          {todoStatus.map(s => <option key={s} value={s}>{s === "Todos" ? "Todos os status" : s}</option>)}
+          {todoStatus.map(s => <option key={s} value={s}>{s === "Todos" ? "Todos os status" : (statusConfig[s as StatusProcesso]?.label || s)}</option>)}
         </select>
 
         <select
@@ -186,7 +195,7 @@ export const ProcessosView = () => {
           {tiposProcesso.map(t => <option key={t} value={t}>{t}</option>)}
         </select>
 
-        <Button className="gap-2 ml-auto">
+        <Button className="gap-2 ml-auto" onClick={() => setModalAberto(true)}>
           <Plus className="h-4 w-4" /> Novo Processo
         </Button>
       </div>
@@ -206,7 +215,7 @@ export const ProcessosView = () => {
                   : "bg-card border-border text-muted-foreground hover:border-primary/40"
               )}
             >
-              {s} <span className="opacity-70">({count})</span>
+              {s === "Todos" ? s : (statusConfig[s as StatusProcesso]?.label || s)} <span className="opacity-70">({count})</span>
             </button>
           );
         })}
@@ -240,7 +249,7 @@ export const ProcessosView = () => {
             </thead>
             <tbody>
               {processosFiltrados.map(p => {
-                const conf = statusConfig[p.status];
+                const conf = statusConfig[p.status] || { class: "bg-muted text-foreground border-border", icon: AlertCircle, label: p.status };
                 const Icon = conf.icon;
                 return (
                   <tr
@@ -294,6 +303,10 @@ export const ProcessosView = () => {
       {/* Drawer */}
       {processoSelecionado && (
         <ProcessoDrawer processo={processoSelecionado} onClose={() => setProcessoSelecionado(null)} />
+      )}
+
+      {modalAberto && (
+        <NovoProcessoModal onClose={() => setModalAberto(false)} onSaved={carregarProcessos} />
       )}
     </div>
   );

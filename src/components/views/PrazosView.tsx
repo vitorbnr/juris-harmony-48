@@ -1,16 +1,19 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { CalendarClock, AlertCircle, Clock, CheckCircle, X, Scale, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { CalendarioPrazos } from "@/components/prazos/CalendarioPrazos";
-import { prazosApi } from "@/services/api";
+import { prazosApi, processosApi } from "@/services/api";
+import { useAuth } from "@/context/AuthContext";
+import { toast } from "sonner";
 import type { Prazo, TipoPrazo, PrioridadePrazo } from "@/types";
 
 // ─── Modal de Adição de Prazo ─────────────────────────────────────────────────
 
-function AdicionarPrazoModal({ dataInicial, onClose }: { dataInicial?: string; onClose: () => void }) {
+function AdicionarPrazoModal({ dataInicial, onClose, onSaved }: { dataInicial?: string; onClose: () => void; onSaved?: () => void }) {
+  const { user } = useAuth();
   const [titulo, setTitulo] = useState("");
   const [data, setData] = useState(dataInicial ?? "");
   const [hora, setHora] = useState("");
@@ -18,6 +21,38 @@ function AdicionarPrazoModal({ dataInicial, onClose }: { dataInicial?: string; o
   const [prioridade, setPrioridade] = useState<PrioridadePrazo>("media");
   const [processoId, setProcessoId] = useState("");
   const [descricao, setDescricao] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [processosLista, setProcessosLista] = useState<{ id: string; numero: string; clienteNome: string }[]>([]);
+
+  useEffect(() => {
+    processosApi.listar({ busca: "" }).then(res => {
+      const items = res.content ?? res;
+      setProcessosLista(Array.isArray(items) ? items : []);
+    }).catch(() => {});
+  }, []);
+
+  const handleSalvar = async () => {
+    if (!titulo || !data) {
+      toast.error("Título e data são obrigatórios");
+      return;
+    }
+    setSaving(true);
+    try {
+      await prazosApi.criar({
+        titulo, data, hora: hora || null, tipo, prioridade,
+        processoId: processoId || null, descricao: descricao || null,
+        advogadoId: user?.id,
+      });
+      toast.success("Prazo cadastrado com sucesso!");
+      onSaved?.();
+      onClose();
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { mensagem?: string } } };
+      toast.error(axiosErr.response?.data?.mensagem || "Erro ao cadastrar prazo");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const tipoLabels: Record<TipoPrazo, string> = {
     prazo_processual: "Prazo Processual",
@@ -98,6 +133,7 @@ function AdicionarPrazoModal({ dataInicial, onClose }: { dataInicial?: string; o
               className="w-full h-10 px-3 rounded-md bg-secondary text-foreground text-sm border-none outline-none"
             >
               <option value="">Nenhum processo</option>
+              {processosLista.map(p => <option key={p.id} value={p.id}>{p.numero} - {p.clienteNome?.split(" ")[0]}</option>)}
             </select>
           </div>
 
@@ -114,7 +150,9 @@ function AdicionarPrazoModal({ dataInicial, onClose }: { dataInicial?: string; o
         </div>
 
         <div className="px-6 py-4 border-t border-border flex gap-2">
-          <Button className="flex-1" onClick={onClose}>Salvar Prazo</Button>
+          <Button className="flex-1" onClick={handleSalvar} disabled={saving}>
+            {saving ? "Salvando..." : "Salvar Prazo"}
+          </Button>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
         </div>
       </div>
@@ -137,7 +175,39 @@ const tipoLabel: Record<string, string> = {
   reuniao: "Reunião",
 };
 
-function PrazoCard({ prazo }: { prazo: Prazo }) {
+function PrazoCard({ prazo, onAtualizar }: { prazo: Prazo; onAtualizar: () => void }) {
+  const [loading, setLoading] = useState(false);
+
+  const handleConcluir = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setLoading(true);
+    try {
+      await prazosApi.concluir(prazo.id);
+      toast.success(prazo.concluido ? "Prazo reaberto" : "Prazo concluído!");
+      onAtualizar();
+    } catch {
+      toast.error("Erro ao alterar status do prazo.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExcluir = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm("Deseja realmente excluir esta tarefa/prazo?")) return;
+    setLoading(true);
+    try {
+      // Assuming prazosApi.excluir exists
+      await prazosApi.excluir(prazo.id);
+      toast.success("Prazo excluído com sucesso!");
+      onAtualizar();
+    } catch {
+      toast.error("Você não tem permissão para excluir, ou ocorreu um erro.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const Icon = prazo.prioridade === "alta" ? AlertCircle : prazo.concluido ? CheckCircle : Clock;
   return (
     <div className={cn(
@@ -164,9 +234,14 @@ function PrazoCard({ prazo }: { prazo: Prazo }) {
           <p className={cn("font-medium text-sm", prazo.concluido ? "line-through text-muted-foreground" : "text-foreground")}>
             {prazo.titulo}
           </p>
-          <span className={cn("shrink-0 text-[10px] px-2 py-0.5 rounded-full font-medium", tipoCor[prazo.tipo])}>
-            {tipoLabel[prazo.tipo]}
-          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {prazo.prioridade === "alta" && <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-red-500/10 text-red-500 uppercase">Alta</span>}
+            {prazo.prioridade === "media" && <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-yellow-500/10 text-yellow-500 uppercase">Média</span>}
+            {prazo.prioridade === "baixa" && <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-green-500/10 text-green-500 uppercase">Baixa</span>}
+            <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-medium hidden sm:inline-flex", tipoCor[prazo.tipo])}>
+              {tipoLabel[prazo.tipo]}
+            </span>
+          </div>
         </div>
         {prazo.processoNumero && (
           <div className="flex items-center gap-1 mt-1">
@@ -177,11 +252,27 @@ function PrazoCard({ prazo }: { prazo: Prazo }) {
         {prazo.clienteNome && !prazo.processoNumero && (
           <p className="text-xs text-muted-foreground mt-0.5">{prazo.clienteNome}</p>
         )}
-        <div className="flex items-center gap-2 mt-1.5">
-          <span className="text-xs text-muted-foreground">
+        <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/40">
+          <span className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
+            <Clock className="h-3.5 w-3.5" />
             {new Date(prazo.data + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
             {prazo.hora && ` · ${prazo.hora}`}
           </span>
+          <div className="flex items-center gap-2">
+            {!prazo.concluido && (
+              <Button size="sm" variant="ghost" onClick={handleConcluir} disabled={loading} className="h-7 text-xs px-2.5 text-green-500 hover:text-green-600 hover:bg-green-500/10 gap-1.5">
+                <CheckCircle className="h-3.5 w-3.5" /> Concluir
+              </Button>
+            )}
+            {prazo.concluido && (
+              <Button size="sm" variant="ghost" onClick={handleConcluir} disabled={loading} className="h-7 text-xs px-2.5 text-muted-foreground gap-1.5 opacity-50">
+                Reabrir
+              </Button>
+            )}
+            <Button size="sm" variant="ghost" onClick={handleExcluir} disabled={loading} className="h-7 w-7 p-0 text-red-500/50 hover:bg-red-500/10 hover:text-red-600" title="Excluir">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
     </div>
@@ -200,7 +291,7 @@ export const PrazosView = () => {
   const [prazos, setPrazos] = useState<Prazo[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const carregarPrazos = useCallback(() => {
     setLoading(true);
     prazosApi.listar()
       .then((data) => {
@@ -210,6 +301,8 @@ export const PrazosView = () => {
       .catch(() => setPrazos([]))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => { carregarPrazos(); }, [carregarPrazos]);
 
   const prazosFiltrados = prazos.filter(p => {
     if (dataSelecionada) return p.data === dataSelecionada;
@@ -292,7 +385,7 @@ export const PrazosView = () => {
             </div>
           ) : (
             <div className="space-y-3">
-              {prazosFiltrados.map(p => <PrazoCard key={p.id} prazo={p} />)}
+              {prazosFiltrados.map(p => <PrazoCard key={p.id} prazo={p} onAtualizar={carregarPrazos} />)}
             </div>
           )}
         </div>
@@ -302,6 +395,7 @@ export const PrazosView = () => {
         <AdicionarPrazoModal
           dataInicial={dataInicial}
           onClose={() => setModalAberto(false)}
+          onSaved={carregarPrazos}
         />
       )}
     </div>

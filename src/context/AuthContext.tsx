@@ -9,6 +9,8 @@ interface AuthUser {
   papel: string;
   cargo: string;
   initials: string;
+  nacionalidade?: string;
+  oab?: string;
   unidadeId: string;
   unidadeNome: string;
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Users, Plus, Search, Mail, Phone, Scale, X, LayoutGrid, List, ChevronRight, Building2, User, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { clientesApi } from "@/services/api";
 import { useUnidade } from "@/context/UnidadeContext";
-
+import { toast } from "sonner";
+import { NovoClienteModal } from "@/components/modals/NovoClienteModal";
+import { NovoProcessoModal } from "@/components/modals/NovoProcessoModal";
 interface ClienteData {
   id: string;
   nome: string;
@@ -76,8 +78,8 @@ function ClienteDrawer({ cliente, onClose }: { cliente: ClienteData; onClose: ()
         </div>
 
         <div className="px-6 py-4 border-t border-border flex gap-2">
-          <Button className="flex-1">Editar Cliente</Button>
-          <Button variant="outline">Novo Processo</Button>
+          <Button className="flex-1" onClick={() => window.dispatchEvent(new CustomEvent("open_editar_cliente", { detail: cliente }))}>Editar Cliente</Button>
+          <Button variant="outline" onClick={() => window.dispatchEvent(new CustomEvent("open_novo_processo", { detail: cliente.id }))}>Novo Processo</Button>
         </div>
       </div>
     </div>
@@ -92,21 +94,46 @@ export const ClientesView = () => {
   const [clienteSelecionado, setClienteSelecionado] = useState<ClienteData | null>(null);
   const [clientes, setClientes] = useState<ClienteData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [modalAberto, setModalAberto] = useState(false);
+  const [modalProcessoAberto, setModalProcessoAberto] = useState(false);
+  const [processoClienteId, setProcessoClienteId] = useState<string>("");
+  const [clienteEditando, setClienteEditando] = useState<ClienteData | null>(null);
   const { unidadeSelecionada } = useUnidade();
 
   useEffect(() => {
+    const handler = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      setProcessoClienteId(customEvent.detail);
+      setModalProcessoAberto(true);
+    };
+    const handlerEdicao = (e: Event) => {
+      setClienteEditando((e as CustomEvent<ClienteData>).detail);
+      setModalAberto(true);
+    };
+    window.addEventListener("open_novo_processo", handler);
+    window.addEventListener("open_editar_cliente", handlerEdicao);
+    return () => {
+      window.removeEventListener("open_novo_processo", handler);
+      window.removeEventListener("open_editar_cliente", handlerEdicao);
+    };
+  }, []);
+
+  const carregarClientes = useCallback(() => {
     setLoading(true);
-    const params: Record<string, string> = {};
-    if (busca) params.busca = busca;
+    const params: Record<string, string> = { busca: busca || "" };
+    if (unidadeSelecionada && unidadeSelecionada !== "todas") {
+      params.unidadeId = unidadeSelecionada;
+    }
     clientesApi.listar(params)
       .then((data) => {
-        // handle paginated or array response
         const items = data.content ?? data;
         setClientes(Array.isArray(items) ? items : []);
       })
       .catch(() => setClientes([]))
       .finally(() => setLoading(false));
-  }, [busca]);
+  }, [busca, unidadeSelecionada]);
+
+  useEffect(() => { carregarClientes(); }, [carregarClientes]);
 
   const clientesFiltrados = clientes.filter(c => {
     if (unidadeSelecionada === "todas") return true;
@@ -142,7 +169,8 @@ export const ClientesView = () => {
           </button>
         </div>
 
-        <Button className="gap-2 ml-auto">
+        {/* Botão Novo Cliente com ref resetada */}
+        <Button className="gap-2 ml-auto" onClick={() => { setClienteEditando(null); setModalAberto(true); }}>
           <Plus className="h-4 w-4" /> Novo Cliente
         </Button>
       </div>
@@ -263,6 +291,22 @@ export const ClientesView = () => {
 
       {clienteSelecionado && (
         <ClienteDrawer cliente={clienteSelecionado} onClose={() => setClienteSelecionado(null)} />
+      )}
+
+      {/* Modais */}
+      {modalAberto && (
+        <NovoClienteModal 
+          onClose={() => setModalAberto(false)} 
+          onSaved={carregarClientes} 
+          initialData={clienteEditando as unknown as Record<string, unknown> || undefined} 
+        />
+      )}
+      {modalProcessoAberto && (
+        <NovoProcessoModal 
+          onClose={() => setModalProcessoAberto(false)} 
+          onSaved={() => toast.success("Processo criado e vinculado!")} 
+          initialClienteId={processoClienteId}
+        />
       )}
     </div>
   );
