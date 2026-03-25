@@ -1,0 +1,26 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL
+    driverClassName: org.h2.Driver
+    username: sa
+    password: password
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        format_sql: true
+  flyway:
+    enabled: false
+
+app:
+  jwt:
+    secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+    access-token-expiration-ms: 3600000
+    refresh-token-expiration-ms: 86400000
+  storage:
+    endpoint: https://fake.r2.cloudflarestorage.com
+    access-key: fake-key
+    secret-key: fake-secret
+    bucket: fake-bucket

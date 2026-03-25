@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: viana-postgres
+    environment:
+      POSTGRES_DB: viana_db
+      POSTGRES_USER: viana
+      POSTGRES_PASSWORD: viana123
+    ports:
+      - "5432:5432"
+    volumes:
+      - viana_pg_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U viana -d viana_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  viana_pg_data:

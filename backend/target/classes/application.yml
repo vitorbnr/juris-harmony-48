@@ -1,0 +1,45 @@
+spring:
+  application:
+    name: viana-advocacia
+
+  # ── JPA / Hibernate ──
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: America/Sao_Paulo
+
+  # ── Flyway ──
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+  # ── Servlet (upload) ──
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
+
+  # ── Jackson ──
+  jackson:
+    time-zone: America/Sao_Paulo
+    serialization:
+      write-dates-as-timestamps: false
+
+# ── Server ──
+server:
+  port: 8081
+  error:
+    include-message: always
+
+# ── Logging ──
+logging:
+  level:
+    com.viana: DEBUG
+    org.springframework.security: DEBUG

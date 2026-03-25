@@ -1,0 +1,14 @@
+# Backend
+backend/.env
+backend/target/
+backend/docs
+backend/deploy
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+*.class
+
+# Logs
+*.log

@@ -1,0 +1,165 @@
+package com.viana.service;
+
+import com.viana.dto.request.CriarMovimentacaoRequest;
+import com.viana.dto.request.CriarProcessoRequest;
+import com.viana.dto.response.ProcessoResponse;
+import com.viana.exception.BusinessException;
+import com.viana.exception.ResourceNotFoundException;
+import com.viana.model.*;
+import com.viana.model.enums.StatusProcesso;
+import com.viana.model.enums.TipoMovimentacao;
+import com.viana.model.enums.TipoProcesso;
+import com.viana.repository.*;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+public class ProcessoService {
+
+    private final ProcessoRepository processoRepository;
+    private final ClienteRepository clienteRepository;
+    private final UsuarioRepository usuarioRepository;
+    private final UnidadeRepository unidadeRepository;
+    private final MovimentacaoRepository movimentacaoRepository;
+
+    @Transactional(readOnly = true)
+    public Page<ProcessoResponse> listar(UUID unidadeId, String status, String tipo, String busca, Pageable pageable) {
+        StatusProcesso statusEnum = parseEnum(StatusProcesso.class, status);
+        TipoProcesso tipoEnum = parseEnum(TipoProcesso.class, tipo);
+
+        return processoRepository.findAllWithFilters(unidadeId, statusEnum, tipoEnum, busca, pageable)
+                .map(this::toResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public ProcessoResponse buscarPorId(UUID id) {
+        Processo processo = findOrThrow(id);
+        ProcessoResponse response = toResponse(processo);
+        response.setMovimentacoes(
+                movimentacaoRepository.findByProcessoIdOrderByDataDesc(id).stream()
+                        .map(m -> ProcessoResponse.MovimentacaoResponse.builder()
+                                .id(m.getId().toString())
+                                .data(m.getData().toString())
+                                .descricao(m.getDescricao())
+                                .tipo(m.getTipo().name())
+                                .build())
+                        .toList()
+        );
+        return response;
+    }
+
+    @Transactional
+    public ProcessoResponse criar(CriarProcessoRequest request) {
+        Cliente cliente = clienteRepository.findById(request.getClienteId())
+                .orElseThrow(() -> new ResourceNotFoundException("Cliente não encontrado"));
+        Usuario advogado = usuarioRepository.findById(request.getAdvogadoId())
+                .orElseThrow(() -> new ResourceNotFoundException("Advogado não encontrado"));
+        Unidade unidade = unidadeRepository.findById(request.getUnidadeId())
+                .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada"));
+
+        StatusProcesso statusEnum = parseEnumRequired(StatusProcesso.class, request.getStatus(), "Status");
+        TipoProcesso tipoEnum = parseEnumRequired(TipoProcesso.class, request.getTipo(), "Tipo");
+
+        Processo processo = Processo.builder()
+                .numero(request.getNumero())
+                .cliente(cliente)
+                .tipo(tipoEnum)
+                .vara(request.getVara())
+                .tribunal(request.getTribunal())
+                .advogado(advogado)
+                .status(statusEnum)
+                .dataDistribuicao(request.getDataDistribuicao())
+                .valorCausa(request.getValorCausa())
+                .descricao(request.getDescricao())
+                .unidade(unidade)
+                .build();
+
+        return toResponse(processoRepository.save(processo));
+    }
+
+    @Transactional
+    public ProcessoResponse alterarStatus(UUID id, String novoStatus) {
+        Processo processo = findOrThrow(id);
+        StatusProcesso statusEnum = parseEnumRequired(StatusProcesso.class, novoStatus, "Status");
+        processo.setStatus(statusEnum);
+        return toResponse(processoRepository.save(processo));
+    }
+
+    @Transactional
+    public ProcessoResponse.MovimentacaoResponse adicionarMovimentacao(UUID processoId, CriarMovimentacaoRequest request) {
+        Processo processo = findOrThrow(processoId);
+        TipoMovimentacao tipoEnum = parseEnumRequired(TipoMovimentacao.class, request.getTipo(), "Tipo");
+
+        Movimentacao mov = Movimentacao.builder()
+                .processo(processo)
+                .data(request.getData())
+                .descricao(request.getDescricao())
+                .tipo(tipoEnum)
+                .build();
+
+        mov = movimentacaoRepository.save(mov);
+
+        // Atualiza última movimentação do processo
+        processo.setUltimaMovimentacao(request.getData());
+        processoRepository.save(processo);
+
+        return ProcessoResponse.MovimentacaoResponse.builder()
+                .id(mov.getId().toString())
+                .data(mov.getData().toString())
+                .descricao(mov.getDescricao())
+                .tipo(mov.getTipo().name())
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public long contarAtivos() {
+        return processoRepository.countByStatusIn(List.of(
+                StatusProcesso.EM_ANDAMENTO, StatusProcesso.URGENTE, StatusProcesso.AGUARDANDO));
+    }
+
+    private Processo findOrThrow(UUID id) {
+        return processoRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Processo não encontrado"));
+    }
+
+    private ProcessoResponse toResponse(Processo p) {
+        return ProcessoResponse.builder()
+                .id(p.getId().toString())
+                .numero(p.getNumero())
+                .clienteId(p.getCliente().getId().toString())
+                .clienteNome(p.getCliente().getNome())
+                .tipo(p.getTipo().name())
+                .vara(p.getVara())
+                .tribunal(p.getTribunal())
+                .advogadoId(p.getAdvogado().getId().toString())
+                .advogadoNome(p.getAdvogado().getNome())
+                .status(p.getStatus().name())
+                .dataDistribuicao(p.getDataDistribuicao() != null ? p.getDataDistribuicao().toString() : null)
+                .ultimaMovimentacao(p.getUltimaMovimentacao() != null ? p.getUltimaMovimentacao().toString() : null)
+                .proximoPrazo(p.getProximoPrazo() != null ? p.getProximoPrazo().toString() : null)
+                .valorCausa(p.getValorCausa() != null ? p.getValorCausa().toString() : null)
+                .descricao(p.getDescricao())
+                .unidadeId(p.getUnidade().getId().toString())
+                .unidadeNome(p.getUnidade().getNome())
+                .build();
+    }
+
+    private <T extends Enum<T>> T parseEnum(Class<T> clazz, String value) {
+        if (value == null || value.isBlank()) return null;
+        try { return Enum.valueOf(clazz, value.toUpperCase()); }
+        catch (IllegalArgumentException e) { return null; }
+    }
+
+    private <T extends Enum<T>> T parseEnumRequired(Class<T> clazz, String value, String fieldName) {
+        try { return Enum.valueOf(clazz, value.toUpperCase()); }
+        catch (IllegalArgumentException e) { throw new BusinessException(fieldName + " inválido: " + value); }
+    }
+}

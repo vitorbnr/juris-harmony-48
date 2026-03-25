@@ -1,0 +1,94 @@
+package com.viana.controller;
+
+import com.viana.dto.request.CriarPrazoRequest;
+import com.viana.dto.response.PrazoResponse;
+import com.viana.model.Usuario;
+import com.viana.model.enums.UserRole;
+import com.viana.repository.UsuarioRepository;
+import com.viana.service.PrazoService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/prazos")
+@RequiredArgsConstructor
+public class PrazoController {
+
+    private final PrazoService prazoService;
+    private final UsuarioRepository usuarioRepository;
+
+    @GetMapping
+    public ResponseEntity<Page<PrazoResponse>> listar(
+            @RequestParam(required = false) UUID unidadeId,
+            @RequestParam(required = false) String tipo,
+            @RequestParam(required = false) Boolean concluido,
+            @RequestParam(required = false) UUID advogadoId,
+            @PageableDefault(size = 20, sort = "data", direction = Sort.Direction.ASC) Pageable pageable,
+            Authentication authentication) {
+
+        Usuario usuario = usuarioRepository.findByEmailIgnoreCase(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+
+        if (usuario.getPapel() != UserRole.ADMINISTRADOR) {
+            advogadoId = usuario.getId(); // Força segregação por pessoa caso não seja Admin
+        }
+
+        return ResponseEntity.ok(prazoService.listar(unidadeId, tipo, concluido, advogadoId, pageable));
+    }
+
+    @GetMapping("/calendario")
+    public ResponseEntity<List<PrazoResponse>> calendario(
+            @RequestParam LocalDate inicio,
+            @RequestParam LocalDate fim,
+            @RequestParam(required = false) UUID advogadoId,
+            @RequestParam(required = false) UUID unidadeId,
+            Authentication authentication) {
+
+        Usuario usuario = usuarioRepository.findByEmailIgnoreCase(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+
+        if (usuario.getPapel() != UserRole.ADMINISTRADOR) {
+            advogadoId = usuario.getId();
+        }
+
+        return ResponseEntity.ok(prazoService.getCalendario(usuario.getId(), advogadoId, unidadeId, inicio, fim));
+    }
+
+    @PostMapping
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO', 'SECRETARIA')")
+    public ResponseEntity<PrazoResponse> criar(@Valid @RequestBody CriarPrazoRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(prazoService.criar(request));
+    }
+
+    @PatchMapping("/{id}/concluir")
+    public ResponseEntity<PrazoResponse> concluir(@PathVariable UUID id) {
+        return ResponseEntity.ok(prazoService.marcarConcluido(id));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO')")
+    public ResponseEntity<Void> excluir(@PathVariable UUID id) {
+        prazoService.excluir(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    private UUID getUsuarioIdFromAuth(Authentication authentication) {
+        String email = authentication.getName();
+        Usuario usuario = usuarioRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+        return usuario.getId();
+    }
+}
