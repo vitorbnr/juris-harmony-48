@@ -1,8 +1,8 @@
 # Backend
-backend/.env
-backend/target/
-backend/docs
-backend/deploy
+.env
+target/
+docs
+deploy
 
 # IDEs
 .idea/
