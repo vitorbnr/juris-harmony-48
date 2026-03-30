@@ -1,8 +1,8 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { ConfiguracoesView } from "./ConfiguracoesView";
 import { useAuth } from "@/context/AuthContext";
 import { usuariosApi, logsApi } from "@/services/api";
-import { vi, describe, it, expect, beforeEach } from "vitest";
+import { vi, describe, it, expect, beforeEach, type Mock } from "vitest";
 
 // Mocks
 vi.mock("@/context/AuthContext", () => ({
@@ -20,6 +20,7 @@ vi.mock("@/services/api", () => ({
 
 describe("ConfiguracoesView", () => {
   const mockUser = {
+    id: "1", // Adicionado para evitar o warning de "unique key prop" no TabEquipe e TabLogs
     nome: "Admin Teste",
     cargo: "Administrador",
     papel: "ADMINISTRADOR",
@@ -30,16 +31,19 @@ describe("ConfiguracoesView", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (useAuth as any).mockReturnValue({ user: mockUser });
-    (usuariosApi.listar as any).mockResolvedValue({ content: [mockUser] });
-    (logsApi.listar as any).mockResolvedValue({ content: [] });
+    
+    // Substituímos o 'any' pelo tipo 'Mock' nativo do Vitest
+    (useAuth as Mock).mockReturnValue({ user: mockUser });
+    (usuariosApi.listar as Mock).mockResolvedValue({ content: [mockUser] });
+    (logsApi.listar as Mock).mockResolvedValue({ content: [] });
   });
 
   it("deve renderizar a aba Perfil por padrão", () => {
     render(<ConfiguracoesView />);
     expect(screen.getByText("Admin Teste")).toBeDefined();
-    // Seleciona pelo texto da label, mas sem exigir associação form control por enquanto
-    expect(screen.getByText(/Nome Completo/i)).toBeDefined();
+    
+    // Agora que o input tem o ID e a Label o htmlFor, podemos usar a query correta de acessibilidade
+    expect(screen.getByLabelText(/Nome Completo/i)).toBeDefined();
   });
 
   it("deve exibir as abas Equipe e Logs para Administradores", () => {
@@ -49,7 +53,8 @@ describe("ConfiguracoesView", () => {
   });
 
   it("não deve exibir as abas Equipe e Logs para Advogados", () => {
-    (useAuth as any).mockReturnValue({ user: { ...mockUser, papel: "ADVOGADO" } });
+    // Substituímos o 'any' pelo tipo 'Mock' nativo do Vitest
+    (useAuth as Mock).mockReturnValue({ user: { ...mockUser, papel: "ADVOGADO" } });
     render(<ConfiguracoesView />);
     expect(screen.queryByRole("button", { name: /Equipe/i })).toBeNull();
   });

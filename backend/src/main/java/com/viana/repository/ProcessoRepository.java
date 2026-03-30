@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.UUID;
 
 @Repository
@@ -16,8 +17,12 @@ public interface ProcessoRepository extends JpaRepository<Processo, UUID> {
 
     long countByClienteId(UUID clienteId);
 
-    long countByStatusIn(java.util.List<StatusProcesso> statuses);
+    long countByStatusIn(List<StatusProcesso> statuses);
 
+    /**
+     * Lista com filtros + paginação.
+     * NOTA: countQuery separada para evitar MultipleBagFetchException com LEFT JOIN FETCH.
+     */
     @Query(value = """
         SELECT p FROM Processo p
         LEFT JOIN FETCH p.cliente
@@ -26,14 +31,14 @@ public interface ProcessoRepository extends JpaRepository<Processo, UUID> {
         WHERE (:unidadeId IS NULL OR p.unidade.id = :unidadeId)
         AND (:status IS NULL OR p.status = :status)
         AND (:tipo IS NULL OR p.tipo = :tipo)
-        AND (:busca IS NULL OR LOWER(p.numero) LIKE LOWER(CONCAT('%', :busca, '%'))
+        AND (:busca IS NULL OR :busca = '' OR LOWER(p.numero) LIKE LOWER(CONCAT('%', :busca, '%'))
              OR LOWER(p.cliente.nome) LIKE LOWER(CONCAT('%', :busca, '%')))
     """, countQuery = """
         SELECT count(p) FROM Processo p
         WHERE (:unidadeId IS NULL OR p.unidade.id = :unidadeId)
         AND (:status IS NULL OR p.status = :status)
         AND (:tipo IS NULL OR p.tipo = :tipo)
-        AND (:busca IS NULL OR LOWER(p.numero) LIKE LOWER(CONCAT('%', :busca, '%'))
+        AND (:busca IS NULL OR :busca = '' OR LOWER(p.numero) LIKE LOWER(CONCAT('%', :busca, '%'))
              OR LOWER(p.cliente.nome) LIKE LOWER(CONCAT('%', :busca, '%')))
     """)
     Page<Processo> findAllWithFilters(
@@ -44,4 +49,20 @@ public interface ProcessoRepository extends JpaRepository<Processo, UUID> {
             Pageable pageable);
 
     long countByAdvogadoId(UUID advogadoId);
+
+    /**
+     * Últimos 5 processos cadastrados para o dashboard.
+     */
+    @Query("""
+        SELECT p FROM Processo p
+        LEFT JOIN FETCH p.cliente
+        LEFT JOIN FETCH p.advogado
+        LEFT JOIN FETCH p.unidade
+        ORDER BY p.criadoEm DESC
+    """)
+    List<Processo> findTop5ByOrderByCriadoEmDesc(Pageable pageable);
+
+    default List<Processo> findTop5ByOrderByCriadoEmDesc() {
+        return findTop5ByOrderByCriadoEmDesc(org.springframework.data.domain.PageRequest.of(0, 5));
+    }
 }

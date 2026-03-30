@@ -1,12 +1,15 @@
 package com.viana.service;
 
+import com.viana.dto.request.AtualizarProcessoRequest;
 import com.viana.dto.request.CriarMovimentacaoRequest;
 import com.viana.dto.request.CriarProcessoRequest;
 import com.viana.dto.response.ProcessoResponse;
 import com.viana.exception.BusinessException;
 import com.viana.exception.ResourceNotFoundException;
 import com.viana.model.*;
+import com.viana.model.enums.ModuloLog;
 import com.viana.model.enums.StatusProcesso;
+import com.viana.model.enums.TipoAcao;
 import com.viana.model.enums.TipoMovimentacao;
 import com.viana.model.enums.TipoProcesso;
 import com.viana.repository.*;
@@ -29,14 +32,24 @@ public class ProcessoService {
     private final UsuarioRepository usuarioRepository;
     private final UnidadeRepository unidadeRepository;
     private final MovimentacaoRepository movimentacaoRepository;
+    private final LogAuditoriaService logAuditoriaService;
 
     @Transactional(readOnly = true)
     public Page<ProcessoResponse> listar(UUID unidadeId, String status, String tipo, String busca, Pageable pageable) {
         StatusProcesso statusEnum = parseEnum(StatusProcesso.class, status);
         TipoProcesso tipoEnum = parseEnum(TipoProcesso.class, tipo);
+        String buscaNorm = (busca != null && !busca.isBlank()) ? busca : null;
 
-        return processoRepository.findAllWithFilters(unidadeId, statusEnum, tipoEnum, busca, pageable)
+        return processoRepository.findAllWithFilters(unidadeId, statusEnum, tipoEnum, buscaNorm, pageable)
                 .map(this::toResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProcessoResponse> listarRecentes(int limite) {
+        return processoRepository.findTop5ByOrderByCriadoEmDesc().stream()
+                .limit(limite)
+                .map(this::toResponse)
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -82,6 +95,43 @@ public class ProcessoService {
                 .unidade(unidade)
                 .build();
 
+        ProcessoResponse response = toResponse(processoRepository.save(processo));
+
+        // Log de auditoria (best-effort)
+        try {
+            logAuditoriaService.registrar(advogado.getId(), TipoAcao.CRIOU, ModuloLog.PROCESSOS,
+                    "Processo criado: " + request.getNumero() + " — " + cliente.getNome(), "sistema");
+        } catch (Exception ignored) {}
+
+        return response;
+    }
+
+    @Transactional
+    public ProcessoResponse atualizar(UUID id, AtualizarProcessoRequest request) {
+        Processo processo = findOrThrow(id);
+
+        if (request.getTipo() != null) {
+            processo.setTipo(parseEnumRequired(TipoProcesso.class, request.getTipo(), "Tipo"));
+        }
+        if (request.getStatus() != null) {
+            processo.setStatus(parseEnumRequired(StatusProcesso.class, request.getStatus(), "Status"));
+        }
+        if (request.getVara() != null)             processo.setVara(request.getVara());
+        if (request.getTribunal() != null)          processo.setTribunal(request.getTribunal());
+        if (request.getDataDistribuicao() != null)  processo.setDataDistribuicao(request.getDataDistribuicao());
+        if (request.getValorCausa() != null)        processo.setValorCausa(request.getValorCausa());
+        if (request.getDescricao() != null)         processo.setDescricao(request.getDescricao());
+        if (request.getAdvogadoId() != null) {
+            Usuario adv = usuarioRepository.findById(request.getAdvogadoId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Advogado não encontrado"));
+            processo.setAdvogado(adv);
+        }
+        if (request.getUnidadeId() != null) {
+            Unidade unidade = unidadeRepository.findById(request.getUnidadeId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada"));
+            processo.setUnidade(unidade);
+        }
+
         return toResponse(processoRepository.save(processo));
     }
 
@@ -107,7 +157,7 @@ public class ProcessoService {
 
         mov = movimentacaoRepository.save(mov);
 
-        // Atualiza última movimentação do processo
+        // Atualiza última movimentação + próximo prazo do processo
         processo.setUltimaMovimentacao(request.getData());
         processoRepository.save(processo);
 

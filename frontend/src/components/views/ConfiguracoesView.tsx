@@ -98,30 +98,29 @@ function TabPerfil() {
       </div>
 
       <div className="space-y-1.5">
-        <Label>Nome Completo</Label>
-        <Input defaultValue={user.nome} disabled />
+        <Label htmlFor="nome">Nome Completo</Label>
+        <Input id="nome" defaultValue={user.nome} disabled />
       </div>
 
       <div className="space-y-1.5">
-        <Label>E-mail</Label>
-        <Input defaultValue={user.email} disabled />
+        <Label htmlFor="email">E-mail</Label>
+        <Input id="email" defaultValue={user.email} disabled />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <Label>OAB</Label>
-          <Input defaultValue={user.oab || ""} disabled />
+          <Label htmlFor="oab">OAB</Label>
+          <Input id="oab" defaultValue={user.oab || ""} disabled />
         </div>
         <div className="space-y-1.5">
-          <Label>Unidade Base</Label>
-          <Input defaultValue={user.unidadeNome} disabled />
+          <Label htmlFor="unidade">Unidade Base</Label>
+          <Input id="unidade" defaultValue={user.unidadeNome} disabled />
         </div>
       </div>
 
       {user.papel === "ADMINISTRADOR" && (
         <div className="space-y-1.5 pt-4">
-          <Label>Nova Senha (opcional)</Label>
-          <Input type="password" placeholder="••••••••" disabled />
+          <Input id="senha" type="password" placeholder="••••••••" disabled />
           <p className="text-xs text-muted-foreground pt-1">O perfil Administrador editará isto via seção Equipe.</p>
         </div>
       )}

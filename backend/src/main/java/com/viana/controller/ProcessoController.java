@@ -1,5 +1,6 @@
 package com.viana.controller;
 
+import com.viana.dto.request.AtualizarProcessoRequest;
 import com.viana.dto.request.CriarMovimentacaoRequest;
 import com.viana.dto.request.CriarProcessoRequest;
 import com.viana.dto.response.ProcessoResponse;
@@ -44,6 +45,13 @@ public class ProcessoController {
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO')")
     public ResponseEntity<ProcessoResponse> criar(@Valid @RequestBody CriarProcessoRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(processoService.criar(request));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO')")
+    public ResponseEntity<ProcessoResponse> atualizar(@PathVariable UUID id,
+                                                      @RequestBody AtualizarProcessoRequest request) {
+        return ResponseEntity.ok(processoService.atualizar(id, request));
     }
 
     @PatchMapping("/{id}/status")
