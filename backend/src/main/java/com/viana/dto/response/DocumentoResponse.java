@@ -15,8 +15,11 @@ public class DocumentoResponse {
     private String tipo;
     private String categoria;
     private long tamanhoBytes;
+    private String tamanho; // formatado: "1.2 MB"
     private String clienteId;
+    private String clienteNome;
     private String processoId;
+    private String processoNumero;
     private String pastaId;
     private String dataUpload;
     private String uploadedPor;

@@ -4,6 +4,8 @@ import com.viana.dto.request.LoginRequest;
 import com.viana.dto.request.RefreshTokenRequest;
 import com.viana.dto.response.TokenResponse;
 import com.viana.model.Usuario;
+import com.viana.model.enums.ModuloLog;
+import com.viana.model.enums.TipoAcao;
 import com.viana.repository.UsuarioRepository;
 import com.viana.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +23,7 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
     private final UsuarioRepository usuarioRepository;
+    private final LogAuditoriaService logAuditoriaService;
 
     @Transactional(readOnly = true)
     public TokenResponse login(LoginRequest request) {
@@ -33,6 +36,12 @@ public class AuthService {
 
             Usuario usuario = usuarioRepository.findByEmailIgnoreCase(request.getEmail())
                     .orElseThrow(() -> new BadCredentialsException("Credenciais inválidas"));
+
+            // Log de auditoria do login
+            try {
+                logAuditoriaService.registrar(usuario.getId(), TipoAcao.ACESSOU, ModuloLog.SISTEMA,
+                        "Login realizado: " + usuario.getNome(), request.getIpAddress());
+            } catch (Exception ignored) {}
 
             return buildTokenResponse(accessToken, refreshToken, usuario);
 
@@ -64,7 +73,7 @@ public class AuthService {
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .tipo("Bearer")
-                .expiresIn(28800) // 8h em segundos
+                .expiresIn(28800)
                 .usuario(TokenResponse.UsuarioResumoResponse.builder()
                         .id(usuario.getId().toString())
                         .nome(usuario.getNome())

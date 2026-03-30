@@ -4,6 +4,8 @@ import com.viana.dto.response.DocumentoResponse;
 import com.viana.exception.ResourceNotFoundException;
 import com.viana.model.*;
 import com.viana.model.enums.CategoriaDocumento;
+import com.viana.model.enums.ModuloLog;
+import com.viana.model.enums.TipoAcao;
 import com.viana.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -25,6 +27,7 @@ public class DocumentoService {
     private final PastaRepository pastaRepository;
     private final UsuarioRepository usuarioRepository;
     private final StorageService storageService;
+    private final LogAuditoriaService logAuditoriaService;
 
     @Transactional
     public DocumentoResponse upload(MultipartFile file, String categoria, UUID clienteId,
@@ -39,10 +42,9 @@ public class DocumentoService {
         Usuario uploadedPor = usuarioRepository.findById(uploadedPorId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
-        // Upload para R2
+        // Upload para Cloudflare R2
         String storageKey = storageService.upload(file, unidadeId, clienteId, processoId);
 
-        // Extrair extensão
         String filename = file.getOriginalFilename();
         String ext = filename != null && filename.contains(".")
                 ? filename.substring(filename.lastIndexOf('.') + 1) : "bin";
@@ -59,7 +61,15 @@ public class DocumentoService {
                 .uploadedPor(uploadedPor)
                 .build();
 
-        return toResponse(documentoRepository.save(doc));
+        DocumentoResponse response = toResponse(documentoRepository.save(doc));
+
+        // Auditoria
+        try {
+            logAuditoriaService.registrar(uploadedPorId, TipoAcao.FEZ_UPLOAD, ModuloLog.DOCUMENTOS,
+                    "Upload: " + filename + " (" + formatarTamanho(file.getSize()) + ")", "sistema");
+        } catch (Exception ignored) {}
+
+        return response;
     }
 
     @Transactional(readOnly = true)
@@ -67,6 +77,13 @@ public class DocumentoService {
         Documento doc = documentoRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Documento não encontrado"));
         return storageService.generatePresignedUrl(doc.getStorageKey());
+    }
+
+    @Transactional(readOnly = true)
+    public Page<DocumentoResponse> listar(UUID clienteId, UUID processoId, String busca, Pageable pageable) {
+        String buscaNorm = (busca != null && !busca.isBlank()) ? busca : null;
+        return documentoRepository.findAllWithFilters(clienteId, processoId, buscaNorm, pageable)
+                .map(this::toResponse);
     }
 
     @Transactional(readOnly = true)
@@ -97,13 +114,23 @@ public class DocumentoService {
                 .id(d.getId().toString())
                 .nome(d.getNome())
                 .tipo(d.getTipo())
-                .categoria(d.getCategoria().name())
+                .categoria(d.getCategoria().name().toLowerCase())
                 .tamanhoBytes(d.getTamanhoBytes())
+                .tamanho(formatarTamanho(d.getTamanhoBytes()))
                 .clienteId(d.getCliente() != null ? d.getCliente().getId().toString() : null)
+                .clienteNome(d.getCliente() != null ? d.getCliente().getNome() : null)
                 .processoId(d.getProcesso() != null ? d.getProcesso().getId().toString() : null)
+                .processoNumero(d.getProcesso() != null ? d.getProcesso().getNumero() : null)
                 .pastaId(d.getPasta() != null ? d.getPasta().getId().toString() : null)
                 .dataUpload(d.getDataUpload().toString())
                 .uploadedPor(d.getUploadedPor().getNome())
                 .build();
+    }
+
+    private String formatarTamanho(long bytes) {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return String.format("%.1f KB", bytes / 1024.0);
+        if (bytes < 1024L * 1024 * 1024) return String.format("%.1f MB", bytes / (1024.0 * 1024));
+        return String.format("%.1f GB", bytes / (1024.0 * 1024 * 1024));
     }
 }

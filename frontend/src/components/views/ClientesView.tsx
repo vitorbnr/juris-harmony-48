@@ -120,11 +120,11 @@ export const ClientesView = () => {
 
   const carregarClientes = useCallback(() => {
     setLoading(true);
-    const params: Record<string, string> = { busca: busca || "" };
-    if (unidadeSelecionada && unidadeSelecionada !== "todas") {
-      params.unidadeId = unidadeSelecionada;
-    }
-    clientesApi.listar(params)
+    clientesApi.listar({
+      // Filtra por unidade NO servidor — sem double-filter local
+      unidadeId: unidadeSelecionada !== "todas" ? unidadeSelecionada : undefined,
+      busca: busca || undefined,
+    })
       .then((data) => {
         const items = data.content ?? data;
         setClientes(Array.isArray(items) ? items : []);
@@ -135,10 +135,9 @@ export const ClientesView = () => {
 
   useEffect(() => { carregarClientes(); }, [carregarClientes]);
 
-  const clientesFiltrados = clientes.filter(c => {
-    if (unidadeSelecionada === "todas") return true;
-    return c.unidadeId === unidadeSelecionada;
-  });
+  // Sem double-filter: a lista já vem filtrada do servidor
+  const clientesFiltrados = clientes;
+
 
   return (
     <div className="p-6 md:p-8 space-y-6">

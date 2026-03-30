@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { User, Building2, Users, Plus, Activity, Check, Save } from "lucide-react";
+import { User, Building2, Users, Plus, Activity, Check, Save, Pencil, UserX, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -190,6 +190,7 @@ function TabEquipe() {
                 <th className="px-5 py-3 hidden md:table-cell">Permissão</th>
                 <th className="px-5 py-3 hidden lg:table-cell">Unidade</th>
                 <th className="px-5 py-3">Status</th>
+                {user?.papel === "ADMINISTRADOR" && <th className="px-3 py-3" />}
               </tr>
             </thead>
             <tbody>
@@ -233,6 +234,43 @@ function TabEquipe() {
                         </div>
                       )}
                     </td>
+                    {user?.papel === "ADMINISTRADOR" && (
+                      <td className="px-3 py-4">
+                        <div className="flex items-center gap-1">
+                          <button
+                            title="Editar"
+                            className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-all"
+                            onClick={() => alert('Edição de usuário: em breve')}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          {u.ativo !== false ? (
+                            <button
+                              title="Desativar"
+                              className="p-1.5 rounded-md hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-all"
+                              onClick={async () => {
+                                if (!confirm(`Desativar ${u.nome}?`)) return;
+                                await usuariosApi.desativar(u.id);
+                                carregar();
+                              }}
+                            >
+                              <UserX className="h-3.5 w-3.5" />
+                            </button>
+                          ) : (
+                            <button
+                              title="Reativar"
+                              className="p-1.5 rounded-md hover:bg-green-500/10 text-muted-foreground hover:text-green-400 transition-all"
+                              onClick={async () => {
+                                await usuariosApi.reativar(u.id);
+                                carregar();
+                              }}
+                            >
+                              <UserCheck className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 );
               })}

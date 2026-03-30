@@ -32,8 +32,7 @@ public class UsuarioController {
 
     @PostMapping
     public ResponseEntity<UsuarioResponse> criar(@Valid @RequestBody CriarUsuarioRequest request) {
-        UsuarioResponse response = usuarioService.criar(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        return ResponseEntity.status(HttpStatus.CREATED).body(usuarioService.criar(request));
     }
 
     @PutMapping("/{id}")
@@ -42,9 +41,17 @@ public class UsuarioController {
         return ResponseEntity.ok(usuarioService.atualizar(id, request));
     }
 
-    @DeleteMapping("/{id}")
+    /** PATCH para desativar — mantém o recurso, apenas muda ativo=false */
+    @PatchMapping("/{id}/desativar")
     public ResponseEntity<Void> desativar(@PathVariable UUID id) {
         usuarioService.desativar(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Reativar usuário */
+    @PatchMapping("/{id}/reativar")
+    public ResponseEntity<Void> reativar(@PathVariable UUID id) {
+        usuarioService.reativar(id);
         return ResponseEntity.noContent().build();
     }
 }

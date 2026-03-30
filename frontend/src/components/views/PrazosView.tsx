@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
-import { CalendarClock, AlertCircle, Clock, CheckCircle, X, Scale, Plus } from "lucide-react";
+import { CalendarClock, AlertCircle, Clock, CheckCircle, X, Scale, Plus, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { CalendarioPrazos } from "@/components/prazos/CalendarioPrazos";
+import { EditarPrazoModal } from "@/components/modals/EditarPrazoModal";
 import { prazosApi, processosApi } from "@/services/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
@@ -178,6 +179,7 @@ const tipoLabel: Record<string, string> = {
 
 function PrazoCard({ prazo, onAtualizar }: { prazo: Prazo; onAtualizar: () => void }) {
   const [loading, setLoading] = useState(false);
+  const [editando, setEditando] = useState(false);
 
   const handleConcluir = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -211,7 +213,8 @@ function PrazoCard({ prazo, onAtualizar }: { prazo: Prazo; onAtualizar: () => vo
 
   const Icon = prazo.prioridade === "alta" ? AlertCircle : prazo.concluido ? CheckCircle : Clock;
   return (
-    <div className={cn(
+    <>
+      <div className={cn(
       "rounded-xl border p-4 flex items-start gap-3 transition-all hover:border-primary/30",
       prazo.concluido ? "border-border/50 bg-muted/20 opacity-60" :
       prazo.prioridade === "alta" ? "border-red-500/30 bg-red-500/5" :
@@ -270,6 +273,9 @@ function PrazoCard({ prazo, onAtualizar }: { prazo: Prazo; onAtualizar: () => vo
                 Reabrir
               </Button>
             )}
+            <Button size="sm" variant="ghost" onClick={e => { e.stopPropagation(); setEditando(true); }} className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" title="Editar">
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
             <Button size="sm" variant="ghost" onClick={handleExcluir} disabled={loading} className="h-7 w-7 p-0 text-red-500/50 hover:bg-red-500/10 hover:text-red-600" title="Excluir">
               <X className="h-4 w-4" />
             </Button>
@@ -277,6 +283,10 @@ function PrazoCard({ prazo, onAtualizar }: { prazo: Prazo; onAtualizar: () => vo
         </div>
       </div>
     </div>
+    {editando && (
+      <EditarPrazoModal prazo={prazo} onClose={() => setEditando(false)} onSaved={() => { setEditando(false); onAtualizar(); }} />
+    )}
+    </>
   );
 }
 

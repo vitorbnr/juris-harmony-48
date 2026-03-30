@@ -123,6 +123,13 @@ public class UsuarioService {
         usuarioRepository.save(usuario);
     }
 
+    @Transactional
+    public void reativar(UUID id) {
+        Usuario usuario = findOrThrow(id);
+        usuario.setAtivo(true);
+        usuarioRepository.save(usuario);
+    }
+
     private Usuario findOrThrow(UUID id) {
         return usuarioRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));

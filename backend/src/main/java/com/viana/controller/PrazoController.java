@@ -1,5 +1,6 @@
 package com.viana.controller;
 
+import com.viana.dto.request.AtualizarPrazoRequest;
 import com.viana.dto.request.CriarPrazoRequest;
 import com.viana.dto.response.PrazoResponse;
 import com.viana.model.Usuario;
@@ -39,11 +40,10 @@ public class PrazoController {
             @PageableDefault(size = 20, sort = "data", direction = Sort.Direction.ASC) Pageable pageable,
             Authentication authentication) {
 
-        Usuario usuario = usuarioRepository.findByEmailIgnoreCase(authentication.getName())
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
-
+        Usuario usuario = getUsuario(authentication);
+        // Não-admin só vê os próprios prazos
         if (usuario.getPapel() != UserRole.ADMINISTRADOR) {
-            advogadoId = usuario.getId(); // Força segregação por pessoa caso não seja Admin
+            advogadoId = usuario.getId();
         }
 
         return ResponseEntity.ok(prazoService.listar(unidadeId, tipo, concluido, advogadoId, pageable));
@@ -57,9 +57,7 @@ public class PrazoController {
             @RequestParam(required = false) UUID unidadeId,
             Authentication authentication) {
 
-        Usuario usuario = usuarioRepository.findByEmailIgnoreCase(authentication.getName())
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
-
+        Usuario usuario = getUsuario(authentication);
         if (usuario.getPapel() != UserRole.ADMINISTRADOR) {
             advogadoId = usuario.getId();
         }
@@ -71,6 +69,13 @@ public class PrazoController {
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO', 'SECRETARIA')")
     public ResponseEntity<PrazoResponse> criar(@Valid @RequestBody CriarPrazoRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(prazoService.criar(request));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO', 'SECRETARIA')")
+    public ResponseEntity<PrazoResponse> atualizar(@PathVariable UUID id,
+                                                    @RequestBody AtualizarPrazoRequest request) {
+        return ResponseEntity.ok(prazoService.atualizar(id, request));
     }
 
     @PatchMapping("/{id}/concluir")
@@ -85,10 +90,8 @@ public class PrazoController {
         return ResponseEntity.noContent().build();
     }
 
-    private UUID getUsuarioIdFromAuth(Authentication authentication) {
-        String email = authentication.getName();
-        Usuario usuario = usuarioRepository.findByEmailIgnoreCase(email)
+    private Usuario getUsuario(Authentication authentication) {
+        return usuarioRepository.findByEmailIgnoreCase(authentication.getName())
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
-        return usuario.getId();
     }
 }

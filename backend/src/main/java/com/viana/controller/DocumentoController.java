@@ -27,6 +27,16 @@ public class DocumentoController {
     private final DocumentoService documentoService;
     private final UsuarioRepository usuarioRepository;
 
+    /** Listagem geral com filtros opcionais */
+    @GetMapping
+    public ResponseEntity<Page<DocumentoResponse>> listar(
+            @RequestParam(required = false) UUID clienteId,
+            @RequestParam(required = false) UUID processoId,
+            @RequestParam(required = false) String busca,
+            @PageableDefault(size = 20, sort = "dataUpload", direction = Sort.Direction.DESC) Pageable pageable) {
+        return ResponseEntity.ok(documentoService.listar(clienteId, processoId, busca, pageable));
+    }
+
     @PostMapping(consumes = "multipart/form-data")
     public ResponseEntity<DocumentoResponse> upload(
             @RequestParam("file") MultipartFile file,

@@ -1,5 +1,6 @@
 package com.viana.service;
 
+import com.viana.dto.request.AtualizarPrazoRequest;
 import com.viana.dto.request.CriarPrazoRequest;
 import com.viana.dto.response.PrazoResponse;
 import com.viana.exception.BusinessException;
@@ -8,7 +9,9 @@ import com.viana.model.Prazo;
 import com.viana.model.Processo;
 import com.viana.model.Unidade;
 import com.viana.model.Usuario;
+import com.viana.model.enums.ModuloLog;
 import com.viana.model.enums.PrioridadePrazo;
+import com.viana.model.enums.TipoAcao;
 import com.viana.model.enums.TipoPrazo;
 import com.viana.model.enums.UserRole;
 import com.viana.repository.PrazoRepository;
@@ -33,12 +36,8 @@ public class PrazoService {
     private final ProcessoRepository processoRepository;
     private final UsuarioRepository usuarioRepository;
     private final UnidadeRepository unidadeRepository;
+    private final LogAuditoriaService logAuditoriaService;
 
-    /**
-     * Calendário com visibilidade por papel:
-     * - ADVOGADO: vê apenas seus próprios prazos
-     * - ADMIN/SECRETARIA: vê todos, pode filtrar por advogado
-     */
     @Transactional(readOnly = true)
     public List<PrazoResponse> getCalendario(UUID usuarioLogadoId, UUID advogadoFiltro, UUID unidadeId,
                                               LocalDate inicio, LocalDate fim) {
@@ -46,12 +45,9 @@ public class PrazoService {
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         List<Prazo> prazos;
-
         if (usuario.getPapel() == UserRole.ADVOGADO) {
-            // Advogado vê APENAS o próprio calendário (RF21)
             prazos = prazoRepository.findByAdvogadoIdAndDataBetween(usuarioLogadoId, inicio, fim);
         } else {
-            // Admin e Secretária veem todos os calendários (RF22)
             prazos = prazoRepository.findCalendario(inicio, fim, advogadoFiltro, unidadeId);
         }
 
@@ -101,6 +97,51 @@ public class PrazoService {
                 .unidade(unidade)
                 .build();
 
+        PrazoResponse response = toResponse(prazoRepository.save(prazo));
+
+        // Log de auditoria
+        if (advogado != null) {
+            try {
+                logAuditoriaService.registrar(advogado.getId(), TipoAcao.CRIOU, ModuloLog.PRAZOS,
+                        "Prazo criado: " + request.getTitulo() + " para " + request.getData(), "sistema");
+            } catch (Exception ignored) {}
+        }
+
+        return response;
+    }
+
+    @Transactional
+    public PrazoResponse atualizar(UUID id, AtualizarPrazoRequest request) {
+        Prazo prazo = prazoRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Prazo não encontrado"));
+
+        if (request.getTitulo() != null)    prazo.setTitulo(request.getTitulo());
+        if (request.getData() != null)      prazo.setData(request.getData());
+        if (request.getHora() != null)      prazo.setHora(request.getHora());
+        if (request.getDescricao() != null) prazo.setDescricao(request.getDescricao());
+
+        if (request.getTipo() != null) {
+            prazo.setTipo(parseEnumRequired(TipoPrazo.class, request.getTipo(), "Tipo"));
+        }
+        if (request.getPrioridade() != null) {
+            prazo.setPrioridade(parseEnumRequired(PrioridadePrazo.class, request.getPrioridade(), "Prioridade"));
+        }
+        if (request.getProcessoId() != null) {
+            Processo p = processoRepository.findById(request.getProcessoId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Processo não encontrado"));
+            prazo.setProcesso(p);
+        }
+        if (request.getAdvogadoId() != null) {
+            Usuario adv = usuarioRepository.findById(request.getAdvogadoId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Advogado não encontrado"));
+            prazo.setAdvogado(adv);
+        }
+        if (request.getUnidadeId() != null) {
+            Unidade u = unidadeRepository.findById(request.getUnidadeId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada"));
+            prazo.setUnidade(u);
+        }
+
         return toResponse(prazoRepository.save(prazo));
     }
 
@@ -108,7 +149,7 @@ public class PrazoService {
     public PrazoResponse marcarConcluido(UUID id) {
         Prazo prazo = prazoRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Prazo não encontrado"));
-        prazo.setConcluido(!prazo.getConcluido()); // toggle
+        prazo.setConcluido(!prazo.getConcluido());
         return toResponse(prazoRepository.save(prazo));
     }
 
@@ -129,8 +170,8 @@ public class PrazoService {
                 .clienteNome(p.getProcesso() != null ? p.getProcesso().getCliente().getNome() : null)
                 .data(p.getData().toString())
                 .hora(p.getHora() != null ? p.getHora().toString() : null)
-                .tipo(p.getTipo().name())
-                .prioridade(p.getPrioridade().name())
+                .tipo(p.getTipo().name().toLowerCase())
+                .prioridade(p.getPrioridade().name().toLowerCase())
                 .concluido(p.getConcluido())
                 .advogadoId(p.getAdvogado() != null ? p.getAdvogado().getId().toString() : null)
                 .advogadoNome(p.getAdvogado() != null ? p.getAdvogado().getNome() : null)
