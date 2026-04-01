@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import api from "@/lib/api";
 import { documentosApi, processosApi } from "@/services/api";
 import { toast } from "sonner";
 import type { Documento } from "@/types";
@@ -327,9 +328,11 @@ export const DocumentosView = () => {
       const nome = typeof result === "string" ? doc.nome : (result.nome || doc.nome);
       
       if (url.startsWith("/")) {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error("Falha no fetch");
-        const blob = await res.blob();
+        // O Axios já tem baseURL="/api", então removemos esse prefixo da URL relativa
+        // Ex: "/api/documentos/stream/..." → "/documentos/stream/..."
+        const apiPath = url.startsWith("/api") ? url.slice(4) : url;
+        const res = await api.get(apiPath, { responseType: "blob" });
+        const blob = res.data;
         const blobUrl = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = blobUrl;
@@ -348,7 +351,8 @@ export const DocumentosView = () => {
         a.click();
         document.body.removeChild(a);
       }
-    } catch {
+    } catch (err) {
+      console.error("[Download Error]", err);
       toast.error("Erro ao obter link de download.");
     }
   };
