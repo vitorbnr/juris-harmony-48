@@ -15,6 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -66,7 +68,7 @@ public class DocumentoService {
         // Auditoria
         try {
             logAuditoriaService.registrar(uploadedPorId, TipoAcao.FEZ_UPLOAD, ModuloLog.DOCUMENTOS,
-                    "Upload: " + filename + " (" + formatarTamanho(file.getSize()) + ")", "sistema");
+                    "Upload: " + filename + " (" + formatarTamanho(file.getSize()) + ")");
         } catch (Exception ignored) {}
 
         return response;
@@ -107,6 +109,11 @@ public class DocumentoService {
                 .orElseThrow(() -> new ResourceNotFoundException("Documento não encontrado"));
         storageService.delete(doc.getStorageKey());
         documentoRepository.delete(doc);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Map<String, String>> listarClientesComDocumentos() {
+        return documentoRepository.findDistinctClientes();
     }
 
     private DocumentoResponse toResponse(Documento d) {

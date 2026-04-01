@@ -11,9 +11,12 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import org.springframework.security.access.prepost.PreAuthorize;
+
 @RestController
 @RequestMapping("/api/logs")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('ADMINISTRADOR')")
 public class LogAuditoriaController {
 
     private final LogAuditoriaService logAuditoriaService;

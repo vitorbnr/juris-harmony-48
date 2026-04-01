@@ -1,14 +1,12 @@
 import { useState, useEffect } from "react";
-import { Bell, Search, MapPin, ChevronDown, Check, LogOut } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Bell, MapPin, ChevronDown, Check, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
-import { unidades } from "@/data/mockData";
 import { useUnidade } from "@/context/UnidadeContext";
 import { useAuth } from "@/context/AuthContext";
-import { notificacoesApi } from "@/services/api";
-import type { Notificacao } from "@/types";
+import { notificacoesApi, unidadesApi } from "@/services/api";
+import type { Notificacao, Unidade } from "@/types";
 
 const getSectionTitles = (userName: string): Record<string, { title: string; subtitle: string }> => ({
   dashboard:    { title: `Olá, ${userName}`, subtitle: "Aqui está o resumo do escritório hoje. ㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤBuild v1.0.0" },
@@ -39,7 +37,20 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
   const [unidadeOpen, setUnidadeOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifs, setNotifs] = useState<Notificacao[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [unidades, setUnidades] = useState<Unidade[]>([]);
 
+  // Carrega unidades reais da API (não mais mockData)
+  useEffect(() => {
+    unidadesApi.listar()
+      .then((data: Unidade[] | { content?: Unidade[] }) => {
+        const items = (data as { content?: Unidade[] }).content ?? data;
+        setUnidades(Array.isArray(items) ? (items as Unidade[]) : []);
+      })
+      .catch(() => setUnidades([]));
+  }, []);
+
+  // Carrega notificações
   useEffect(() => {
     notificacoesApi.listar({ size: 10 })
       .then((data) => {
@@ -47,18 +58,33 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
         setNotifs(Array.isArray(items) ? items : []);
       })
       .catch(() => setNotifs([]));
+
+    notificacoesApi.contarNaoLidas()
+      .then(setUnreadCount)
+      .catch(() => setUnreadCount(0));
   }, []);
 
-  const naoLidas = notifs.filter(n => !n.lida).length;
   const unidadeLabel = unidadeSelecionada === "todas"
     ? "Todas as Unidades"
     : unidades.find(u => u.id === unidadeSelecionada)?.nome ?? "Unidade";
 
-  const marcarLida = (id: string) =>
-    setNotifs(prev => prev.map(n => n.id === id ? { ...n, lida: true } : n));
+  const marcarLida = (id: string) => {
+    notificacoesApi.marcarLida(id)
+      .then(() => {
+        setNotifs(prev => prev.map(n => n.id === id ? { ...n, lida: true } : n));
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      })
+      .catch(err => console.error("Erro ao marcar lida:", err));
+  };
 
-  const marcarTodasLidas = () =>
-    setNotifs(prev => prev.map(n => ({ ...n, lida: true })));
+  const marcarTodasLidas = () => {
+    notificacoesApi.marcarTodasLidas()
+      .then(() => {
+        setNotifs(prev => prev.map(n => ({ ...n, lida: true })));
+        setUnreadCount(0);
+      })
+      .catch(err => console.error("Erro ao marcar todas lidas:", err));
+  };
 
   return (
     <header className="flex items-center justify-between px-6 py-3.5 border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10 gap-3">
@@ -69,13 +95,7 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
       </div>
 
       <div className="flex items-center gap-2 shrink-0">
-        {/* Busca */}
-        <div className="relative hidden lg:block">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar..." className="pl-9 w-56 bg-secondary border-none h-9" />
-        </div>
-
-        {/* Filtro de Unidade */}
+        {/* Seletor de Unidade — dados reais da API */}
         <div className="relative">
           <button
             onClick={() => { setUnidadeOpen(!unidadeOpen); setNotifOpen(false); }}
@@ -129,9 +149,9 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
             onClick={() => { setNotifOpen(!notifOpen); setUnidadeOpen(false); }}
           >
             <Bell className="h-5 w-5 text-muted-foreground" />
-            {naoLidas > 0 && (
+            {unreadCount > 0 && (
               <span className="absolute top-1.5 right-1.5 min-w-[16px] h-4 bg-destructive rounded-full text-[9px] font-bold text-white flex items-center justify-center px-0.5">
-                {naoLidas}
+                {unreadCount > 99 ? "99+" : unreadCount}
               </span>
             )}
           </Button>
@@ -142,7 +162,7 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
               <div className="absolute right-0 top-11 z-20 w-80 rounded-xl border border-border bg-card shadow-xl overflow-hidden">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                   <p className="font-semibold text-sm text-foreground">Notificações</p>
-                  {naoLidas > 0 && (
+                  {unreadCount > 0 && (
                     <button onClick={marcarTodasLidas} className="text-xs text-primary hover:underline">
                       Marcar todas como lidas
                     </button>
@@ -171,7 +191,9 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
                             {n.titulo}
                           </p>
                           <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.descricao}</p>
-                          <p className="text-[10px] text-muted-foreground mt-1">{n.data} às {n.hora}</p>
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            {n.criadaEm ? new Date(n.criadaEm).toLocaleString("pt-BR", { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : "—"}
+                          </p>
                         </div>
                         {!n.lida && <span className="shrink-0 w-2 h-2 rounded-full bg-primary mt-1.5" />}
                       </button>

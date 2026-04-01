@@ -2,7 +2,6 @@ package com.viana.model;
 
 import com.viana.model.enums.ModuloLog;
 import com.viana.model.enums.TipoAcao;
-import com.viana.model.enums.UserRole;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -38,7 +37,4 @@ public class LogAuditoria {
     @Column(nullable = false, updatable = false)
     @Builder.Default
     private LocalDateTime dataHora = LocalDateTime.now();
-
-    @Column(length = 45)
-    private String ip;
 }

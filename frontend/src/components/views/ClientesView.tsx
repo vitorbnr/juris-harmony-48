@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Users, Plus, Search, Mail, Phone, Scale, X, LayoutGrid, List, ChevronRight, Building2, User, MapPin } from "lucide-react";
+import { Users, Plus, Search, Mail, Phone, Scale, X, LayoutGrid, List, ChevronRight, Building2, User, MapPin, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -20,11 +20,11 @@ interface ClienteData {
   cidade: string;
   estado: string;
   dataCadastro: string;
-  advogadoNome: string;
+  advogadoResponsavel: string; // Vem do backend
   unidadeId: string;
   unidadeNome: string;
   ativo: boolean;
-  totalProcessos?: number;
+  processos?: number; // Vem do backend
 }
 
 function getInitials(nome: string) {
@@ -33,7 +33,24 @@ function getInitials(nome: string) {
 
 // ─── Drawer de Detalhes ───────────────────────────────────────────────────────
 
-function ClienteDrawer({ cliente, onClose }: { cliente: ClienteData; onClose: () => void }) {
+function ClienteDrawer({ cliente, onClose, onDesativado }: { cliente: ClienteData; onClose: () => void; onDesativado: () => void }) {
+  const [desativando, setDesativando] = useState(false);
+
+  const handleDesativar = async () => {
+    if (!confirm(`Deseja realmente desativar o cliente "${cliente.nome}"? Esta ação pode ser revertida somente pelo administrador.`)) return;
+    setDesativando(true);
+    try {
+      await clientesApi.desativar(cliente.id);
+      toast.success(`Cliente "${cliente.nome}" desativado com sucesso.`);
+      onDesativado();
+      onClose();
+    } catch {
+      toast.error("Erro ao desativar cliente.");
+    } finally {
+      setDesativando(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
@@ -65,7 +82,7 @@ function ClienteDrawer({ cliente, onClose }: { cliente: ClienteData; onClose: ()
                 { label: "Telefone", value: cliente.telefone },
                 { label: "Cidade / UF", value: `${cliente.cidade} — ${cliente.estado}` },
                 { label: "Cadastro", value: new Date(cliente.dataCadastro).toLocaleDateString("pt-BR") },
-                { label: "Advogado Responsável", value: cliente.advogadoNome || "—" },
+                { label: "Advogado Responsável", value: cliente.advogadoResponsavel || "—" },
                 { label: "Unidade", value: cliente.unidadeNome || "—" },
               ].map(({ label, value }) => (
                 <div key={label} className="flex justify-between items-start py-2 border-b border-border/50 last:border-0">
@@ -80,6 +97,16 @@ function ClienteDrawer({ cliente, onClose }: { cliente: ClienteData; onClose: ()
         <div className="px-6 py-4 border-t border-border flex gap-2">
           <Button className="flex-1" onClick={() => window.dispatchEvent(new CustomEvent("open_editar_cliente", { detail: cliente }))}>Editar Cliente</Button>
           <Button variant="outline" onClick={() => window.dispatchEvent(new CustomEvent("open_novo_processo", { detail: cliente.id }))}>Novo Processo</Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-red-500/70 hover:text-red-600 hover:bg-red-500/10"
+            onClick={handleDesativar}
+            disabled={desativando}
+            title="Desativar cliente"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
         </div>
       </div>
     </div>
@@ -120,16 +147,22 @@ export const ClientesView = () => {
 
   const carregarClientes = useCallback(() => {
     setLoading(true);
-    clientesApi.listar({
-      // Filtra por unidade NO servidor — sem double-filter local
-      unidadeId: unidadeSelecionada !== "todas" ? unidadeSelecionada : undefined,
-      busca: busca || undefined,
-    })
+
+    const buscaNorm = busca.trim();
+    const params: { unidadeId?: string; busca?: string } = {};
+    if (unidadeSelecionada && unidadeSelecionada !== "todas") params.unidadeId = unidadeSelecionada;
+    if (buscaNorm) params.busca = buscaNorm;
+
+    clientesApi.listar(Object.keys(params).length ? params : undefined)
       .then((data) => {
         const items = data.content ?? data;
         setClientes(Array.isArray(items) ? items : []);
       })
-      .catch(() => setClientes([]))
+      .catch((err) => {
+        console.error("Erro ao carregar clientes:", err);
+        toast.error("Erro ao carregar clientes");
+        setClientes([]);
+      })
       .finally(() => setLoading(false));
   }, [busca, unidadeSelecionada]);
 
@@ -206,7 +239,7 @@ export const ClientesView = () => {
                   <p className="text-xs text-muted-foreground mt-0.5">{c.cpfCnpj}</p>
                 </div>
                 <Badge variant="outline" className="shrink-0 text-xs bg-accent text-foreground border-border">
-                  <Scale className="h-3 w-3 mr-1" />{c.totalProcessos ?? 0}
+                  <Scale className="h-3 w-3 mr-1" />{c.processos ?? 0}
                 </Badge>
               </div>
               <div className="mt-4 space-y-1.5">
@@ -220,7 +253,7 @@ export const ClientesView = () => {
                 </div>
               </div>
               <div className="mt-3 pt-3 border-t border-border/60 flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">{c.advogadoNome || "—"}</span>
+                <span className="text-xs text-muted-foreground">{c.advogadoResponsavel || "—"}</span>
                 <div className="flex items-center gap-1.5">
                   <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
                     <MapPin className="h-2.5 w-2.5" />{c.unidadeNome || "—"}
@@ -268,10 +301,10 @@ export const ClientesView = () => {
                     <p className="text-sm text-foreground">{c.telefone || "—"}</p>
                     <p className="text-xs text-muted-foreground">{c.email || "—"}</p>
                   </td>
-                  <td className="px-5 py-3.5 text-muted-foreground hidden lg:table-cell">{c.advogadoNome || "—"}</td>
+                  <td className="px-5 py-3.5 text-muted-foreground hidden lg:table-cell">{c.advogadoResponsavel || "—"}</td>
                   <td className="px-5 py-3.5">
                     <span className="inline-flex items-center gap-1 text-xs font-medium bg-accent text-foreground px-2 py-1 rounded-full">
-                      <Scale className="h-3 w-3" />{c.totalProcessos ?? 0}
+                      <Scale className="h-3 w-3" />{c.processos ?? 0}
                     </span>
                   </td>
                   <td className="px-3 py-3.5">
@@ -289,7 +322,7 @@ export const ClientesView = () => {
       </p>
 
       {clienteSelecionado && (
-        <ClienteDrawer cliente={clienteSelecionado} onClose={() => setClienteSelecionado(null)} />
+        <ClienteDrawer cliente={clienteSelecionado} onClose={() => setClienteSelecionado(null)} onDesativado={carregarClientes} />
       )}
 
       {/* Modais */}

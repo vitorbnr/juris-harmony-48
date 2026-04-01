@@ -10,7 +10,7 @@ spring:
     open-in-view: false
     properties:
       hibernate:
-        format_sql: true
+        format_sql: false
         jdbc:
           time_zone: America/Sao_Paulo
 
@@ -31,15 +31,21 @@ spring:
     time-zone: America/Sao_Paulo
     serialization:
       write-dates-as-timestamps: false
+    default-property-inclusion: non_null
 
 # ── Server ──
 server:
   port: 8081
+  # Em produção não expor detalhes de erro (stacktrace, mensagem interna)
   error:
-    include-message: always
+    include-message: never
+    include-binding-errors: never
+    include-stacktrace: never
+    include-exception: false
 
-# ── Logging ──
+# ── Logging padrão (sobrescrito por application-dev.yml / application-prod.yml) ──
 logging:
   level:
-    com.viana: DEBUG
-    org.springframework.security: DEBUG
+    com.viana: INFO
+    org.springframework.security: WARN
+    org.hibernate.SQL: WARN

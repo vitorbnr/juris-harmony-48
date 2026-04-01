@@ -41,12 +41,10 @@ public class PrazoController {
             Authentication authentication) {
 
         Usuario usuario = getUsuario(authentication);
-        // Não-admin só vê os próprios prazos
-        if (usuario.getPapel() != UserRole.ADMINISTRADOR) {
-            advogadoId = usuario.getId();
-        }
+        // Sobrescrevemos o ID solicitado para sempre ser o do próprio usuário (privacidade estrita)
+        UUID idParaListar = usuario.getId();
 
-        return ResponseEntity.ok(prazoService.listar(unidadeId, tipo, concluido, advogadoId, pageable));
+        return ResponseEntity.ok(prazoService.listar(unidadeId, tipo, concluido, idParaListar, pageable));
     }
 
     @GetMapping("/calendario")
@@ -58,24 +56,24 @@ public class PrazoController {
             Authentication authentication) {
 
         Usuario usuario = getUsuario(authentication);
-        if (usuario.getPapel() != UserRole.ADMINISTRADOR) {
-            advogadoId = usuario.getId();
-        }
-
-        return ResponseEntity.ok(prazoService.getCalendario(usuario.getId(), advogadoId, unidadeId, inicio, fim));
+        // Visão do calendário agora é sempre individual para todos os papéis
+        return ResponseEntity.ok(prazoService.getCalendario(usuario.getId(), unidadeId, inicio, fim));
     }
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO', 'SECRETARIA')")
-    public ResponseEntity<PrazoResponse> criar(@Valid @RequestBody CriarPrazoRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(prazoService.criar(request));
+    public ResponseEntity<PrazoResponse> criar(@Valid @RequestBody CriarPrazoRequest request, Authentication authentication) {
+        Usuario usuario = getUsuario(authentication);
+        return ResponseEntity.status(HttpStatus.CREATED).body(prazoService.criar(request, usuario.getId()));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO', 'SECRETARIA')")
     public ResponseEntity<PrazoResponse> atualizar(@PathVariable UUID id,
-                                                    @RequestBody AtualizarPrazoRequest request) {
-        return ResponseEntity.ok(prazoService.atualizar(id, request));
+                                                    @RequestBody AtualizarPrazoRequest request,
+                                                    Authentication authentication) {
+        Usuario usuario = getUsuario(authentication);
+        return ResponseEntity.ok(prazoService.atualizar(id, request, usuario.getId()));
     }
 
     @PatchMapping("/{id}/concluir")

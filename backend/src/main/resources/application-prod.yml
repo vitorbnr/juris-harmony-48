@@ -1,23 +1,29 @@
-# ── Perfil de Produção ──
+# ── Perfil de Produção (Hostinger VPS KVM1) ──
 spring:
   datasource:
-    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10
       minimum-idle: 2
+      idle-timeout: 300000      # 5 min
+      connection-timeout: 20000 # 20s
+      max-lifetime: 1200000     # 20 min
 
   jpa:
     show-sql: false
+
+# ── CORS em produção (sobrescrever via env se necessário) ──
+# A configuração de CORS está em CorsConfig.java
 
 # ── JWT ──
 app:
   jwt:
     secret: ${JWT_SECRET}
-    access-token-expiration-ms: 28800000
-    refresh-token-expiration-ms: 604800000
+    access-token-expiration-ms: 28800000   # 8 horas
+    refresh-token-expiration-ms: 604800000  # 7 dias
 
 # ── Cloudflare R2 ──
 app.storage:
@@ -27,8 +33,15 @@ app.storage:
   bucket: ${R2_BUCKET}
   region: auto
 
-# ── Logging ──
+# ── Logging produção ──
 logging:
   level:
     com.viana: INFO
     org.springframework.security: WARN
+    org.hibernate.SQL: OFF
+  file:
+    name: /var/log/viana-advocacia/app.log
+  logback:
+    rollingpolicy:
+      max-file-size: 50MB
+      max-history: 30

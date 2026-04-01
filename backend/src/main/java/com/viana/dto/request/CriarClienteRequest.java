@@ -22,7 +22,7 @@ public class CriarClienteRequest {
     private String tipo; // PESSOA_FISICA, PESSOA_JURIDICA
 
     @NotBlank(message = "CPF/CNPJ é obrigatório")
-    @Size(max = 20)
+    @Size(min = 11, max = 20, message = "CPF deve ter 11 dígitos e CNPJ 14 dígitos")
     private String cpfCnpj;
 
     private String email;

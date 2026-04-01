@@ -71,9 +71,11 @@ const Index = () => {
     <UnidadeProvider>
       <div className="flex min-h-screen bg-background">
         <AppSidebar activeItem={activeItem} onNavigate={setActiveItem} />
-        <main className="flex-1 min-w-0 flex flex-col">
+        <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
           <DashboardHeader activeItem={activeItem} onNavigate={setActiveItem} />
-          {renderContent(activeItem, setActiveItem)}
+          <div className="flex-1 min-h-0 overflow-auto">
+            {renderContent(activeItem, setActiveItem)}
+          </div>
         </main>
       </div>
     </UnidadeProvider>

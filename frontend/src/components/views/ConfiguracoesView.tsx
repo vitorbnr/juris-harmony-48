@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { usuariosApi, logsApi } from "@/services/api";
 import { NovoUsuarioModal } from "@/components/modals/NovoUsuarioModal";
+import { EditarUsuarioModal } from "@/components/modals/EditarUsuarioModal";
 import type { UserRole } from "@/types";
 
 // --- INTERFACES ADICIONADAS ---
@@ -51,17 +52,35 @@ const papelConfig: Record<UserRole | "advogado" | "secretaria" | "administrador"
 };
 
 const acaoCor: Record<string, string> = {
-  login: "bg-blue-500/15 text-blue-500",
-  criacao: "bg-green-500/15 text-green-500",
-  edicao: "bg-orange-500/15 text-orange-500",
-  exclusao: "bg-red-500/15 text-red-500",
+  LOGIN:      "bg-blue-500/15 text-blue-500",
+  ACESSOU:    "bg-blue-500/15 text-blue-500",
+  CRIOU:      "bg-green-500/15 text-green-500",
+  EDITOU:     "bg-orange-500/15 text-orange-500",
+  EXCLUIU:    "bg-red-500/15 text-red-500",
+  FEZ_UPLOAD: "bg-purple-500/15 text-purple-500",
+  BAIXOU:     "bg-cyan-500/15 text-cyan-500",
+  VISUALIZOU: "bg-muted text-muted-foreground",
+  // legado (minúsculo)
+  login:      "bg-blue-500/15 text-blue-500",
+  criacao:    "bg-green-500/15 text-green-500",
+  edicao:     "bg-orange-500/15 text-orange-500",
+  exclusao:   "bg-red-500/15 text-red-500",
 };
 
 const acaoLabel: Record<string, string> = {
-  login: "Login",
-  criacao: "Criação",
-  edicao: "Edição",
-  exclusao: "Desativação",
+  ACESSOU:    "Login",
+  LOGIN:      "Login",
+  CRIOU:      "Criação",
+  EDITOU:     "Edição",
+  EXCLUIU:    "Desativação",
+  FEZ_UPLOAD: "Upload",
+  BAIXOU:     "Download",
+  VISUALIZOU: "Visualizou",
+  // legado
+  login:      "Login",
+  criacao:    "Criação",
+  edicao:     "Edição",
+  exclusao:   "Desativação",
 };
 
 const moduloLabel: Record<string, string> = {
@@ -137,6 +156,7 @@ function TabEquipe() {
   const [papelFiltro, setPapelFiltro] = useState<string>("todos");
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [modalUsuario, setModalUsuario] = useState(false);
+  const [idUsuarioEdicao, setIdUsuarioEdicao] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const carregar = useCallback(() => {
@@ -240,7 +260,7 @@ function TabEquipe() {
                           <button
                             title="Editar"
                             className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-all"
-                            onClick={() => alert('Edição de usuário: em breve')}
+                            onClick={() => setIdUsuarioEdicao(u.id)}
                           >
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
@@ -280,6 +300,13 @@ function TabEquipe() {
       </div>
 
       {modalUsuario && <NovoUsuarioModal onClose={() => setModalUsuario(false)} onSaved={carregar} />}
+      {idUsuarioEdicao && (
+        <EditarUsuarioModal
+          usuarioId={idUsuarioEdicao}
+          onClose={() => setIdUsuarioEdicao(null)}
+          onSaved={carregar}
+        />
+      )}
     </div>
   );
 }
@@ -316,7 +343,7 @@ function TabLogs() {
               </div>
               <p className="text-sm text-muted-foreground mt-0.5">{log.descricao}</p>
               <p className="text-[10px] text-muted-foreground mt-1">
-                {new Date(log.dataHora).toLocaleString("pt-BR")} · IP {log.ipAddress}
+                {new Date(log.dataHora).toLocaleString("pt-BR")}
               </p>
             </div>
           </div>

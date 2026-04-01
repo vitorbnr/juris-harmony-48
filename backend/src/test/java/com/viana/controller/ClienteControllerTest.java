@@ -86,7 +86,7 @@ class ClienteControllerTest {
                 .tipo("PESSOA_FISICA")
                 .build();
 
-        when(clienteService.criar(any())).thenReturn(resp);
+        when(clienteService.criar(any(), any())).thenReturn(resp);
 
         mockMvc.perform(post("/api/clientes")
                         .contentType(MediaType.APPLICATION_JSON)

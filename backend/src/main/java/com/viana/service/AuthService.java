@@ -25,7 +25,7 @@ public class AuthService {
     private final UsuarioRepository usuarioRepository;
     private final LogAuditoriaService logAuditoriaService;
 
-    @Transactional(readOnly = true)
+    @Transactional
     public TokenResponse login(LoginRequest request) {
         try {
             Authentication authentication = authenticationManager.authenticate(
@@ -40,7 +40,7 @@ public class AuthService {
             // Log de auditoria do login
             try {
                 logAuditoriaService.registrar(usuario.getId(), TipoAcao.ACESSOU, ModuloLog.SISTEMA,
-                        "Login realizado: " + usuario.getNome(), request.getIpAddress());
+                        "Login realizado: " + usuario.getNome());
             } catch (Exception ignored) {}
 
             return buildTokenResponse(accessToken, refreshToken, usuario);

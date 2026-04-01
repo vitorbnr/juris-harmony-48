@@ -100,7 +100,7 @@ public class ProcessoService {
         // Log de auditoria (best-effort)
         try {
             logAuditoriaService.registrar(advogado.getId(), TipoAcao.CRIOU, ModuloLog.PROCESSOS,
-                    "Processo criado: " + request.getNumero() + " — " + cliente.getNome(), "sistema");
+                    "Processo criado: " + request.getNumero() + " — " + cliente.getNome());
         } catch (Exception ignored) {}
 
         return response;

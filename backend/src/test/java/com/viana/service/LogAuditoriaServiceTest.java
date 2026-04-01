@@ -54,7 +54,7 @@ class LogAuditoriaServiceTest {
     void registrar_Sucesso() {
         when(usuarioRepository.findById(usuarioId)).thenReturn(Optional.of(usuario));
 
-        logService.registrar(usuarioId, TipoAcao.CRIOU, ModuloLog.PROCESSOS, "Processo criado", "192.168.0.1");
+        logService.registrar(usuarioId, TipoAcao.CRIOU, ModuloLog.PROCESSOS, "Processo criado");
 
         verify(logRepository, times(1)).save(any(LogAuditoria.class));
     }
@@ -65,7 +65,7 @@ class LogAuditoriaServiceTest {
         UUID randomId = UUID.randomUUID();
         when(usuarioRepository.findById(randomId)).thenReturn(Optional.empty());
 
-        logService.registrar(randomId, TipoAcao.CRIOU, ModuloLog.PROCESSOS, "Processo criado", "192.168.0.1");
+        logService.registrar(randomId, TipoAcao.CRIOU, ModuloLog.PROCESSOS, "Processo criado");
 
         verify(logRepository, never()).save(any(LogAuditoria.class));
     }
@@ -79,7 +79,6 @@ class LogAuditoriaServiceTest {
                 .acao(TipoAcao.EDITOU)
                 .modulo(ModuloLog.CLIENTES)
                 .descricao("Cliente Editado")
-                .ip("127.0.0.1")
                 .dataHora(LocalDateTime.now())
                 .build();
 

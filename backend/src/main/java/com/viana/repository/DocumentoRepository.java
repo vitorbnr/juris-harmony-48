@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Repository
@@ -35,4 +36,16 @@ public interface DocumentoRepository extends JpaRepository<Documento, UUID> {
             @Param("processoId") UUID processoId,
             @Param("busca") String busca,
             Pageable pageable);
+
+    @Query("""
+        SELECT DISTINCT new map(
+            CAST(d.cliente.id AS string) as id,
+            d.cliente.nome as nome
+        )
+        FROM Documento d
+        WHERE d.cliente IS NOT NULL
+        ORDER BY d.cliente.nome ASC
+    """)
+    List<Map<String, String>> findDistinctClientes();
 }
+

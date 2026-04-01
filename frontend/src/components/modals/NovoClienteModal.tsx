@@ -43,8 +43,13 @@ export function NovoClienteModal({ onClose, onSaved, initialData }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const digitsOnly = form.cpfCnpj.replace(/\D/g, "");
     if (!form.nome || !form.cpfCnpj) {
       toast.error("Nome e CPF/CNPJ são obrigatórios");
+      return;
+    }
+    if (digitsOnly.length < 11) {
+      toast.error("CPF deve ter 11 dígitos e CNPJ deve ter 14 dígitos");
       return;
     }
     setLoading(true);
@@ -146,8 +151,12 @@ export function NovoClienteModal({ onClose, onSaved, initialData }: Props) {
         </form>
 
         <div className="px-6 py-4 border-t border-border flex gap-2">
-          <Button className="flex-1" onClick={handleSubmit} disabled={loading}>
-            {loading ? "Salvando..." : "Cadastrar Cliente"}
+          <Button
+            className="flex-1"
+            onClick={handleSubmit}
+            disabled={loading || form.cpfCnpj.replace(/\D/g, "").length < 11}
+          >
+            {loading ? "Salvando..." : initialData ? "Salvar Alterações" : "Cadastrar Cliente"}
           </Button>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
         </div>

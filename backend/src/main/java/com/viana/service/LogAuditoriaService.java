@@ -22,7 +22,7 @@ public class LogAuditoriaService {
     private final UsuarioRepository usuarioRepository;
 
     @Transactional
-    public void registrar(UUID usuarioId, TipoAcao acao, ModuloLog modulo, String descricao, String ip) {
+    public void registrar(UUID usuarioId, TipoAcao acao, ModuloLog modulo, String descricao) {
         Usuario usuario = usuarioRepository.findById(usuarioId).orElse(null);
         if (usuario == null) return;
 
@@ -31,7 +31,6 @@ public class LogAuditoriaService {
                 .acao(acao)
                 .modulo(modulo)
                 .descricao(descricao)
-                .ip(ip)
                 .build();
 
         logRepository.save(log);
@@ -46,12 +45,11 @@ public class LogAuditoriaService {
     private LogAuditoriaResponse toResponse(LogAuditoria l) {
         return LogAuditoriaResponse.builder()
                 .id(l.getId().toString())
-                .usuario(l.getUsuario().getNome())
+                .usuarioNome(l.getUsuario().getNome())
                 .acao(l.getAcao().name())
                 .modulo(l.getModulo().name())
                 .descricao(l.getDescricao())
                 .dataHora(l.getDataHora().toString())
-                .ip(l.getIp())
                 .build();
     }
 
@@ -61,11 +59,10 @@ public class LogAuditoriaService {
     @lombok.AllArgsConstructor
     public static class LogAuditoriaResponse {
         private String id;
-        private String usuario;
+        private String usuarioNome;
         private String acao;
         private String modulo;
         private String descricao;
         private String dataHora;
-        private String ip;
     }
 }

@@ -1,9 +1,9 @@
 # ── Perfil de Desenvolvimento ──
 spring:
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:viana_db}
-    username: ${DB_USERNAME:viana}
-    password: ${DB_PASSWORD:viana123}
+    url: jdbc:postgresql://localhost:5432/viana_db
+    username: viana
+    password: viana123
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -16,10 +16,13 @@ app:
     access-token-expiration-ms: 28800000   # 8 horas
     refresh-token-expiration-ms: 604800000  # 7 dias
 
-# ── Cloudflare R2 ──
+# ── Cloudflare R2 (credenciais para produção — manter como placeholder em DEV) ──
 app.storage:
   endpoint: ${R2_ENDPOINT:https://placeholder.r2.cloudflarestorage.com}
   access-key: ${R2_ACCESS_KEY:placeholder}
   secret-key: ${R2_SECRET_KEY:placeholder}
   bucket: ${R2_BUCKET:viana-dev}
   region: auto
+  # Modo local: salva arquivos em disco (true em DEV, false em PROD)
+  local: true
+  local-path: uploads

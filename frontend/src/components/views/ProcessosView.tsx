@@ -13,6 +13,7 @@ import { processosApi } from "@/services/api";
 import { NovoProcessoModal } from "@/components/modals/NovoProcessoModal";
 import { EditarProcessoModal } from "@/components/modals/EditarProcessoModal";
 import type { Processo, StatusProcesso, TipoProcesso } from "@/types";
+import { toast } from "sonner";
 
 const statusConfig: Record<StatusProcesso, { label: string; class: string; icon: React.ElementType }> = {
   "EM_ANDAMENTO": { label: "Em andamento", class: "bg-blue-500/15 text-blue-400 border-blue-500/20", icon: Clock },
@@ -159,16 +160,22 @@ export const ProcessosView = () => {
 
   const carregarProcessos = useCallback(() => {
     setLoading(true);
-    processosApi.listar({
-      // Filtragem por unidade feita SOMENTE no servidor — sem double-filter
-      unidadeId: unidadeSelecionada !== "todas" ? unidadeSelecionada : undefined,
-      busca: busca || undefined,
-    })
+
+    const buscaNorm = busca.trim();
+    const params: { unidadeId?: string; busca?: string } = {};
+    if (unidadeSelecionada && unidadeSelecionada !== "todas") params.unidadeId = unidadeSelecionada;
+    if (buscaNorm) params.busca = buscaNorm;
+
+    processosApi.listar(Object.keys(params).length ? params : undefined)
       .then((data) => {
         const items = data.content ?? data;
         setProcessos(Array.isArray(items) ? items : []);
       })
-      .catch(() => setProcessos([]))
+      .catch((err) => {
+        console.error("Erro ao carregar processos:", err);
+        toast.error("Erro ao carregar processos");
+        setProcessos([]);
+      })
       .finally(() => setLoading(false));
   }, [busca, unidadeSelecionada]);
 

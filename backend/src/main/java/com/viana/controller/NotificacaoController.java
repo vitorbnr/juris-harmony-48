@@ -43,6 +43,13 @@ public class NotificacaoController {
     public ResponseEntity<NotificacaoResponse> marcarComoLida(@PathVariable UUID id) {
         return ResponseEntity.ok(notificacaoService.marcarComoLida(id));
     }
+ 
+    @PatchMapping("/lidas")
+    public ResponseEntity<Void> marcarTodasLidas(Authentication authentication) {
+        UUID usuarioId = getUsuarioId(authentication);
+        notificacaoService.marcarTodasComoLidas(usuarioId);
+        return ResponseEntity.noContent().build();
+    }
 
     private UUID getUsuarioId(Authentication authentication) {
         String email = authentication.getName();

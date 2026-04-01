@@ -48,6 +48,12 @@ class PrazoServiceTest {
     @Mock
     private UnidadeRepository unidadeRepository;
 
+    @Mock
+    private LogAuditoriaService logAuditoriaService;
+
+    @Mock
+    private NotificacaoService notificacaoService;
+
     @InjectMocks
     private PrazoService prazoService;
 
@@ -87,11 +93,11 @@ class PrazoServiceTest {
     @DisplayName("getCalendario: Advogado deve ver APENAS os próprios prazos")
     void getCalendario_ParaAdvogado() {
         when(usuarioRepository.findById(advogado.getId())).thenReturn(Optional.of(advogado));
-        when(prazoRepository.findByAdvogadoIdAndDataBetween(eq(advogado.getId()), any(), any()))
+        when(prazoRepository.findCalendario(any(), any(), eq(advogado.getId()), any()))
                 .thenReturn(List.of(prazoMock));
 
         List<PrazoResponse> result = prazoService.getCalendario(
-                advogado.getId(), null, null, LocalDate.now().minusDays(1), LocalDate.now().plusDays(1));
+                advogado.getId(), null, LocalDate.now().minusDays(1), LocalDate.now().plusDays(1));
 
         assertEquals(1, result.size());
         assertEquals(prazoId.toString(), result.get(0).getId());
@@ -106,11 +112,10 @@ class PrazoServiceTest {
                 .thenReturn(List.of(prazoMock));
 
         List<PrazoResponse> result = prazoService.getCalendario(
-                secretaria.getId(), advogado.getId(), null, LocalDate.now().minusDays(1), LocalDate.now().plusDays(1));
+                secretaria.getId(), null, LocalDate.now().minusDays(1), LocalDate.now().plusDays(1));
 
         assertEquals(1, result.size());
         verify(prazoRepository, times(1)).findCalendario(any(), any(), any(), any());
-        verify(prazoRepository, never()).findByAdvogadoIdAndDataBetween(any(), any(), any());
     }
 
     @Test
@@ -122,9 +127,10 @@ class PrazoServiceTest {
         req.setTipo("PRAZO_PROCESSUAL");
         req.setPrioridade("MEDIA");
 
+        when(usuarioRepository.findById(advogado.getId())).thenReturn(Optional.of(advogado));
         when(prazoRepository.save(any(Prazo.class))).thenReturn(prazoMock);
 
-        PrazoResponse response = prazoService.criar(req);
+        PrazoResponse response = prazoService.criar(req, advogado.getId());
 
         assertNotNull(response);
         assertEquals(prazoId.toString(), response.getId());

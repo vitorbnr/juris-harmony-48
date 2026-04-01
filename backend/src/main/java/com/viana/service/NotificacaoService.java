@@ -40,6 +40,11 @@ public class NotificacaoService {
         notificacao.setLida(true);
         return toResponse(notificacaoRepository.save(notificacao));
     }
+ 
+    @Transactional
+    public void marcarTodasComoLidas(UUID usuarioId) {
+        notificacaoRepository.marcarTodasComoLidas(usuarioId);
+    }
 
     @Transactional
     public void criarNotificacao(UUID usuarioId, String titulo, String descricao, TipoNotificacao tipo, String link) {

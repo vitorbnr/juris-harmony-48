@@ -110,9 +110,9 @@ class PrazoRepositoryTest {
     }
 
     @Test
-    @DisplayName("Retorna Top 5 prazos pendentes futuros e de hoje")
-    void findTop5ByConcluidoFalseAndDataGreaterThanEqualOrderByDataAsc() {
-        List<Prazo> dashboard = prazoRepository.findTop5ByConcluidoFalseAndDataGreaterThanEqualOrderByDataAsc(hoje);
+    @DisplayName("Retorna Top 5 prazos pendentes futuros e de hoje para um advogado")
+    void findTop5ByAdvogadoIdAndConcluidoFalseAndDataGreaterThanEqualOrderByDataAsc() {
+        List<Prazo> dashboard = prazoRepository.findTop5ByAdvogadoIdAndConcluidoFalseAndDataGreaterThanEqualOrderByDataAsc(advogado1.getId(), hoje);
         assertThat(dashboard).hasSize(2);
         assertThat(dashboard.get(0).getData()).isEqualTo(hoje); // p1 vem primeiro
         assertThat(dashboard.get(1).getData()).isEqualTo(hoje.plusDays(4)); // p3 vem depois

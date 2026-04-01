@@ -171,6 +171,7 @@ export function EditarProcessoModal({ processo, onClose, onSaved }: Props) {
                 <Label>Advogado Responsável</Label>
                 <select value={form.advogadoId} onChange={e => set("advogadoId", e.target.value)}
                   className="w-full h-10 px-3 rounded-md bg-secondary text-foreground text-sm border-none outline-none">
+                  <option value="">— Selecionar advogado —</option>
                   {advogados.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
                 </select>
               </div>

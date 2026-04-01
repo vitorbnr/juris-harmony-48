@@ -1,21 +1,30 @@
 package com.viana.controller;
 
 import com.viana.dto.response.DocumentoResponse;
+import com.viana.model.Documento;
 import com.viana.model.Usuario;
+import com.viana.repository.DocumentoRepository;
 import com.viana.repository.UsuarioRepository;
 import com.viana.service.DocumentoService;
+import com.viana.service.LogAuditoriaService;
+import com.viana.service.StorageService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -25,7 +34,10 @@ import java.util.UUID;
 public class DocumentoController {
 
     private final DocumentoService documentoService;
+    private final DocumentoRepository documentoRepository;
     private final UsuarioRepository usuarioRepository;
+    private final LogAuditoriaService logAuditoriaService;
+    private final StorageService storageService;
 
     /** Listagem geral com filtros opcionais */
     @GetMapping
@@ -52,10 +64,40 @@ public class DocumentoController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    /** Download: retorna URL pré-assinada (PROD) ou URL de stream local (DEV) */
     @GetMapping("/{id}/download")
-    public ResponseEntity<Map<String, String>> download(@PathVariable UUID id) {
+    public ResponseEntity<Map<String, String>> download(
+            @PathVariable UUID id,
+            Authentication authentication) {
+        Documento doc = documentoRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Documento não encontrado"));
         String url = documentoService.getDownloadUrl(id);
-        return ResponseEntity.ok(Map.of("url", url));
+
+        // Auditoria de download
+        try {
+            UUID usuarioId = getUsuarioId(authentication);
+            logAuditoriaService.registrar(usuarioId,
+                    com.viana.model.enums.TipoAcao.BAIXOU,
+                    com.viana.model.enums.ModuloLog.DOCUMENTOS,
+                    "Download: " + doc.getNome());
+        } catch (Exception ignored) {}
+
+        return ResponseEntity.ok(Map.of("url", url, "nome", doc.getNome()));
+    }
+
+    /** Stream direto para modo DEV (local storage) */
+    @GetMapping("/stream/{encodedKey}")
+    public ResponseEntity<InputStreamResource> streamLocal(
+            @PathVariable String encodedKey) throws IOException {
+        // Decodifica o storageKey (__ → /)
+        String storageKey = encodedKey.replace("__", "/");
+        InputStream stream = storageService.getLocalStream(storageKey);
+        String filename = storageService.getOriginalFilename(storageKey);
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(new InputStreamResource(stream));
     }
 
     @GetMapping("/pasta/{pastaId}")
@@ -68,7 +110,7 @@ public class DocumentoController {
     @GetMapping("/cliente/{clienteId}")
     public ResponseEntity<Page<DocumentoResponse>> listarPorCliente(
             @PathVariable UUID clienteId,
-            @PageableDefault(size = 20, sort = "dataUpload", direction = Sort.Direction.DESC) Pageable pageable) {
+            @PageableDefault(size = 200, sort = "dataUpload", direction = Sort.Direction.DESC) Pageable pageable) {
         return ResponseEntity.ok(documentoService.listarPorCliente(clienteId, pageable));
     }
 
@@ -77,6 +119,12 @@ public class DocumentoController {
             @PathVariable UUID processoId,
             @PageableDefault(size = 20, sort = "dataUpload", direction = Sort.Direction.DESC) Pageable pageable) {
         return ResponseEntity.ok(documentoService.listarPorProcesso(processoId, pageable));
+    }
+
+    /** Retorna lista simples (sem paginação) de todos os clientes que possuem documentos */
+    @GetMapping("/clientes-com-documentos")
+    public ResponseEntity<List<Map<String, String>>> clientesComDocumentos() {
+        return ResponseEntity.ok(documentoService.listarClientesComDocumentos());
     }
 
     @DeleteMapping("/{id}")

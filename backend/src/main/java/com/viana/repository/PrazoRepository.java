@@ -15,14 +15,11 @@ import java.util.UUID;
 @Repository
 public interface PrazoRepository extends JpaRepository<Prazo, UUID> {
 
-    // Calendário do advogado (só vê o próprio)
-    List<Prazo> findByAdvogadoIdAndDataBetween(UUID advogadoId, LocalDate inicio, LocalDate fim);
-
-    // Calendário do admin/secretária (vê todos, opcionalmente filtrado por advogado)
+    // Calendário (sempre individual por usuário)
     @Query("""
         SELECT p FROM Prazo p
-        WHERE p.data BETWEEN :inicio AND :fim
-        AND (:advogadoId IS NULL OR p.advogado.id = :advogadoId)
+        WHERE p.advogado.id = :advogadoId
+        AND p.data BETWEEN :inicio AND :fim
         AND (:unidadeId IS NULL OR p.unidade.id = :unidadeId)
         ORDER BY p.data ASC, p.hora ASC
     """)
@@ -32,14 +29,20 @@ public interface PrazoRepository extends JpaRepository<Prazo, UUID> {
             @Param("advogadoId") UUID advogadoId,
             @Param("unidadeId") UUID unidadeId);
 
-    // Lista com filtros
-    @Query("""
+    // Lista com filtros (sempre individual por usuário)
+    @Query(value = """
         SELECT p FROM Prazo p
-        WHERE (:unidadeId IS NULL OR p.unidade.id = :unidadeId)
+        WHERE p.advogado.id = :advogadoId
+        AND (:unidadeId IS NULL OR p.unidade.id = :unidadeId)
         AND (:tipo IS NULL OR p.tipo = :tipo)
         AND (:concluido IS NULL OR p.concluido = :concluido)
-        AND (:advogadoId IS NULL OR p.advogado.id = :advogadoId)
         ORDER BY p.data ASC
+    """, countQuery = """
+        SELECT count(p) FROM Prazo p
+        WHERE p.advogado.id = :advogadoId
+        AND (:unidadeId IS NULL OR p.unidade.id = :unidadeId)
+        AND (:tipo IS NULL OR p.tipo = :tipo)
+        AND (:concluido IS NULL OR p.concluido = :concluido)
     """)
     Page<Prazo> findAllWithFilters(
             @Param("unidadeId") UUID unidadeId,
@@ -48,9 +51,9 @@ public interface PrazoRepository extends JpaRepository<Prazo, UUID> {
             @Param("advogadoId") UUID advogadoId,
             Pageable pageable);
 
-    // Próximos prazos não concluídos (dashboard)
-    List<Prazo> findTop5ByConcluidoFalseAndDataGreaterThanEqualOrderByDataAsc(LocalDate data);
+    // Próximos prazos não concluídos (dashboard) — individual por usuário
+    List<Prazo> findTop5ByAdvogadoIdAndConcluidoFalseAndDataGreaterThanEqualOrderByDataAsc(UUID advogadoId, LocalDate data);
 
-    // Contagem de prazos da semana
-    long countByConcluidoFalseAndDataBetween(LocalDate inicio, LocalDate fim);
+    // Contagem de prazos da semana — individual por usuário
+    long countByAdvogadoIdAndConcluidoFalseAndDataBetween(UUID advogadoId, LocalDate inicio, LocalDate fim);
 }

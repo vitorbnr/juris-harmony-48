@@ -74,7 +74,7 @@ class PrazoControllerTest {
                 .titulo("Petição")
                 .build();
 
-        when(prazoService.criar(any())).thenReturn(resp);
+        when(prazoService.criar(any(), any())).thenReturn(resp);
 
         mockMvc.perform(post("/api/prazos")
                         .contentType(MediaType.APPLICATION_JSON)

@@ -37,9 +37,20 @@ public class ClienteController {
     }
 
     @PostMapping
-    public ResponseEntity<ClienteResponse> criar(@Valid @RequestBody CriarClienteRequest request) {
-        ClienteResponse response = clienteService.criar(request);
+    public ResponseEntity<ClienteResponse> criar(@Valid @RequestBody CriarClienteRequest request, 
+                                                 org.springframework.security.core.Authentication authentication) {
+        // Captura o ID do usuário logado para o log de auditoria
+        UUID usuarioId = getUsuarioId(authentication);
+        ClienteResponse response = clienteService.criar(request, usuarioId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    private UUID getUsuarioId(org.springframework.security.core.Authentication auth) {
+        if (auth == null) return null;
+        // Depende de como o UsuarioPrincipal está no seu sistema, 
+        // mas aqui buscaremos pelo email no UsuárioRepository se necessário ou se o Principal já tiver o ID.
+        // Vou assumir que o controller já tem acesso ao UsuarioRepository ou chamará o service.
+        return clienteService.getUsuarioIdByEmail(auth.getName());
     }
 
     @PutMapping("/{id}")

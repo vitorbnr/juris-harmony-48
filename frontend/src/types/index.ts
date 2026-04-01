@@ -207,8 +207,7 @@ export interface Notificacao {
   descricao: string;
   tipo: TipoNotificacao;
   lida: boolean;
-  data: string;
-  hora: string;
+  criadaEm: string;
   link?: string; // seção para navegar ao clicar
 }
 

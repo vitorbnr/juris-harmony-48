@@ -212,11 +212,14 @@ function PrazoCard({ prazo, onAtualizar }: { prazo: Prazo; onAtualizar: () => vo
   };
 
   const Icon = prazo.prioridade === "alta" ? AlertCircle : prazo.concluido ? CheckCircle : Clock;
+  const hoje = new Date().toISOString().split("T")[0];
+  const atrasado = !prazo.concluido && prazo.data < hoje;
   return (
     <>
       <div className={cn(
       "rounded-xl border p-4 flex items-start gap-3 transition-all hover:border-primary/30",
       prazo.concluido ? "border-border/50 bg-muted/20 opacity-60" :
+      atrasado ? "border-red-600/50 bg-red-600/5" :
       prazo.prioridade === "alta" ? "border-red-500/30 bg-red-500/5" :
       "border-border bg-card"
     )}>
@@ -239,7 +242,10 @@ function PrazoCard({ prazo, onAtualizar }: { prazo: Prazo; onAtualizar: () => vo
             {prazo.titulo}
           </p>
           <div className="flex items-center gap-1.5 shrink-0">
-            {prazo.prioridade === "alta" && <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-red-500/10 text-red-500 uppercase">Alta</span>}
+            {atrasado && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-red-600/15 text-red-600 uppercase border border-red-600/30">Atrasado</span>
+            )}
+            {prazo.prioridade === "alta" && !atrasado && <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-red-500/10 text-red-500 uppercase">Alta</span>}
             {prazo.prioridade === "media" && <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-yellow-500/10 text-yellow-500 uppercase">Média</span>}
             {prazo.prioridade === "baixa" && <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-green-500/10 text-green-500 uppercase">Baixa</span>}
             <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-medium hidden sm:inline-flex", tipoCor[prazo.tipo])}>
