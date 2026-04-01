@@ -84,7 +84,7 @@ function UploadModal({ onClose, onSaved, initialClienteId, clientesList }: Uploa
   const [categoria, setCategoria] = useState("OUTROS");
   const [clienteId, setClienteId] = useState(initialClienteId || "");
   const [processoId, setProcessoId] = useState("");
-  const [processos, setProcessos] = useState<{ id: string; numero: string; clienteNome: string }[]>([]);
+  const [processos, setProcessos] = useState<{ id: string; numero: string; clienteNome: string; clienteId: string }[]>([]);
   const [progresso, setProgresso] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [concluido, setConcluido] = useState(false);
@@ -144,6 +144,28 @@ function UploadModal({ onClose, onSaved, initialClienteId, clientesList }: Uploa
       setUploading(false);
     }
   };
+
+  const handleClienteChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const cId = e.target.value;
+    setClienteId(cId);
+    if (!cId) {
+      setProcessoId("");
+    } else {
+      const p = processos.find(p => p.id === processoId);
+      if (p && p.clienteId !== cId) setProcessoId("");
+    }
+  };
+
+  const handleProcessoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const pId = e.target.value;
+    setProcessoId(pId);
+    if (pId) {
+      const p = processos.find(proc => proc.id === pId);
+      if (p?.clienteId) setClienteId(p.clienteId);
+    }
+  };
+
+  const processosFiltrados = processos.filter(p => !clienteId || p.clienteId === clienteId);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -221,7 +243,7 @@ function UploadModal({ onClose, onSaved, initialClienteId, clientesList }: Uploa
 
               <div className="space-y-1.5">
                 <Label>Atribuir ao cliente (opcional)</Label>
-                <select value={clienteId} onChange={e => setClienteId(e.target.value)}
+                <select value={clienteId} onChange={handleClienteChange}
                   className="w-full h-10 px-3 rounded-md bg-secondary text-foreground text-sm border-none outline-none">
                   <option value="">Nenhum cliente</option>
                   {clientesList.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
@@ -230,10 +252,10 @@ function UploadModal({ onClose, onSaved, initialClienteId, clientesList }: Uploa
 
               <div className="space-y-1.5">
                 <Label>Vincular ao processo (opcional)</Label>
-                <select value={processoId} onChange={e => setProcessoId(e.target.value)}
+                <select value={processoId} onChange={handleProcessoChange}
                   className="w-full h-10 px-3 rounded-md bg-secondary text-foreground text-sm border-none outline-none">
                   <option value="">Nenhum processo</option>
-                  {processos.map(p => <option key={p.id} value={p.id}>{p.numero} — {p.clienteNome?.split(" ")[0]}</option>)}
+                  {processosFiltrados.map(p => <option key={p.id} value={p.id}>{p.numero} — {p.clienteNome?.split(" ")[0]}</option>)}
                 </select>
               </div>
             </div>
@@ -302,15 +324,30 @@ export const DocumentosView = () => {
     try {
       const result = await documentosApi.downloadUrl(doc.id);
       const url = typeof result === "string" ? result : result.url;
-      // URL local (/api/documentos/stream/...) abre um link de download direto
-      const a = document.createElement("a");
-      a.href = url.startsWith("/") ? url : url;
-      a.download = doc.nome;
-      a.target = "_blank";
-      a.rel = "noopener noreferrer";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      const nome = typeof result === "string" ? doc.nome : (result.nome || doc.nome);
+      
+      if (url.startsWith("/")) {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Falha no fetch");
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = nome;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+      } else {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = nome;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
     } catch {
       toast.error("Erro ao obter link de download.");
     }
