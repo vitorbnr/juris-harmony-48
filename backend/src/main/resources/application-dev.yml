@@ -12,7 +12,8 @@ spring:
 # ── JWT ──
 app:
   jwt:
-    secret: ${JWT_SECRET:dev-secret-key-viana-advocacia-2026-min-256-bits-xxxxxxxxxxxxx}
+    # ATENÇÃO: deve ser Base64 puro (openssl rand -base64 64). Rotacionar antes do deploy!
+    secret: ${JWT_SECRET:ZGV2LXNlY3JldC1rZXktdmlhbmEtYWR2b2NhY2lhLTIwMjYtbWluLTI1Ni1iaXRzLXh4eA==}
     access-token-expiration-ms: 28800000   # 8 horas
     refresh-token-expiration-ms: 604800000  # 7 dias
 

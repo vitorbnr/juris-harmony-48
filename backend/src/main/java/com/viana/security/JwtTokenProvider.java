@@ -23,8 +23,9 @@ public class JwtTokenProvider {
             @Value("${app.jwt.secret}") String jwtSecret,
             @Value("${app.jwt.access-token-expiration-ms}") long accessTokenExpirationMs,
             @Value("${app.jwt.refresh-token-expiration-ms}") long refreshTokenExpirationMs) {
-        this.key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(
-                java.util.Base64.getEncoder().encodeToString(jwtSecret.getBytes())));
+        // O JWT_SECRET deve ser uma string em Base64 pura (ex: openssl rand -base64 64)
+        // Evitar qualquer recodificação que reduza a entropia real da chave HMAC
+        this.key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtSecret));
         this.accessTokenExpirationMs = accessTokenExpirationMs;
         this.refreshTokenExpirationMs = refreshTokenExpirationMs;
     }

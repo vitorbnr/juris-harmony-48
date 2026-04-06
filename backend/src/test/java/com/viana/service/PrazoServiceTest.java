@@ -90,9 +90,8 @@ class PrazoServiceTest {
     }
 
     @Test
-    @DisplayName("getCalendario: Advogado deve ver APENAS os próprios prazos")
+    @DisplayName("getCalendario: Advogado deve ver os prazos pelo calendário")
     void getCalendario_ParaAdvogado() {
-        when(usuarioRepository.findById(advogado.getId())).thenReturn(Optional.of(advogado));
         when(prazoRepository.findCalendario(any(), any(), eq(advogado.getId()), any()))
                 .thenReturn(List.of(prazoMock));
 
@@ -101,13 +100,12 @@ class PrazoServiceTest {
 
         assertEquals(1, result.size());
         assertEquals(prazoId.toString(), result.get(0).getId());
-        verify(prazoRepository, never()).findCalendario(any(), any(), any(), any());
+        verify(prazoRepository, times(1)).findCalendario(any(), any(), eq(advogado.getId()), any());
     }
 
     @Test
     @DisplayName("getCalendario: Secretaria/Admin deve ver TODOS os prazos com base no filtro")
     void getCalendario_ParaSecretariaOuAdmin() {
-        when(usuarioRepository.findById(secretaria.getId())).thenReturn(Optional.of(secretaria));
         when(prazoRepository.findCalendario(any(), any(), any(), any()))
                 .thenReturn(List.of(prazoMock));
 
@@ -138,13 +136,14 @@ class PrazoServiceTest {
     }
 
     @Test
-    @DisplayName("marcarConcluido: Deve inverter o status de conclusão do prazo")
+    @DisplayName("marcarConcluido: Deve inverter o status de conclusão do prazo (para o dono)")
     void marcarConcluido_Success() {
         when(prazoRepository.findById(prazoId)).thenReturn(Optional.of(prazoMock));
         when(prazoRepository.save(any(Prazo.class))).thenReturn(prazoMock);
 
         boolean initialStatus = prazoMock.getConcluido();
-        PrazoResponse response = prazoService.marcarConcluido(prazoId);
+        // Passar o ID do próprio advogado (dono do prazo)
+        PrazoResponse response = prazoService.marcarConcluido(prazoId, advogado.getId());
 
         assertNotEquals(initialStatus, response.isConcluido());
         verify(prazoRepository, times(1)).save(prazoMock);

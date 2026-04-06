@@ -75,8 +75,9 @@ public class PrazoController {
     }
 
     @PatchMapping("/{id}/concluir")
-    public ResponseEntity<PrazoResponse> concluir(@PathVariable UUID id) {
-        return ResponseEntity.ok(prazoService.marcarConcluido(id));
+    public ResponseEntity<PrazoResponse> concluir(@PathVariable UUID id, Authentication authentication) {
+        Usuario usuario = getUsuario(authentication);
+        return ResponseEntity.ok(prazoService.marcarConcluido(id, usuario.getId()));
     }
 
     @DeleteMapping("/{id}")

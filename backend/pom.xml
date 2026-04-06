@@ -84,6 +84,13 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- Rate Limiting (PATCH-003: proteção contra brute force no login) -->
+        <dependency>
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j-core</artifactId>
+            <version>8.10.1</version>
+        </dependency>
+
         <!-- Cloudflare R2 (S3 compatible) -->
         <dependency>
             <groupId>software.amazon.awssdk</groupId>

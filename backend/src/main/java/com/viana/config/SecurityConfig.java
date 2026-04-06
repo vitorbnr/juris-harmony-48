@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -34,6 +35,26 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+            // ── Headers de Segurança HTTP ──────────────────────────────────────────
+            .headers(headers -> headers
+                // Previne MIME sniffing (XSS via content-type)
+                .contentTypeOptions(Customizer.withDefaults())
+                // Previne Clickjacking
+                .frameOptions(frame -> frame.deny())
+                // Referrer-Policy: não vazar a URL em requisições externas
+                .referrerPolicy(ref -> ref
+                    .policy(org.springframework.security.web.header.writers
+                        .ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                // HSTS: forçar HTTPS por 1 ano (ativado via Nginx em produção de fato)
+                .httpStrictTransportSecurity(hsts -> hsts
+                    .includeSubDomains(true)
+                    .maxAgeInSeconds(31536000))
+                // CSP básica: bloquear frames de origens externas
+                .contentSecurityPolicy(csp -> csp
+                    .policyDirectives("default-src 'self'; frame-ancestors 'none'; object-src 'none';"))
+            )
+
             .authorizeHttpRequests(auth -> auth
                 // ── Público ──
                 .requestMatchers("/api/auth/**").permitAll()

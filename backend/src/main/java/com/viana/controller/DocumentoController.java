@@ -128,7 +128,20 @@ public class DocumentoController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> excluir(@PathVariable UUID id) {
+    public ResponseEntity<Void> excluir(@PathVariable UUID id, Authentication authentication) {
+        UUID usuarioId = getUsuarioId(authentication);
+        Documento doc = documentoRepository.findById(id)
+                .orElseThrow(() -> new com.viana.exception.ResourceNotFoundException("Documento não encontrado"));
+
+        // Apenas ADMINISTRADOR ou o próprio uploader podem deletar
+        boolean isAdmin = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMINISTRADOR"));
+        boolean isUploader = doc.getUploadedPor().getId().equals(usuarioId);
+
+        if (!isAdmin && !isUploader) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN).build();
+        }
+
         documentoService.excluir(id);
         return ResponseEntity.noContent().build();
     }

@@ -135,7 +135,17 @@ public class StorageService {
         if (!localMode) throw new BusinessException("Stream local indisponível no modo produção.");
         // storeKey com '/' foi codificado como '__' na URL
         String realKey = storageKey.replace("__", "/");
-        Path filePath = Paths.get(localPath, realKey);
+
+        // ── Proteção contra Path Traversal ─────────────────────────────────────
+        Path baseDir = Paths.get(localPath).toAbsolutePath().normalize();
+        Path filePath = baseDir.resolve(realKey).normalize();
+
+        // Garante que o caminho resolvido ainda está dentro do diretório base
+        if (!filePath.startsWith(baseDir)) {
+            throw new BusinessException("Acesso negado: caminho de arquivo inválido.");
+        }
+        // ─────────────────────────────────────────────────────────────
+
         if (!Files.exists(filePath)) throw new BusinessException("Arquivo não encontrado: " + realKey);
         return Files.newInputStream(filePath);
     }

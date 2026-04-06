@@ -22,11 +22,13 @@ public class CustomUserDetailsService implements UserDetailsService {
     @Override
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
+        // Usar a MESMA mensagem para usuário não encontrado e desativado
+        // Previne enumeração de usuários (User Enumeration Oracle — OWASP)
         Usuario usuario = usuarioRepository.findByEmailIgnoreCase(email)
-                .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado: " + email));
+                .orElseThrow(() -> new UsernameNotFoundException("Credenciais inválidas"));
 
         if (!usuario.getAtivo()) {
-            throw new UsernameNotFoundException("Usuário desativado: " + email);
+            throw new UsernameNotFoundException("Credenciais inválidas");
         }
 
         return new User(

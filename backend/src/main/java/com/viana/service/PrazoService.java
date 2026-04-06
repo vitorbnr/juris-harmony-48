@@ -14,7 +14,6 @@ import com.viana.model.enums.PrioridadePrazo;
 import com.viana.model.enums.TipoAcao;
 import com.viana.model.enums.TipoPrazo;
 import com.viana.model.enums.TipoNotificacao;
-import com.viana.model.enums.UserRole;
 import com.viana.repository.PrazoRepository;
 import com.viana.repository.ProcessoRepository;
 import com.viana.repository.UnidadeRepository;
@@ -153,9 +152,17 @@ public class PrazoService {
     }
 
     @Transactional
-    public PrazoResponse marcarConcluido(UUID id) {
+    public PrazoResponse marcarConcluido(UUID id, UUID usuarioLogadoId) {
         Prazo prazo = prazoRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Prazo não encontrado"));
+
+        // Isolamento total: apenas o próprio dono do prazo pode concluí-lo.
+        // Nem ADMINISTRADOR tem exceção — prazos são estritamente pessoais.
+        // (Mesma regra já aplicada em atualizar())
+        if (prazo.getAdvogado() == null || !prazo.getAdvogado().getId().equals(usuarioLogadoId)) {
+            throw new BusinessException("Você não tem permissão para alterar prazos de outros usuários.");
+        }
+
         prazo.setConcluido(!prazo.getConcluido());
         return toResponse(prazoRepository.save(prazo));
     }

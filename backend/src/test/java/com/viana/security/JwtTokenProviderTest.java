@@ -15,7 +15,9 @@ import static org.junit.jupiter.api.Assertions.*;
 class JwtTokenProviderTest {
 
     private JwtTokenProvider jwtTokenProvider;
-    private final String SECRET = "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970"; // 256-bit safe hex
+    // Secret em Base64 puro (como deve ser gerado com: openssl rand -base64 64)
+    // Valor decodifica para 48 bytes (384 bits) — adequado para HMAC-SHA256+
+    private final String SECRET = "ZGV2LXNlY3JldC1rZXktdmlhbmEtYWR2b2NhY2lhLTIwMjYtbWluLTI1Ni1iaXRzLXh4eA==";
     private final long ACCESS_EXPIRATION = 3600000; // 1h
     private final long REFRESH_EXPIRATION = 86400000; // 24h
 
