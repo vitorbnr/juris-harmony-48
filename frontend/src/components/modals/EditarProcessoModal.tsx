@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { processosApi, usuariosApi } from "@/services/api";
 import { toast } from "sonner";
+import { maskCurrency, parseCurrency } from "@/lib/masks";
 import type { Processo } from "@/types";
 
 const statusOpcoes = [
@@ -42,7 +43,7 @@ export function EditarProcessoModal({ processo, onClose, onSaved }: Props) {
   const [form, setForm] = useState({
     vara: processo.vara ?? "",
     tribunal: processo.tribunal ?? "",
-    valorCausa: processo.valorCausa ?? "",
+    valorCausa: processo.valorCausa ? maskCurrency(Number(processo.valorCausa).toFixed(2).replace(".", "")) : "",
     descricao: processo.descricao ?? "",
     advogadoId: processo.advogadoId ?? "",
     status: processo.status,
@@ -69,7 +70,7 @@ export function EditarProcessoModal({ processo, onClose, onSaved }: Props) {
       await processosApi.atualizar(processo.id, {
         vara: form.vara || null,
         tribunal: form.tribunal || null,
-        valorCausa: form.valorCausa ? parseFloat(form.valorCausa) : null,
+        valorCausa: form.valorCausa ? parseCurrency(form.valorCausa) : null,
         descricao: form.descricao || null,
         advogadoId: form.advogadoId || null,
       });
@@ -163,9 +164,9 @@ export function EditarProcessoModal({ processo, onClose, onSaved }: Props) {
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Valor da Causa (R$)</Label>
-                <Input type="number" step="0.01" value={form.valorCausa}
-                  onChange={e => set("valorCausa", e.target.value)} />
+                <Label>Valor da Causa</Label>
+                <Input type="text" placeholder="R$ 0,00" value={form.valorCausa}
+                  onChange={e => set("valorCausa", maskCurrency(e.target.value))} />
               </div>
               <div className="space-y-1.5">
                 <Label>Advogado Responsável</Label>

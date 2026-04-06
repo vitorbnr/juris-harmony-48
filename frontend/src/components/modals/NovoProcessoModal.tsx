@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { processosApi, clientesApi, unidadesApi } from "@/services/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { maskProcesso } from "@/lib/masks";
+import { maskProcesso, maskCurrency, parseCurrency } from "@/lib/masks";
 
 interface Props {
   onClose: () => void;
@@ -69,7 +69,7 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
     try {
       await processosApi.criar({
         ...form,
-        valorCausa: form.valorCausa ? parseFloat(form.valorCausa) : null,
+        valorCausa: form.valorCausa ? parseCurrency(form.valorCausa) : null,
       });
       toast.success("Processo cadastrado com sucesso!");
       onSaved?.();
@@ -132,8 +132,8 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
           </div>
 
           <div className="space-y-1.5">
-            <Label>Valor da causa (R$)</Label>
-            <Input type="number" step="0.01" placeholder="" value={form.valorCausa} onChange={e => set("valorCausa", e.target.value)} />
+            <Label>Valor da causa</Label>
+            <Input type="text" placeholder="R$ 0,00" value={form.valorCausa} onChange={e => set("valorCausa", maskCurrency(e.target.value))} />
           </div>
 
           <div className="space-y-1.5">

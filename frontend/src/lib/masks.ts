@@ -32,3 +32,17 @@ export const maskProcesso = (value: string) => {
   v = v.replace(/^(\d{7})-(\d{2})\.(\d{4})\.(\d{1})\.(\d{2})(\d)/, "$1-$2.$3.$4.$5.$6");
   return v;
 };
+
+export const maskCurrency = (value: string) => {
+  const v = value.replace(/\D/g, "");
+  if (!v) return "";
+  const num = (Number(v) / 100).toFixed(2);
+  const formatted = num.replace(".", ",").replace(/(\d)(?=(\d{3})+(?!\d))/g, "$1.");
+  return `R$ ${formatted}`;
+};
+
+export const parseCurrency = (value: string) => {
+  const v = value.replace(/\D/g, "");
+  if (!v) return null;
+  return Number(v) / 100;
+};
