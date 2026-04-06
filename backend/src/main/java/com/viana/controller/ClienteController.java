@@ -47,9 +47,6 @@ public class ClienteController {
 
     private UUID getUsuarioId(org.springframework.security.core.Authentication auth) {
         if (auth == null) return null;
-        // Depende de como o UsuarioPrincipal está no seu sistema, 
-        // mas aqui buscaremos pelo email no UsuárioRepository se necessário ou se o Principal já tiver o ID.
-        // Vou assumir que o controller já tem acesso ao UsuarioRepository ou chamará o service.
         return clienteService.getUsuarioIdByEmail(auth.getName());
     }
 

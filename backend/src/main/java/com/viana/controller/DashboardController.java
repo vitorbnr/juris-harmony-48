@@ -39,12 +39,11 @@ public class DashboardController {
         LocalDate inicioSemana = hoje.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         LocalDate fimSemana = hoje.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY));
 
-        // Clientes e Processos são visíveis por todos (conforme feedback)
+    
         long totalClientes = clienteRepository.countByAtivoTrue();
         long processosAtivos = processoRepository.countByStatusIn(
                 List.of(StatusProcesso.EM_ANDAMENTO, StatusProcesso.URGENTE, StatusProcesso.AGUARDANDO));
         
-        // Prazos são individuais (cada um vê o seu)
         long prazosSemana = prazoRepository.countByAdvogadoIdAndConcluidoFalseAndDataBetween(usuarioId, inicioSemana, fimSemana);
 
         List<ProcessoResponse> processosRecentes = processoService.listarRecentes(5);

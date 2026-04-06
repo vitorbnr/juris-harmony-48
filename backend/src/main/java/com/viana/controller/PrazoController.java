@@ -41,7 +41,6 @@ public class PrazoController {
             Authentication authentication) {
 
         Usuario usuario = getUsuario(authentication);
-        // Sobrescrevemos o ID solicitado para sempre ser o do próprio usuário (privacidade estrita)
         UUID idParaListar = usuario.getId();
 
         return ResponseEntity.ok(prazoService.listar(unidadeId, tipo, concluido, idParaListar, pageable));
@@ -56,7 +55,6 @@ public class PrazoController {
             Authentication authentication) {
 
         Usuario usuario = getUsuario(authentication);
-        // Visão do calendário agora é sempre individual para todos os papéis
         return ResponseEntity.ok(prazoService.getCalendario(usuario.getId(), unidadeId, inicio, fim));
     }
 

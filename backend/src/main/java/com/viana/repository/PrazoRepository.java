@@ -15,7 +15,6 @@ import java.util.UUID;
 @Repository
 public interface PrazoRepository extends JpaRepository<Prazo, UUID> {
 
-    // Calendário (sempre individual por usuário)
     @Query("""
         SELECT p FROM Prazo p
         WHERE p.advogado.id = :advogadoId
@@ -29,7 +28,6 @@ public interface PrazoRepository extends JpaRepository<Prazo, UUID> {
             @Param("advogadoId") UUID advogadoId,
             @Param("unidadeId") UUID unidadeId);
 
-    // Lista com filtros (sempre individual por usuário)
     @Query(value = """
         SELECT p FROM Prazo p
         WHERE p.advogado.id = :advogadoId
@@ -51,9 +49,7 @@ public interface PrazoRepository extends JpaRepository<Prazo, UUID> {
             @Param("advogadoId") UUID advogadoId,
             Pageable pageable);
 
-    // Próximos prazos não concluídos (dashboard) — individual por usuário
     List<Prazo> findTop5ByAdvogadoIdAndConcluidoFalseAndDataGreaterThanEqualOrderByDataAsc(UUID advogadoId, LocalDate data);
 
-    // Contagem de prazos da semana — individual por usuário
     long countByAdvogadoIdAndConcluidoFalseAndDataBetween(UUID advogadoId, LocalDate inicio, LocalDate fim);
 }

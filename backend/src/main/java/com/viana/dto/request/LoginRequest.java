@@ -18,6 +18,5 @@ public class LoginRequest {
     @NotBlank(message = "Senha é obrigatória")
     private String senha;
 
-    // Preenchido pelo controller a partir do cabeçalho X-Forwarded-For
     private String ipAddress;
 }

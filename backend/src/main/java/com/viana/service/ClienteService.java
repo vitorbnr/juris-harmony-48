@@ -164,7 +164,7 @@ public class ClienteService {
                 .cidade(c.getCidade())
                 .estado(c.getEstado())
                 .dataCadastro(c.getDataCadastro() != null ? c.getDataCadastro().toString() : "")
-                .processos(0L) // Temporariamente zerado para evitar erro 500 na listagem
+                .processos(0L) 
                 .advogadoResponsavel(c.getAdvogadoResponsavel() != null ? c.getAdvogadoResponsavel().getNome() : null)
                 .initials(c.getInitials())
                 .unidadeId(c.getUnidade() != null ? c.getUnidade().getId().toString() : null)

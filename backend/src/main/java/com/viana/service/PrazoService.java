@@ -43,7 +43,6 @@ public class PrazoService {
     @Transactional(readOnly = true)
     public List<PrazoResponse> getCalendario(UUID usuarioLogadoId, UUID unidadeId,
                                               LocalDate inicio, LocalDate fim) {
-        // Conforme feedback: cada um vê apenas seu próprio calendário individualmente
         List<Prazo> prazos = prazoRepository.findCalendario(inicio, fim, usuarioLogadoId, unidadeId);
         return prazos.stream().map(this::toResponse).toList();
     }
@@ -76,8 +75,6 @@ public class PrazoService {
                     .orElseThrow(() -> new ResourceNotFoundException("Processo não encontrado"));
         }
 
-        // Conforme feedback: cada um só adiciona no seu PRÓPRIO calendário.
-        // Ignoramos qualquer outro ID vindo do request.
         Usuario advogado = usuarioRepository.findById(usuarioLogadoId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário logado não encontrado"));
 
@@ -101,7 +98,6 @@ public class PrazoService {
 
         PrazoResponse response = toResponse(prazoRepository.save(prazo));
 
-        // Log de auditoria (quem criou) e Notificacao
         try {
             logAuditoriaService.registrar(usuarioLogadoId, TipoAcao.CRIOU, ModuloLog.PRAZOS,
                     "Prazo criado: " + request.getTitulo() + " para " + request.getData());
@@ -121,7 +117,6 @@ public class PrazoService {
         Prazo prazo = prazoRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Prazo não encontrado"));
 
-        // Segurança: só pode atualizar o próprio prazo
         if (!prazo.getAdvogado().getId().equals(usuarioLogadoId)) {
             throw new BusinessException("Você não tem permissão para editar prazos de outros usuários.");
         }
@@ -138,7 +133,6 @@ public class PrazoService {
             prazo.setPrioridade(parseEnumRequired(PrioridadePrazo.class, request.getPrioridade(), "Prioridade"));
         }
         
-        // Unidade e Processo podem ser alterados, mas o advogado no prazo continua sendo o dono
         if (request.getProcessoId() != null) {
             Processo p = processoRepository.findById(request.getProcessoId())
                     .orElseThrow(() -> new ResourceNotFoundException("Processo não encontrado"));
