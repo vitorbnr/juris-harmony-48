@@ -315,7 +315,7 @@ function TabLogs() {
   const [logs, setLogs] = useState<LogAcesso[]>([]);
 
   useEffect(() => {
-    logsApi.listar().then((res: { content?: LogAcesso[] } | LogAcesso[]) => {
+    logsApi.listar({ size: 1000 }).then((res: { content?: LogAcesso[] } | LogAcesso[]) => {
       const items = (res as { content?: LogAcesso[] }).content ?? res;
       setLogs(Array.isArray(items) ? (items as LogAcesso[]) : []);
     }).catch(() => {});

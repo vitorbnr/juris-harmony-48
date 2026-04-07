@@ -47,7 +47,7 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
   });
 
   useEffect(() => {
-    clientesApi.listar({ busca: "" }).then(data => {
+    clientesApi.listar({ size: 1000 }).then(data => {
       const items = data.content ?? data;
       setClientes(Array.isArray(items) ? items : []);
     }).catch(() => {});

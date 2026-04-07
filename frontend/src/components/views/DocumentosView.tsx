@@ -305,7 +305,7 @@ export const DocumentosView = () => {
 
   const carregarDocumentos = useCallback(() => {
     setLoading(true);
-    const params: { clienteId?: string; busca?: string } = {};
+    const params: { clienteId?: string; busca?: string; size?: number } = { size: 1000 };
     if (clienteSelecionado) params.clienteId = clienteSelecionado.id;
     if (busca.trim()) params.busca = busca.trim();
 

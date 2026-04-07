@@ -135,7 +135,7 @@ export const documentosApi = {
 
 // ─── Usuários ─────────────────────────────────────────────────────────────────
 export const usuariosApi = {
-  listar: () => api.get("/usuarios").then(r => r.data),
+  listar: () => api.get("/usuarios", { params: { size: 1000 } }).then(r => r.data),
   buscar: (id: string) => api.get(`/usuarios/${id}`).then(r => r.data),
   criar: (data: Record<string, unknown>) =>
     api.post("/usuarios", data).then(r => r.data),
@@ -147,7 +147,7 @@ export const usuariosApi = {
 
 // ─── Unidades ─────────────────────────────────────────────────────────────────
 export const unidadesApi = {
-  listar: () => api.get("/unidades").then(r => r.data),
+  listar: () => api.get("/unidades", { params: { size: 1000 } }).then(r => r.data),
 };
 
 // ─── Notificações ─────────────────────────────────────────────────────────────

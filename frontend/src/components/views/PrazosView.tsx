@@ -26,7 +26,7 @@ function AdicionarPrazoModal({ dataInicial, onClose, onSaved }: { dataInicial?: 
   const [processosLista, setProcessosLista] = useState<{ id: string; numero: string; clienteNome: string }[]>([]);
 
   useEffect(() => {
-    processosApi.listar({ busca: "" }).then(res => {
+    processosApi.listar({ size: 1000 }).then(res => {
       const items = res.content ?? res;
       setProcessosLista(Array.isArray(items) ? items : []);
     }).catch(() => {});
@@ -310,7 +310,7 @@ export const PrazosView = () => {
 
   const carregarPrazos = useCallback(() => {
     setLoading(true);
-    prazosApi.listar()
+    prazosApi.listar({ size: 1000 })
       .then((data) => {
         const items = data.content ?? data;
         setPrazos(Array.isArray(items) ? items : []);
