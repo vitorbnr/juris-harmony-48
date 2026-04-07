@@ -149,7 +149,7 @@ export const ClientesView = () => {
     setLoading(true);
 
     const buscaNorm = busca.trim();
-    const params: { unidadeId?: string; busca?: string } = {};
+    const params: { unidadeId?: string; busca?: string; size?: number } = { size: 1000 };
     if (unidadeSelecionada && unidadeSelecionada !== "todas") params.unidadeId = unidadeSelecionada;
     if (buscaNorm) params.busca = buscaNorm;
 
