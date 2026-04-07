@@ -1,5 +1,6 @@
 package com.viana.dto.request;
 
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -19,7 +20,9 @@ public class AtualizarClienteRequest {
     private String cpfCnpj;
     private String email;
     private String telefone;
+    @NotBlank(message = "Cidade é obrigatória")
     private String cidade;
+    @NotBlank(message = "Estado/UF é obrigatório")
     private String estado;
     private UUID advogadoId;
     private UUID unidadeId;

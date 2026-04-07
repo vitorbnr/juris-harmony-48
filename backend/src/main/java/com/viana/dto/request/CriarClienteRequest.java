@@ -27,7 +27,10 @@ public class CriarClienteRequest {
 
     private String email;
     private String telefone;
+    @NotBlank(message = "Cidade é obrigatória")
     private String cidade;
+
+    @NotBlank(message = "Estado/UF é obrigatório")
     private String estado;
 
     private UUID advogadoId;

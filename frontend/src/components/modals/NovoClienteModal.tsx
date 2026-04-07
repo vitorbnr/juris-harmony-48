@@ -44,8 +44,8 @@ export function NovoClienteModal({ onClose, onSaved, initialData }: Props) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const digitsOnly = form.cpfCnpj.replace(/\D/g, "");
-    if (!form.nome || !form.cpfCnpj) {
-      toast.error("Nome e CPF/CNPJ são obrigatórios");
+    if (!form.nome || !form.cpfCnpj || !form.cidade || !form.estado) {
+      toast.error("Nome, CPF/CNPJ, Cidade e UF são obrigatórios");
       return;
     }
     if (digitsOnly.length < 11) {
@@ -129,12 +129,12 @@ export function NovoClienteModal({ onClose, onSaved, initialData }: Props) {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Cidade</Label>
-              <Input placeholder="" value={form.cidade} onChange={e => set("cidade", e.target.value)} />
+              <Label>Cidade *</Label>
+              <Input placeholder="" value={form.cidade} onChange={e => set("cidade", e.target.value)} required />
             </div>
             <div className="space-y-1.5">
-              <Label>UF</Label>
-              <select value={form.estado} onChange={e => set("estado", e.target.value)}
+              <Label>UF *</Label>
+              <select value={form.estado} onChange={e => set("estado", e.target.value)} required
                 className="w-full h-10 px-3 rounded-md bg-secondary text-foreground text-sm border-none outline-none">
                 {estados.map(uf => <option key={uf} value={uf}>{uf}</option>)}
               </select>
