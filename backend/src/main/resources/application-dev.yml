@@ -14,8 +14,8 @@ app:
   jwt:
     # ATENÇÃO: deve ser Base64 puro (openssl rand -base64 64). Rotacionar antes do deploy!
     secret: ${JWT_SECRET:ZGV2LXNlY3JldC1rZXktdmlhbmEtYWR2b2NhY2lhLTIwMjYtbWluLTI1Ni1iaXRzLXh4eA==}
-    access-token-expiration-ms: 28800000   # 8 horas
-    refresh-token-expiration-ms: 604800000  # 7 dias
+    access-token-expiration-ms: 28800000 # 8 horas
+    refresh-token-expiration-ms: 604800000 # 7 dias
 
 # ── Cloudflare R2 (credenciais para produção — manter como placeholder em DEV) ──
 app.storage:
