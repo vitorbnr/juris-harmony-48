@@ -9,7 +9,7 @@ import { notificacoesApi, unidadesApi } from "@/services/api";
 import type { Notificacao, Unidade } from "@/types";
 
 const getSectionTitles = (userName: string): Record<string, { title: string; subtitle: string }> => ({
-  dashboard:    { title: `Olá, ${userName}`, subtitle: "Aqui está o resumo do escritório hoje. ㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤBuild v1.0.0" },
+  dashboard:    { title: `Olá, ${userName}`, subtitle: "Aqui está o resumo do escritório hoje. ㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤBuild v2.36.1" },
   processos:    { title: "Processos",          subtitle: "Gerencie todos os processos do escritório." },
   clientes:     { title: "Clientes",           subtitle: "Carteira de clientes do escritório." },
   prazos:       { title: "Prazos & Tarefas",   subtitle: "Acompanhe prazos processuais, audiências e tarefas." },
