@@ -8,9 +8,9 @@ spring:
     hikari:
       maximum-pool-size: 10
       minimum-idle: 2
-      idle-timeout: 300000      # 5 min
+      idle-timeout: 300000 # 5 min
       connection-timeout: 20000 # 20s
-      max-lifetime: 1200000     # 20 min
+      max-lifetime: 1200000 # 20 min
 
   jpa:
     show-sql: false
@@ -22,8 +22,8 @@ spring:
 app:
   jwt:
     secret: ${JWT_SECRET}
-    access-token-expiration-ms: 28800000   # 8 horas
-    refresh-token-expiration-ms: 604800000  # 7 dias
+    access-token-expiration-ms: 28800000 # 8 horas
+    refresh-token-expiration-ms: 604800000 # 7 dias
 
 # ── Cloudflare R2 ──
 app.storage:

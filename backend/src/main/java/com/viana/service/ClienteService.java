@@ -154,6 +154,11 @@ public class ClienteService {
     private ClienteResponse toResponse(Cliente c) {
         if (c == null) return null;
 
+        long numProcessos = 0;
+        if (c.getId() != null) {
+            numProcessos = processoRepository.countByClienteId(c.getId());
+        }
+
         return ClienteResponse.builder()
                 .id(c.getId() != null ? c.getId().toString() : "")
                 .nome(c.getNome())
@@ -164,7 +169,7 @@ public class ClienteService {
                 .cidade(c.getCidade())
                 .estado(c.getEstado())
                 .dataCadastro(c.getDataCadastro() != null ? c.getDataCadastro().toString() : "")
-                .processos(0L) 
+                .processos(numProcessos) 
                 .advogadoResponsavel(c.getAdvogadoResponsavel() != null ? c.getAdvogadoResponsavel().getNome() : null)
                 .initials(c.getInitials())
                 .unidadeId(c.getUnidade() != null ? c.getUnidade().getId().toString() : null)
