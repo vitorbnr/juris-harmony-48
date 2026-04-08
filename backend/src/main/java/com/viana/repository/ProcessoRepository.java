@@ -15,6 +15,8 @@ import java.util.UUID;
 @Repository
 public interface ProcessoRepository extends JpaRepository<Processo, UUID> {
 
+    boolean existsByNumero(String numero);
+
     long countByClienteId(UUID clienteId);
 
     long countByStatusIn(List<StatusProcesso> statuses);

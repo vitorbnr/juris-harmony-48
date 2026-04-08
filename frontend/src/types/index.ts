@@ -90,8 +90,11 @@ export interface Processo {
 export interface Movimentacao {
   id: string;
   data: string;
+  dataHora?: string;
   descricao: string;
-  tipo: "despacho" | "sentenca" | "audiencia" | "peticao" | "publicacao" | "outro";
+  tipo: string;
+  origem?: string;
+  orgaoJulgador?: string;
 }
 
 // ─── Prazos & Tarefas ────────────────────────────────────────────────────────

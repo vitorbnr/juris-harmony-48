@@ -1,10 +1,12 @@
 package com.viana.model;
 
+import com.viana.model.enums.OrigemMovimentacao;
 import com.viana.model.enums.TipoMovimentacao;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
@@ -31,4 +33,20 @@ public class Movimentacao {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private TipoMovimentacao tipo;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private OrigemMovimentacao origem = OrigemMovimentacao.MANUAL;
+
+    @Column
+    private Integer codigoExterno;
+
+    @Column(length = 255)
+    private String chaveExterna;
+
+    @Column(length = 255)
+    private String orgaoJulgador;
+
+    private LocalDateTime dataHoraOriginal;
 }

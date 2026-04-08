@@ -20,6 +20,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -73,7 +74,7 @@ class ProcessoRepositoryTest {
         Processo p1 = Processo.builder()
                 .numero("0000001-00.2024.8.26.0000")
                 .cliente(cliente)
-                .advogado(advogado)
+                .advogados(Set.of(advogado))
                 .unidade(unidade)
                 .tipo(TipoProcesso.CIVEL)
                 .status(StatusProcesso.EM_ANDAMENTO)
@@ -83,7 +84,7 @@ class ProcessoRepositoryTest {
         Processo p2 = Processo.builder()
                 .numero("0000002-00.2024.8.26.0000")
                 .cliente(cliente)
-                .advogado(advogado)
+                .advogados(Set.of(advogado))
                 .unidade(unidade)
                 .tipo(TipoProcesso.TRABALHISTA)
                 .status(StatusProcesso.CONCLUIDO)

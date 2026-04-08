@@ -1,8 +1,10 @@
 spring:
   application:
     name: viana-advocacia
+  config:
+    import: optional:file:.env[.properties]
 
-  # ── JPA / Hibernate ──
+  # â”€â”€ JPA / Hibernate â”€â”€
   jpa:
     hibernate:
       ddl-auto: validate
@@ -14,38 +16,43 @@ spring:
         jdbc:
           time_zone: America/Sao_Paulo
 
-  # ── Flyway ──
+  # â”€â”€ Flyway â”€â”€
   flyway:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
 
-  # ── Servlet (upload) ──
+  # â”€â”€ Servlet (upload) â”€â”€
   servlet:
     multipart:
       max-file-size: 100MB
       max-request-size: 100MB
 
-  # ── Jackson ──
+  # â”€â”€ Jackson â”€â”€
   jackson:
     time-zone: America/Sao_Paulo
     serialization:
       write-dates-as-timestamps: false
     default-property-inclusion: non_null
 
-# ── Server ──
+# â”€â”€ Server â”€â”€
 server:
   port: 8081
-  # Em produção não expor detalhes de erro (stacktrace, mensagem interna)
+  # Em produÃ§Ã£o nÃ£o expor detalhes de erro (stacktrace, mensagem interna)
   error:
     include-message: never
     include-binding-errors: never
     include-stacktrace: never
     include-exception: false
 
-# ── Logging padrão (sobrescrito por application-dev.yml / application-prod.yml) ──
+# â”€â”€ Logging padrÃ£o (sobrescrito por application-dev.yml / application-prod.yml) â”€â”€
 logging:
   level:
     com.viana: INFO
     org.springframework.security: WARN
     org.hibernate.SQL: WARN
+
+api:
+  datajud:
+    base-url: https://api-publica.datajud.cnj.jus.br
+    api-key: ${DATAJUD_API_KEY}

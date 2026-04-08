@@ -1,4 +1,4 @@
-# ── Perfil de Desenvolvimento ──
+# â”€â”€ Perfil de Desenvolvimento â”€â”€
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/viana_db
@@ -9,15 +9,15 @@ spring:
   jpa:
     show-sql: true
 
-# ── JWT ──
+# â”€â”€ JWT â”€â”€
 app:
   jwt:
-    # ATENÇÃO: deve ser Base64 puro (openssl rand -base64 64). Rotacionar antes do deploy!
+    # ATENÃ‡ÃƒO: deve ser Base64 puro (openssl rand -base64 64). Rotacionar antes do deploy!
     secret: ${JWT_SECRET:ZGV2LXNlY3JldC1rZXktdmlhbmEtYWR2b2NhY2lhLTIwMjYtbWluLTI1Ni1iaXRzLXh4eA==}
     access-token-expiration-ms: 28800000 # 8 horas
     refresh-token-expiration-ms: 604800000 # 7 dias
 
-# ── Cloudflare R2 (credenciais para produção — manter como placeholder em DEV) ──
+# â”€â”€ Cloudflare R2 (credenciais para produÃ§Ã£o â€” manter como placeholder em DEV) â”€â”€
 app.storage:
   endpoint: ${R2_ENDPOINT:https://placeholder.r2.cloudflarestorage.com}
   access-key: ${R2_ACCESS_KEY:placeholder}
@@ -27,3 +27,7 @@ app.storage:
   # Modo local: salva arquivos em disco (true em DEV, false em PROD)
   local: true
   local-path: uploads
+
+api:
+  datajud:
+    api-key: ${DATAJUD_API_KEY:datajud_api_key_dummy}

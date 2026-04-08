@@ -59,7 +59,10 @@ public class ProcessoResponse {
     public static class MovimentacaoResponse {
         private String id;
         private String data;
+        private String dataHora;
         private String descricao;
         private String tipo;
+        private String origem;
+        private String orgaoJulgador;
     }
 }

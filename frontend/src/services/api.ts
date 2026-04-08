@@ -2,6 +2,28 @@ import api from "@/lib/api";
 
 type ApiParams = Record<string, unknown>;
 
+export interface DatajudCapaResponse {
+  numeroCnj: string | null;
+  classe: string | null;
+  assunto: string | null;
+  tribunal: string | null;
+  orgaoJulgador: string | null;
+  dataDistribuicao: string | null;
+  valorCausa: string | null;
+  movimentacoes?: DatajudMovimentacaoResponse[];
+}
+
+export interface DatajudMovimentacaoResponse {
+  codigo: number | null;
+  nome: string | null;
+  descricao: string | null;
+  data: string | null;
+  dataHora: string | null;
+  orgaoJulgador: string | null;
+  tipo: string | null;
+  chaveExterna: string | null;
+}
+
 function cleanParams<T extends ApiParams | undefined>(params: T): T {
   if (!params) return params;
   const out: ApiParams = {};
@@ -36,6 +58,9 @@ export const processosApi = {
   }) => api.get("/processos", { params: cleanParams(params) }).then(r => r.data),
 
   buscar: (id: string) => api.get(`/processos/${id}`).then(r => r.data),
+
+  consultarCapaDatajud: (numero: string) =>
+    api.get(`/processos/consulta-datajud/${numero}`).then(r => r.data as DatajudCapaResponse),
 
   criar: (data: Record<string, unknown>) =>
     api.post("/processos", data).then(r => r.data),

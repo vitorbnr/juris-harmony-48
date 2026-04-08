@@ -1,29 +1,30 @@
-import { useState, useEffect } from "react";
-import { X, Plus, UserPlus } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Plus, UserPlus, X } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { processosApi, usuariosApi } from "@/services/api";
-import { toast } from "sonner";
 import { maskCurrency, parseCurrency } from "@/lib/masks";
+import { processosApi, usuariosApi } from "@/services/api";
 import type { Processo } from "@/types";
+import { toast } from "sonner";
 
 const statusOpcoes = [
   { value: "EM_ANDAMENTO", label: "Em Andamento" },
-  { value: "AGUARDANDO",   label: "Aguardando" },
-  { value: "URGENTE",      label: "Urgente" },
-  { value: "CONCLUIDO",    label: "Concluído" },
-  { value: "SUSPENSO",     label: "Suspenso" },
-  { value: "ARQUIVADO",    label: "Arquivado" },
+  { value: "AGUARDANDO", label: "Aguardando" },
+  { value: "URGENTE", label: "Urgente" },
+  { value: "CONCLUIDO", label: "Concluido" },
+  { value: "SUSPENSO", label: "Suspenso" },
+  { value: "ARQUIVADO", label: "Arquivado" },
 ];
 
 const tiposMovimentacao = [
-  { value: "DESPACHO",    label: "Despacho" },
-  { value: "SENTENCA",    label: "Sentença" },
-  { value: "AUDIENCIA",   label: "Audiência" },
-  { value: "PETICAO",     label: "Petição" },
-  { value: "PUBLICACAO",  label: "Publicação" },
-  { value: "OUTRO",       label: "Outro" },
+  { value: "DESPACHO", label: "Despacho" },
+  { value: "SENTENCA", label: "Sentenca" },
+  { value: "AUDIENCIA", label: "Audiencia" },
+  { value: "PETICAO", label: "Peticao" },
+  { value: "PUBLICACAO", label: "Publicacao" },
+  { value: "OUTRO", label: "Outro" },
 ];
 
 interface Props {
@@ -38,8 +39,8 @@ export function EditarProcessoModal({ processo, onClose, onSaved }: Props) {
   const [tab, setTab] = useState<Tab>("dados");
   const [loading, setLoading] = useState(false);
   const [todosAdvogados, setTodosAdvogados] = useState<{ id: string; nome: string }[]>([]);
+  const [advogadosError, setAdvogadosError] = useState("");
 
-  // ── Form de dados ──────────────────────────────────────────────────────────
   const [form, setForm] = useState({
     vara: processo.vara ?? "",
     tribunal: processo.tribunal ?? "",
@@ -48,13 +49,11 @@ export function EditarProcessoModal({ processo, onClose, onSaved }: Props) {
     status: processo.status,
   });
 
-  // Lista de advogados selecionados para este processo
   const [advogadosSelecionados, setAdvogadosSelecionados] = useState<{ id: string; nome: string }[]>(
-    processo.advogados ?? (processo.advogadoId ? [{ id: processo.advogadoId, nome: processo.advogadoNome ?? "" }] : [])
+    processo.advogados ?? (processo.advogadoId ? [{ id: processo.advogadoId, nome: processo.advogadoNome ?? "" }] : []),
   );
   const [advogadoSelecionarId, setAdvogadoSelecionarId] = useState("");
 
-  // ── Form de movimentação ───────────────────────────────────────────────────
   const [mov, setMov] = useState({
     data: new Date().toISOString().split("T")[0],
     descricao: "",
@@ -73,7 +72,9 @@ export function EditarProcessoModal({ processo, onClose, onSaved }: Props) {
     if (!advogadoSelecionarId) return;
     const adv = todosAdvogados.find(a => a.id === advogadoSelecionarId);
     if (!adv || advogadosSelecionados.some(a => a.id === adv.id)) return;
+
     setAdvogadosSelecionados(prev => [...prev, adv]);
+    setAdvogadosError("");
     setAdvogadoSelecionarId("");
   };
 
@@ -83,8 +84,14 @@ export function EditarProcessoModal({ processo, onClose, onSaved }: Props) {
 
   const advogadosDisponiveis = todosAdvogados.filter(a => !advogadosSelecionados.some(s => s.id === a.id));
 
-  // ── Salvar dados ───────────────────────────────────────────────────────────
   const salvarDados = async () => {
+    if (advogadosSelecionados.length === 0) {
+      const message = "Selecione ao menos um advogado responsavel.";
+      setAdvogadosError(message);
+      toast.error(message);
+      return;
+    }
+
     setLoading(true);
     try {
       await processosApi.atualizar(processo.id, {
@@ -98,7 +105,7 @@ export function EditarProcessoModal({ processo, onClose, onSaved }: Props) {
       onSaved();
       onClose();
     } catch {
-      toast.error("Erro ao salvar alterações");
+      toast.error("Erro ao salvar alteracoes");
     } finally {
       setLoading(false);
     }
@@ -119,15 +126,19 @@ export function EditarProcessoModal({ processo, onClose, onSaved }: Props) {
   };
 
   const salvarMovimentacao = async () => {
-    if (!mov.descricao.trim()) { toast.error("Descrição é obrigatória"); return; }
+    if (!mov.descricao.trim()) {
+      toast.error("Descricao e obrigatoria");
+      return;
+    }
+
     setLoading(true);
     try {
       await processosApi.adicionarMovimentacao(processo.id, mov);
-      toast.success("Movimentação registrada!");
+      toast.success("Movimentacao registrada!");
       onSaved();
       onClose();
     } catch {
-      toast.error("Erro ao registrar movimentação");
+      toast.error("Erro ao registrar movimentacao");
     } finally {
       setLoading(false);
     }
@@ -136,7 +147,7 @@ export function EditarProcessoModal({ processo, onClose, onSaved }: Props) {
   const tabs: { id: Tab; label: string }[] = [
     { id: "dados", label: "Editar Dados" },
     { id: "status", label: "Alterar Status" },
-    { id: "movimentacao", label: "+ Movimentação" },
+    { id: "movimentacao", label: "+ Movimentacao" },
   ];
 
   return (
@@ -153,7 +164,6 @@ export function EditarProcessoModal({ processo, onClose, onSaved }: Props) {
           </Button>
         </div>
 
-        {/* Tabs */}
         <div className="flex border-b border-border px-6">
           {tabs.map(t => (
             <button
@@ -186,18 +196,17 @@ export function EditarProcessoModal({ processo, onClose, onSaved }: Props) {
 
               <div className="space-y-1.5">
                 <Label>Valor da Causa</Label>
-                <Input type="text" placeholder="R$ 0,00" value={form.valorCausa}
-                  onChange={e => set("valorCausa", maskCurrency(e.target.value))} />
+                <Input
+                  type="text"
+                  placeholder="R$ 0,00"
+                  value={form.valorCausa}
+                  onChange={e => set("valorCausa", maskCurrency(e.target.value))}
+                />
               </div>
 
-              {/* ── Advogados Responsáveis ───────────────────────── */}
               <div className="space-y-2">
-                <Label>
-                  Advogados Responsáveis{" "}
-                  <span className="text-muted-foreground text-xs">(opcional)</span>
-                </Label>
+                <Label>Advogados Responsaveis *</Label>
 
-                {/* Chips dos selecionados */}
                 {advogadosSelecionados.length > 0 ? (
                   <div className="flex flex-wrap gap-1.5">
                     {advogadosSelecionados.map(a => (
@@ -218,10 +227,11 @@ export function EditarProcessoModal({ processo, onClose, onSaved }: Props) {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground">Nenhum advogado responsável.</p>
+                  <p className={`text-xs ${advogadosError ? "text-destructive" : "text-muted-foreground"}`}>
+                    {advogadosError || "Selecione ao menos um advogado responsavel."}
+                  </p>
                 )}
 
-                {/* Seletor + botão adicionar */}
                 {advogadosDisponiveis.length > 0 && (
                   <div className="flex gap-2">
                     <select
@@ -229,7 +239,7 @@ export function EditarProcessoModal({ processo, onClose, onSaved }: Props) {
                       onChange={e => setAdvogadoSelecionarId(e.target.value)}
                       className="flex-1 h-10 px-3 rounded-md bg-secondary text-foreground text-sm border-none outline-none"
                     >
-                      <option value="">— Adicionar advogado —</option>
+                      <option value="">- Adicionar advogado -</option>
                       {advogadosDisponiveis.map(a => (
                         <option key={a.id} value={a.id}>{a.nome}</option>
                       ))}
@@ -250,9 +260,13 @@ export function EditarProcessoModal({ processo, onClose, onSaved }: Props) {
               </div>
 
               <div className="space-y-1.5">
-                <Label>Descrição</Label>
-                <textarea className="w-full px-3 py-2 rounded-md bg-secondary text-foreground text-sm resize-none border-none outline-none"
-                  rows={3} value={form.descricao} onChange={e => set("descricao", e.target.value)} />
+                <Label>Descricao</Label>
+                <textarea
+                  className="w-full px-3 py-2 rounded-md bg-secondary text-foreground text-sm resize-none border-none outline-none"
+                  rows={3}
+                  value={form.descricao}
+                  onChange={e => set("descricao", e.target.value)}
+                />
               </div>
             </>
           )}
@@ -284,37 +298,49 @@ export function EditarProcessoModal({ processo, onClose, onSaved }: Props) {
           {tab === "movimentacao" && (
             <>
               <div className="space-y-1.5">
-                <Label>Tipo de Movimentação</Label>
-                <select value={mov.tipo} onChange={e => setMov(m => ({ ...m, tipo: e.target.value }))}
-                  className="w-full h-10 px-3 rounded-md bg-secondary text-foreground text-sm border-none outline-none">
+                <Label>Tipo de Movimentacao</Label>
+                <select
+                  value={mov.tipo}
+                  onChange={e => setMov(m => ({ ...m, tipo: e.target.value }))}
+                  className="w-full h-10 px-3 rounded-md bg-secondary text-foreground text-sm border-none outline-none"
+                >
                   {tiposMovimentacao.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
               </div>
               <div className="space-y-1.5">
                 <Label>Data</Label>
-                <Input type="date" value={mov.data}
-                  onChange={e => setMov(m => ({ ...m, data: e.target.value }))} />
+                <Input type="date" value={mov.data} onChange={e => setMov(m => ({ ...m, data: e.target.value }))} />
               </div>
               <div className="space-y-1.5">
-                <Label>Descrição da Movimentação *</Label>
-                <textarea className="w-full px-3 py-2 rounded-md bg-secondary text-foreground text-sm resize-none border-none outline-none"
-                  rows={4} placeholder="Descreva a movimentação processual..."
+                <Label>Descricao da Movimentacao *</Label>
+                <textarea
+                  className="w-full px-3 py-2 rounded-md bg-secondary text-foreground text-sm resize-none border-none outline-none"
+                  rows={4}
+                  placeholder="Descreva a movimentacao processual..."
                   value={mov.descricao}
-                  onChange={e => setMov(m => ({ ...m, descricao: e.target.value }))} />
+                  onChange={e => setMov(m => ({ ...m, descricao: e.target.value }))}
+                />
               </div>
             </>
           )}
         </div>
 
         <div className="px-6 py-4 border-t border-border flex gap-2">
-          <Button className="flex-1" disabled={loading} onClick={
-            tab === "dados" ? salvarDados :
-            tab === "status" ? salvarStatus :
-            salvarMovimentacao
-          }>
+          <Button
+            className="flex-1"
+            disabled={loading}
+            onClick={
+              tab === "dados" ? salvarDados
+                : tab === "status" ? salvarStatus
+                  : salvarMovimentacao
+            }
+          >
             {loading ? "Salvando..." : tab === "movimentacao" ? (
-              <><Plus className="h-4 w-4 mr-1" />Registrar Movimentação</>
-            ) : "Salvar Alterações"}
+              <>
+                <Plus className="h-4 w-4 mr-1" />
+                Registrar Movimentacao
+              </>
+            ) : "Salvar Alteracoes"}
           </Button>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
         </div>

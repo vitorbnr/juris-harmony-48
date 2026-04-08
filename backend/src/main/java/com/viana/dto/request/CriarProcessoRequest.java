@@ -1,6 +1,7 @@
 package com.viana.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -31,6 +32,7 @@ public class CriarProcessoRequest {
     /**
      * Lista de IDs dos advogados responsáveis (opcional — pode ser null ou vazia).
      */
+    @NotEmpty(message = "Pelo menos um advogado responsÃ¡vel Ã© obrigatÃ³rio")
     private List<UUID> advogadoIds;
 
     @NotBlank(message = "Status é obrigatório")

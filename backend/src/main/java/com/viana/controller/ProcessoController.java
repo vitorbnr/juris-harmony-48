@@ -3,7 +3,10 @@ package com.viana.controller;
 import com.viana.dto.request.AtualizarProcessoRequest;
 import com.viana.dto.request.CriarMovimentacaoRequest;
 import com.viana.dto.request.CriarProcessoRequest;
+import com.viana.dto.response.DatajudCapaResponse;
 import com.viana.dto.response.ProcessoResponse;
+import com.viana.exception.BusinessException;
+import com.viana.service.DatajudClientService;
 import com.viana.service.ProcessoService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +27,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ProcessoController {
 
+    private final DatajudClientService datajudClientService;
     private final ProcessoService processoService;
 
     @GetMapping
@@ -39,6 +43,16 @@ public class ProcessoController {
     @GetMapping("/{id}")
     public ResponseEntity<ProcessoResponse> buscar(@PathVariable UUID id) {
         return ResponseEntity.ok(processoService.buscarPorId(id));
+    }
+
+    @GetMapping("/consulta-datajud/{numeroCnj}")
+    public ResponseEntity<DatajudCapaResponse> consultarDatajud(@PathVariable String numeroCnj) {
+        String numeroCnjLimpo = numeroCnj == null ? "" : numeroCnj.replaceAll("\\D", "");
+        if (numeroCnjLimpo.length() != 20) {
+            throw new BusinessException("O número CNJ deve conter 20 dígitos.");
+        }
+
+        return ResponseEntity.ok(datajudClientService.buscarCapaProcesso(numeroCnjLimpo));
     }
 
     @PostMapping
