@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -27,8 +28,10 @@ public class CriarProcessoRequest {
     private String vara;
     private String tribunal;
 
-    @NotNull(message = "Advogado é obrigatório")
-    private UUID advogadoId;
+    /**
+     * Lista de IDs dos advogados responsáveis (opcional — pode ser null ou vazia).
+     */
+    private List<UUID> advogadoIds;
 
     @NotBlank(message = "Status é obrigatório")
     private String status;

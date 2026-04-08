@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -15,7 +16,13 @@ public class AtualizarProcessoRequest {
     private String tipo;
     private String vara;
     private String tribunal;
-    private UUID advogadoId;
+
+    /**
+     * Se presente (não-null), substitui completamente a lista de advogados responsáveis.
+     * Pode ser uma lista vazia para remover todos os advogados.
+     */
+    private List<UUID> advogadoIds;
+
     private String status;
     private LocalDate dataDistribuicao;
     private BigDecimal valorCausa;

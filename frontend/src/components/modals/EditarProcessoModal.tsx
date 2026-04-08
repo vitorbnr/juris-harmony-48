@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, Plus } from "lucide-react";
+import { X, Plus, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,19 +37,24 @@ type Tab = "dados" | "status" | "movimentacao";
 export function EditarProcessoModal({ processo, onClose, onSaved }: Props) {
   const [tab, setTab] = useState<Tab>("dados");
   const [loading, setLoading] = useState(false);
-  const [advogados, setAdvogados] = useState<{ id: string; nome: string }[]>([]);
+  const [todosAdvogados, setTodosAdvogados] = useState<{ id: string; nome: string }[]>([]);
 
-  // Form de dados
+  // ── Form de dados ──────────────────────────────────────────────────────────
   const [form, setForm] = useState({
     vara: processo.vara ?? "",
     tribunal: processo.tribunal ?? "",
     valorCausa: processo.valorCausa ? maskCurrency(Number(processo.valorCausa).toFixed(2).replace(".", "")) : "",
     descricao: processo.descricao ?? "",
-    advogadoId: processo.advogadoId ?? "",
     status: processo.status,
   });
 
-  // Form de movimentação
+  // Lista de advogados selecionados para este processo
+  const [advogadosSelecionados, setAdvogadosSelecionados] = useState<{ id: string; nome: string }[]>(
+    processo.advogados ?? (processo.advogadoId ? [{ id: processo.advogadoId, nome: processo.advogadoNome ?? "" }] : [])
+  );
+  const [advogadoSelecionarId, setAdvogadoSelecionarId] = useState("");
+
+  // ── Form de movimentação ───────────────────────────────────────────────────
   const [mov, setMov] = useState({
     data: new Date().toISOString().split("T")[0],
     descricao: "",
@@ -58,12 +63,27 @@ export function EditarProcessoModal({ processo, onClose, onSaved }: Props) {
 
   useEffect(() => {
     usuariosApi.listar().then((data: { id: string; nome: string; papel: string }[]) => {
-      setAdvogados(data.filter((u) => u.papel === "ADVOGADO" || u.papel === "ADMINISTRADOR"));
+      setTodosAdvogados(data.filter(u => u.papel === "ADVOGADO" || u.papel === "ADMINISTRADOR"));
     }).catch(() => {});
   }, []);
 
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
+  const adicionarAdvogado = () => {
+    if (!advogadoSelecionarId) return;
+    const adv = todosAdvogados.find(a => a.id === advogadoSelecionarId);
+    if (!adv || advogadosSelecionados.some(a => a.id === adv.id)) return;
+    setAdvogadosSelecionados(prev => [...prev, adv]);
+    setAdvogadoSelecionarId("");
+  };
+
+  const removerAdvogado = (id: string) => {
+    setAdvogadosSelecionados(prev => prev.filter(a => a.id !== id));
+  };
+
+  const advogadosDisponiveis = todosAdvogados.filter(a => !advogadosSelecionados.some(s => s.id === a.id));
+
+  // ── Salvar dados ───────────────────────────────────────────────────────────
   const salvarDados = async () => {
     setLoading(true);
     try {
@@ -72,7 +92,7 @@ export function EditarProcessoModal({ processo, onClose, onSaved }: Props) {
         tribunal: form.tribunal || null,
         valorCausa: form.valorCausa ? parseCurrency(form.valorCausa) : null,
         descricao: form.descricao || null,
-        advogadoId: form.advogadoId || null,
+        advogadoIds: advogadosSelecionados.map(a => a.id),
       });
       toast.success("Processo atualizado!");
       onSaved();
@@ -163,19 +183,72 @@ export function EditarProcessoModal({ processo, onClose, onSaved }: Props) {
                   <Input value={form.tribunal} onChange={e => set("tribunal", e.target.value)} />
                 </div>
               </div>
+
               <div className="space-y-1.5">
                 <Label>Valor da Causa</Label>
                 <Input type="text" placeholder="R$ 0,00" value={form.valorCausa}
                   onChange={e => set("valorCausa", maskCurrency(e.target.value))} />
               </div>
-              <div className="space-y-1.5">
-                <Label>Advogado Responsável</Label>
-                <select value={form.advogadoId} onChange={e => set("advogadoId", e.target.value)}
-                  className="w-full h-10 px-3 rounded-md bg-secondary text-foreground text-sm border-none outline-none">
-                  <option value="">— Selecionar advogado —</option>
-                  {advogados.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
-                </select>
+
+              {/* ── Advogados Responsáveis ───────────────────────── */}
+              <div className="space-y-2">
+                <Label>
+                  Advogados Responsáveis{" "}
+                  <span className="text-muted-foreground text-xs">(opcional)</span>
+                </Label>
+
+                {/* Chips dos selecionados */}
+                {advogadosSelecionados.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {advogadosSelecionados.map(a => (
+                      <span
+                        key={a.id}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/15 text-primary text-xs font-medium border border-primary/25"
+                      >
+                        {a.nome}
+                        <button
+                          type="button"
+                          onClick={() => removerAdvogado(a.id)}
+                          className="hover:text-destructive transition-colors ml-0.5"
+                          aria-label={`Remover ${a.nome}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Nenhum advogado responsável.</p>
+                )}
+
+                {/* Seletor + botão adicionar */}
+                {advogadosDisponiveis.length > 0 && (
+                  <div className="flex gap-2">
+                    <select
+                      value={advogadoSelecionarId}
+                      onChange={e => setAdvogadoSelecionarId(e.target.value)}
+                      className="flex-1 h-10 px-3 rounded-md bg-secondary text-foreground text-sm border-none outline-none"
+                    >
+                      <option value="">— Adicionar advogado —</option>
+                      {advogadosDisponiveis.map(a => (
+                        <option key={a.id} value={a.id}>{a.nome}</option>
+                      ))}
+                    </select>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={adicionarAdvogado}
+                      disabled={!advogadoSelecionarId}
+                      className="h-10 w-10 shrink-0"
+                      aria-label="Adicionar advogado"
+                    >
+                      <UserPlus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
+
               <div className="space-y-1.5">
                 <Label>Descrição</Label>
                 <textarea className="w-full px-3 py-2 rounded-md bg-secondary text-foreground text-sm resize-none border-none outline-none"

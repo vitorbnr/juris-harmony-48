@@ -9,7 +9,9 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
@@ -40,9 +42,18 @@ public class Processo {
     @Column(length = 50)
     private String tribunal;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "advogado_id", nullable = false)
-    private Usuario advogado;
+    /**
+     * Advogados responsáveis pelo processo (zero ou mais).
+     * Substituiu o antigo campo advogado (ManyToOne).
+     */
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "processo_advogados",
+        joinColumns = @JoinColumn(name = "processo_id"),
+        inverseJoinColumns = @JoinColumn(name = "usuario_id")
+    )
+    @Builder.Default
+    private Set<Usuario> advogados = new HashSet<>();
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

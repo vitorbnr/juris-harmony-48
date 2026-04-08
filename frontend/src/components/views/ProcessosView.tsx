@@ -75,7 +75,6 @@ function ProcessoDrawer({
                 { label: "Vara / Juízo", value: processo.vara || "—" },
                 { label: "Distribuição", value: processo.dataDistribuicao
                     ? new Date(processo.dataDistribuicao + "T00:00:00").toLocaleDateString("pt-BR") : "—" },
-                { label: "Advogado", value: processo.advogadoNome },
                 { label: "Valor da Causa", value: processo.valorCausa
                     ? `R$ ${parseFloat(processo.valorCausa).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—" },
               ].map(({ label, value }) => (
@@ -84,6 +83,26 @@ function ProcessoDrawer({
                   <p className="text-sm text-foreground font-medium mt-0.5 leading-tight">{value}</p>
                 </div>
               ))}
+            </div>
+
+            {/* Advogados */}
+            <div className="rounded-lg bg-muted/40 px-3 py-2.5">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">Advogados Responsáveis</p>
+              {processo.advogados && processo.advogados.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {processo.advogados.map(a => (
+                    <span key={a.id} className="inline-flex items-center px-2 py-0.5 rounded-full bg-primary/15 text-primary text-xs font-medium border border-primary/20">
+                      {a.nome}
+                    </span>
+                  ))}
+                </div>
+              ) : processo.advogadoNome ? (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-primary/15 text-primary text-xs font-medium border border-primary/20">
+                  {processo.advogadoNome}
+                </span>
+              ) : (
+                <p className="text-sm text-muted-foreground">—</p>
+              )}
             </div>
 
             {processo.descricao && (
@@ -320,7 +339,24 @@ export const ProcessosView = () => {
                         </div>
                       </td>
                       <td className="px-5 py-4 text-muted-foreground hidden md:table-cell">{p.tipo}</td>
-                      <td className="px-5 py-4 text-muted-foreground hidden lg:table-cell text-sm">{p.advogadoNome}</td>
+                      <td className="px-5 py-4 text-muted-foreground hidden lg:table-cell text-sm">
+                        {(() => {
+                          const advs = p.advogados && p.advogados.length > 0
+                            ? p.advogados
+                            : p.advogadoNome ? [{ id: p.advogadoId ?? "", nome: p.advogadoNome }] : [];
+                          if (advs.length === 0) return <span className="text-muted-foreground/50">—</span>;
+                          return (
+                            <span className="flex items-center gap-1">
+                              {advs[0].nome}
+                              {advs.length > 1 && (
+                                <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-primary/15 text-primary text-[9px] font-bold border border-primary/20">
+                                  +{advs.length - 1}
+                                </span>
+                              )}
+                            </span>
+                          );
+                        })()}
+                      </td>
                       <td className="px-5 py-4">
                         <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border", conf.class)}>
                           <Icon className="h-3 w-3" />{conf.label}

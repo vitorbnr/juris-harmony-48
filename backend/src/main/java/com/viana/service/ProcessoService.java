@@ -20,8 +20,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -73,13 +77,13 @@ public class ProcessoService {
     public ProcessoResponse criar(CriarProcessoRequest request) {
         Cliente cliente = clienteRepository.findById(request.getClienteId())
                 .orElseThrow(() -> new ResourceNotFoundException("Cliente não encontrado"));
-        Usuario advogado = usuarioRepository.findById(request.getAdvogadoId())
-                .orElseThrow(() -> new ResourceNotFoundException("Advogado não encontrado"));
         Unidade unidade = unidadeRepository.findById(request.getUnidadeId())
                 .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada"));
 
         StatusProcesso statusEnum = parseEnumRequired(StatusProcesso.class, request.getStatus(), "Status");
         TipoProcesso tipoEnum = parseEnumRequired(TipoProcesso.class, request.getTipo(), "Tipo");
+
+        Set<Usuario> advogados = resolverAdvogados(request.getAdvogadoIds());
 
         Processo processo = Processo.builder()
                 .numero(request.getNumero())
@@ -87,7 +91,7 @@ public class ProcessoService {
                 .tipo(tipoEnum)
                 .vara(request.getVara())
                 .tribunal(request.getTribunal())
-                .advogado(advogado)
+                .advogados(advogados)
                 .status(statusEnum)
                 .dataDistribuicao(request.getDataDistribuicao())
                 .valorCausa(request.getValorCausa())
@@ -99,8 +103,11 @@ public class ProcessoService {
 
         // Log de auditoria (best-effort)
         try {
-            logAuditoriaService.registrar(advogado.getId(), TipoAcao.CRIOU, ModuloLog.PROCESSOS,
-                    "Processo criado: " + request.getNumero() + " — " + cliente.getNome());
+            UUID logUserId = advogados.stream().findFirst().map(Usuario::getId).orElse(null);
+            if (logUserId != null) {
+                logAuditoriaService.registrar(logUserId, TipoAcao.CRIOU, ModuloLog.PROCESSOS,
+                        "Processo criado: " + request.getNumero() + " — " + cliente.getNome());
+            }
         } catch (Exception ignored) {}
 
         return response;
@@ -121,11 +128,13 @@ public class ProcessoService {
         if (request.getDataDistribuicao() != null)  processo.setDataDistribuicao(request.getDataDistribuicao());
         if (request.getValorCausa() != null)        processo.setValorCausa(request.getValorCausa());
         if (request.getDescricao() != null)         processo.setDescricao(request.getDescricao());
-        if (request.getAdvogadoId() != null) {
-            Usuario adv = usuarioRepository.findById(request.getAdvogadoId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Advogado não encontrado"));
-            processo.setAdvogado(adv);
+
+        // Substitui lista de advogados apenas quando o campo está presente no request
+        if (request.getAdvogadoIds() != null) {
+            processo.getAdvogados().clear();
+            processo.getAdvogados().addAll(resolverAdvogados(request.getAdvogadoIds()));
         }
+
         if (request.getUnidadeId() != null) {
             Unidade unidade = unidadeRepository.findById(request.getUnidadeId())
                     .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada"));
@@ -175,12 +184,35 @@ public class ProcessoService {
                 StatusProcesso.EM_ANDAMENTO, StatusProcesso.URGENTE, StatusProcesso.AGUARDANDO));
     }
 
+    // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+    private Set<Usuario> resolverAdvogados(List<UUID> ids) {
+        if (ids == null || ids.isEmpty()) return new HashSet<>();
+        return ids.stream()
+                .map(uid -> usuarioRepository.findById(uid)
+                        .orElseThrow(() -> new ResourceNotFoundException("Advogado não encontrado: " + uid)))
+                .collect(Collectors.toCollection(HashSet::new));
+    }
+
     private Processo findOrThrow(UUID id) {
         return processoRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Processo não encontrado"));
     }
 
     private ProcessoResponse toResponse(Processo p) {
+        List<ProcessoResponse.AdvogadoInfo> advogadoInfos = p.getAdvogados() == null
+                ? new ArrayList<>()
+                : p.getAdvogados().stream()
+                        .map(a -> ProcessoResponse.AdvogadoInfo.builder()
+                                .id(a.getId().toString())
+                                .nome(a.getNome())
+                                .build())
+                        .collect(Collectors.toList());
+
+        // Campos de compatibilidade: primeiro advogado da lista (ou null)
+        String advogadoId   = advogadoInfos.isEmpty() ? null : advogadoInfos.get(0).getId();
+        String advogadoNome = advogadoInfos.isEmpty() ? null : advogadoInfos.get(0).getNome();
+
         return ProcessoResponse.builder()
                 .id(p.getId().toString())
                 .numero(p.getNumero())
@@ -189,8 +221,9 @@ public class ProcessoService {
                 .tipo(p.getTipo().name())
                 .vara(p.getVara())
                 .tribunal(p.getTribunal())
-                .advogadoId(p.getAdvogado().getId().toString())
-                .advogadoNome(p.getAdvogado().getNome())
+                .advogados(advogadoInfos)
+                .advogadoId(advogadoId)
+                .advogadoNome(advogadoNome)
                 .status(p.getStatus().name())
                 .dataDistribuicao(p.getDataDistribuicao() != null ? p.getDataDistribuicao().toString() : null)
                 .ultimaMovimentacao(p.getUltimaMovimentacao() != null ? p.getUltimaMovimentacao().toString() : null)

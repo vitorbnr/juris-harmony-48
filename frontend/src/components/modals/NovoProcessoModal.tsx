@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
-import { X } from "lucide-react";
+import { X, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { processosApi, clientesApi, unidadesApi } from "@/services/api";
+import { processosApi, clientesApi, unidadesApi, usuariosApi } from "@/services/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import { maskProcesso, maskCurrency, parseCurrency } from "@/lib/masks";
@@ -31,6 +31,7 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
   const [loading, setLoading] = useState(false);
   const [clientes, setClientes] = useState<{ id: string; nome: string }[]>([]);
   const [unidades, setUnidades] = useState<{ id: string; nome: string }[]>([]);
+  const [advogados, setAdvogados] = useState<{ id: string; nome: string }[]>([]);
 
   const [form, setForm] = useState({
     numero: "",
@@ -38,13 +39,16 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
     tipo: "CIVEL",
     vara: "",
     tribunal: "",
-    advogadoId: user?.id ?? "",
     status: "EM_ANDAMENTO",
     dataDistribuicao: new Date().toISOString().split("T")[0],
     valorCausa: "",
     descricao: "",
     unidadeId: user?.unidadeId ?? "",
   });
+
+  // Lista de advogados selecionados
+  const [advogadosSelecionados, setAdvogadosSelecionados] = useState<{ id: string; nome: string }[]>([]);
+  const [advogadoSelecionarId, setAdvogadoSelecionarId] = useState("");
 
   useEffect(() => {
     clientesApi.listar({ size: 1000 }).then(data => {
@@ -55,9 +59,25 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
       const items = res.content ?? res;
       setUnidades(Array.isArray(items) ? items : []);
     }).catch(() => {});
+    usuariosApi.listar().then((data: { id: string; nome: string; papel: string }[]) => {
+      setAdvogados(data.filter(u => u.papel === "ADVOGADO" || u.papel === "ADMINISTRADOR"));
+    }).catch(() => {});
   }, []);
 
   const set = (key: string, value: string) => setForm(f => ({ ...f, [key]: value }));
+
+  const adicionarAdvogado = () => {
+    if (!advogadoSelecionarId) return;
+    const adv = advogados.find(a => a.id === advogadoSelecionarId);
+    if (!adv) return;
+    if (advogadosSelecionados.some(a => a.id === adv.id)) return;
+    setAdvogadosSelecionados(prev => [...prev, adv]);
+    setAdvogadoSelecionarId("");
+  };
+
+  const removerAdvogado = (id: string) => {
+    setAdvogadosSelecionados(prev => prev.filter(a => a.id !== id));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,6 +89,7 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
     try {
       await processosApi.criar({
         ...form,
+        advogadoIds: advogadosSelecionados.map(a => a.id),
         valorCausa: form.valorCausa ? parseCurrency(form.valorCausa) : null,
       });
       toast.success("Processo cadastrado com sucesso!");
@@ -81,6 +102,9 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
       setLoading(false);
     }
   };
+
+  // Advogados disponíveis para seleção (excluindo os já selecionados)
+  const advogadosDisponiveis = advogados.filter(a => !advogadosSelecionados.some(s => s.id === a.id));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -129,6 +153,62 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
               <Label>Tribunal</Label>
               <Input placeholder="" value={form.tribunal} onChange={e => set("tribunal", e.target.value)} />
             </div>
+          </div>
+
+          {/* ── Advogados Responsáveis ─────────────────────────── */}
+          <div className="space-y-2">
+            <Label>Advogados Responsáveis <span className="text-muted-foreground text-xs">(opcional)</span></Label>
+
+            {/* Chips dos selecionados */}
+            {advogadosSelecionados.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {advogadosSelecionados.map(a => (
+                  <span
+                    key={a.id}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/15 text-primary text-xs font-medium border border-primary/25"
+                  >
+                    {a.nome}
+                    <button
+                      type="button"
+                      onClick={() => removerAdvogado(a.id)}
+                      className="hover:text-destructive transition-colors ml-0.5"
+                      aria-label={`Remover ${a.nome}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Seletor + botão adicionar */}
+            {advogadosDisponiveis.length > 0 && (
+              <div className="flex gap-2">
+                <select
+                  value={advogadoSelecionarId}
+                  onChange={e => setAdvogadoSelecionarId(e.target.value)}
+                  className="flex-1 h-10 px-3 rounded-md bg-secondary text-foreground text-sm border-none outline-none"
+                >
+                  <option value="">— Selecionar advogado —</option>
+                  {advogadosDisponiveis.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
+                </select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={adicionarAdvogado}
+                  disabled={!advogadoSelecionarId}
+                  className="h-10 w-10 shrink-0"
+                  aria-label="Adicionar advogado"
+                >
+                  <UserPlus className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+
+            {advogadosDisponiveis.length === 0 && advogadosSelecionados.length > 0 && (
+              <p className="text-xs text-muted-foreground">Todos os advogados foram adicionados.</p>
+            )}
           </div>
 
           <div className="space-y-1.5">

@@ -71,8 +71,11 @@ export interface Processo {
   tipo: TipoProcesso;
   vara: string;
   tribunal: string;
-  advogadoId: string;
-  advogadoNome: string;
+  /** Lista completa de advogados responsáveis */
+  advogados?: { id: string; nome: string }[];
+  /** Compat: primeiro advogado da lista (pode ser null) */
+  advogadoId?: string;
+  advogadoNome?: string;
   status: StatusProcesso;
   dataDistribuicao: string;
   ultimaMovimentacao: string;
