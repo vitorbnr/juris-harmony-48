@@ -4,6 +4,7 @@ import {
   CalendarClock,
   CheckCircle,
   Clock,
+  Loader2,
   ListChecks,
   MoveLeft,
   MoveRight,
@@ -15,6 +16,7 @@ import {
 } from "lucide-react";
 
 import { CalendarioPrazos } from "@/components/prazos/CalendarioPrazos";
+import { PrazoDateCalculator } from "@/components/prazos/PrazoDateCalculator";
 import { EditarPrazoModal } from "@/components/modals/EditarPrazoModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -94,112 +96,116 @@ function AdicionarPrazoModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 overflow-y-auto p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md rounded-2xl border border-border bg-card shadow-2xl">
-        <div className="flex items-center justify-between border-b border-border px-6 py-5">
-          <h2 className="text-lg font-semibold text-foreground">Novo prazo / tarefa</h2>
-          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-
-        <div className="space-y-4 p-6">
-          <div className="space-y-1.5">
-            <Label>Titulo *</Label>
-            <Input value={titulo} onChange={(e) => setTitulo(e.target.value)} />
+      <div className="flex min-h-full items-start justify-center py-4 md:items-center">
+        <div className="relative flex w-full max-w-md max-h-[calc(100vh-2rem)] flex-col rounded-2xl border border-border bg-card shadow-2xl">
+          <div className="flex items-center justify-between border-b border-border px-6 py-5">
+            <h2 className="text-lg font-semibold text-foreground">Novo prazo / tarefa</h2>
+            <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
+              <X className="h-4 w-4" />
+            </Button>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-4 overflow-y-auto p-6">
             <div className="space-y-1.5">
-              <Label>Data *</Label>
-              <Input type="date" value={data} onChange={(e) => setData(e.target.value)} />
+              <Label>Titulo *</Label>
+              <Input value={titulo} onChange={(e) => setTitulo(e.target.value)} />
             </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Data *</Label>
+                <Input type="date" value={data} onChange={(e) => setData(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Hora</Label>
+                <Input type="time" value={hora} onChange={(e) => setHora(e.target.value)} />
+              </div>
+            </div>
+
+            <PrazoDateCalculator dataInicial={data} onAplicarData={setData} />
+
             <div className="space-y-1.5">
-              <Label>Hora</Label>
-              <Input type="time" value={hora} onChange={(e) => setHora(e.target.value)} />
+              <Label>Tipo</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {(Object.keys(tipoLabels) as TipoPrazo[]).map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setTipo(item)}
+                    className={cn(
+                      "rounded-lg border px-3 py-2 text-left text-sm transition-all",
+                      tipo === item
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border text-muted-foreground hover:border-primary/40",
+                    )}
+                  >
+                    {tipoLabels[item]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Prioridade</Label>
+              <div className="flex gap-2">
+                {(["alta", "media", "baixa"] as const).map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setPrioridade(item)}
+                    className={cn(
+                      "flex-1 rounded-lg border px-3 py-2 text-sm transition-all",
+                      prioridade === item
+                        ? item === "alta"
+                          ? "border-red-500/50 bg-red-500/10 text-red-400"
+                          : item === "media"
+                          ? "border-yellow-500/50 bg-yellow-500/10 text-yellow-400"
+                          : "border-primary/50 bg-primary/10 text-primary"
+                        : "border-border text-muted-foreground hover:border-primary/40",
+                    )}
+                  >
+                    {item === "alta" ? "Alta" : item === "media" ? "Media" : "Baixa"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Processo vinculado</Label>
+              <select
+                value={processoId}
+                onChange={(e) => setProcessoId(e.target.value)}
+                className="h-10 w-full rounded-md bg-secondary px-3 text-sm text-foreground outline-none"
+              >
+                <option value="">Nenhum processo</option>
+                {processosLista.map((processo) => (
+                  <option key={processo.id} value={processo.id}>
+                    {processo.numero} - {processo.clienteNome}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Descricao</Label>
+              <textarea
+                className="min-h-[120px] w-full rounded-md bg-secondary px-3 py-2 text-sm text-foreground outline-none"
+                value={descricao}
+                onChange={(e) => setDescricao(e.target.value)}
+              />
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <Label>Tipo</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {(Object.keys(tipoLabels) as TipoPrazo[]).map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => setTipo(item)}
-                  className={cn(
-                    "rounded-lg border px-3 py-2 text-left text-sm transition-all",
-                    tipo === item
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border text-muted-foreground hover:border-primary/40",
-                  )}
-                >
-                  {tipoLabels[item]}
-                </button>
-              ))}
-            </div>
+          <div className="flex shrink-0 gap-2 border-t border-border px-6 py-4">
+            <Button className="flex-1" onClick={handleSalvar} disabled={saving}>
+              {saving ? "Salvando..." : "Salvar"}
+            </Button>
+            <Button variant="outline" onClick={onClose}>
+              Cancelar
+            </Button>
           </div>
-
-          <div className="space-y-1.5">
-            <Label>Prioridade</Label>
-            <div className="flex gap-2">
-              {(["alta", "media", "baixa"] as const).map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => setPrioridade(item)}
-                  className={cn(
-                    "flex-1 rounded-lg border px-3 py-2 text-sm transition-all",
-                    prioridade === item
-                      ? item === "alta"
-                        ? "border-red-500/50 bg-red-500/10 text-red-400"
-                        : item === "media"
-                        ? "border-yellow-500/50 bg-yellow-500/10 text-yellow-400"
-                        : "border-primary/50 bg-primary/10 text-primary"
-                      : "border-border text-muted-foreground hover:border-primary/40",
-                  )}
-                >
-                  {item === "alta" ? "Alta" : item === "media" ? "Media" : "Baixa"}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Processo vinculado</Label>
-            <select
-              value={processoId}
-              onChange={(e) => setProcessoId(e.target.value)}
-              className="h-10 w-full rounded-md bg-secondary px-3 text-sm text-foreground outline-none"
-            >
-              <option value="">Nenhum processo</option>
-              {processosLista.map((processo) => (
-                <option key={processo.id} value={processo.id}>
-                  {processo.numero} - {processo.clienteNome}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Descricao</Label>
-            <textarea
-              className="min-h-[120px] w-full rounded-md bg-secondary px-3 py-2 text-sm text-foreground outline-none"
-              value={descricao}
-              onChange={(e) => setDescricao(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <div className="flex gap-2 border-t border-border px-6 py-4">
-          <Button className="flex-1" onClick={handleSalvar} disabled={saving}>
-            {saving ? "Salvando..." : "Salvar"}
-          </Button>
-          <Button variant="outline" onClick={onClose}>
-            Cancelar
-          </Button>
         </div>
       </div>
     </div>

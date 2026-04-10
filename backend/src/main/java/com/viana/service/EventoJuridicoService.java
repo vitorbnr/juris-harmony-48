@@ -91,11 +91,23 @@ public class EventoJuridicoService {
         Usuario usuario = usuarioRepository.findByEmailIgnoreCase(emailResponsavel)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario responsavel nao encontrado"));
 
-        evento.setResponsavel(usuario);
-        if (evento.getStatus() == StatusEventoJuridico.NOVO) {
-            evento.setStatus(StatusEventoJuridico.EM_TRIAGEM);
+        return atribuirResponsavel(evento, usuario);
+    }
+
+    @Transactional
+    public EventoJuridicoResponse atribuirResponsavel(UUID eventoId, UUID responsavelId) {
+        EventoJuridico evento = eventoJuridicoRepository.findById(eventoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Evento juridico nao encontrado"));
+
+        if (responsavelId == null) {
+            evento.setResponsavel(null);
+            return toResponse(eventoJuridicoRepository.save(evento));
         }
-        return toResponse(eventoJuridicoRepository.save(evento));
+
+        Usuario usuario = usuarioRepository.findById(responsavelId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario responsavel nao encontrado"));
+
+        return atribuirResponsavel(evento, usuario);
     }
 
     @Transactional
@@ -434,6 +446,34 @@ public class EventoJuridicoService {
                 .trim();
 
         return normalized.isBlank() ? null : normalized;
+    }
+
+    private EventoJuridicoResponse atribuirResponsavel(EventoJuridico evento, Usuario usuario) {
+        validarResponsavelAtivo(usuario);
+        validarResponsavelCompativelComProcesso(evento, usuario);
+
+        evento.setResponsavel(usuario);
+        if (evento.getStatus() == StatusEventoJuridico.NOVO) {
+            evento.setStatus(StatusEventoJuridico.EM_TRIAGEM);
+        }
+        return toResponse(eventoJuridicoRepository.save(evento));
+    }
+
+    private void validarResponsavelAtivo(Usuario usuario) {
+        if (!Boolean.TRUE.equals(usuario.getAtivo())) {
+            throw new BusinessException("O responsavel selecionado esta inativo.");
+        }
+    }
+
+    private void validarResponsavelCompativelComProcesso(EventoJuridico evento, Usuario usuario) {
+        Processo processo = evento.getProcesso();
+        if (processo == null || processo.getUnidade() == null || usuario.getUnidade() == null) {
+            return;
+        }
+
+        if (!processo.getUnidade().getId().equals(usuario.getUnidade().getId())) {
+            throw new BusinessException("O responsavel precisa pertencer a mesma unidade do processo.");
+        }
     }
 
     private record DistribuicaoAutomatica(Usuario responsavel, String parteRelacionada) {

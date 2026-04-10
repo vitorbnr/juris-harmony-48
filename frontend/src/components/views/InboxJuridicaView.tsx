@@ -15,12 +15,13 @@ import {
   X,
 } from "lucide-react";
 
+import { PrazoDateCalculator } from "@/components/prazos/PrazoDateCalculator";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
-import { eventosJuridicosApi, processosApi } from "@/services/api";
+import { eventosJuridicosApi, processosApi, usuariosApi } from "@/services/api";
 import type {
   EventoJuridico,
   FonteEventoJuridico,
@@ -29,6 +30,7 @@ import type {
   StatusEventoJuridico,
   TipoEventoJuridico,
   TipoPrazo,
+  Usuario,
 } from "@/types";
 import { toast } from "sonner";
 
@@ -152,85 +154,89 @@ function CriarPrazoEventoModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 overflow-y-auto p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-lg rounded-2xl border border-border bg-card shadow-2xl">
-        <div className="flex items-center justify-between border-b border-border px-6 py-5">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">Criar prazo do evento</h2>
-            <p className="text-sm text-muted-foreground">
-              O prazo sera criado manualmente, sem qualquer ciencia automatica.
-            </p>
-          </div>
-          <Button type="button" variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-
-        <div className="space-y-4 p-6">
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-foreground">Titulo</label>
-            <Input value={titulo} onChange={(event) => setTitulo(event.target.value)} />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">Data</label>
-              <Input type="date" value={data} onChange={(event) => setData(event.target.value)} />
+      <div className="flex min-h-full items-start justify-center py-4 md:items-center">
+        <div className="relative flex w-full max-w-lg max-h-[calc(100vh-2rem)] flex-col rounded-2xl border border-border bg-card shadow-2xl">
+          <div className="flex items-center justify-between border-b border-border px-6 py-5">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Criar prazo do evento</h2>
+              <p className="text-sm text-muted-foreground">
+                O prazo sera criado manualmente, sem qualquer ciencia automatica.
+              </p>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">Hora</label>
-              <Input type="time" value={hora} onChange={(event) => setHora(event.target.value)} />
-            </div>
+            <Button type="button" variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
+              <X className="h-4 w-4" />
+            </Button>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-4 overflow-y-auto p-6">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">Tipo</label>
-              <select
-                value={tipo}
-                onChange={(event) => setTipo(event.target.value as TipoPrazo)}
-                className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none"
-              >
-                <option value="prazo_processual">Prazo processual</option>
-                <option value="audiencia">Audiencia</option>
-                <option value="tarefa_interna">Tarefa interna</option>
-                <option value="reuniao">Reuniao</option>
-              </select>
+              <label className="text-sm font-medium text-foreground">Titulo</label>
+              <Input value={titulo} onChange={(event) => setTitulo(event.target.value)} />
             </div>
 
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">Data</label>
+                <Input type="date" value={data} onChange={(event) => setData(event.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">Hora</label>
+                <Input type="time" value={hora} onChange={(event) => setHora(event.target.value)} />
+              </div>
+            </div>
+
+            <PrazoDateCalculator dataInicial={data} onAplicarData={setData} />
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">Tipo</label>
+                <select
+                  value={tipo}
+                  onChange={(event) => setTipo(event.target.value as TipoPrazo)}
+                  className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none"
+                >
+                  <option value="prazo_processual">Prazo processual</option>
+                  <option value="audiencia">Audiencia</option>
+                  <option value="tarefa_interna">Tarefa interna</option>
+                  <option value="reuniao">Reuniao</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">Prioridade</label>
+                <select
+                  value={prioridade}
+                  onChange={(event) => setPrioridade(event.target.value as PrioridadePrazo)}
+                  className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none"
+                >
+                  <option value="alta">Alta</option>
+                  <option value="media">Media</option>
+                  <option value="baixa">Baixa</option>
+                </select>
+              </div>
+            </div>
+
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">Prioridade</label>
-              <select
-                value={prioridade}
-                onChange={(event) => setPrioridade(event.target.value as PrioridadePrazo)}
-                className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none"
-              >
-                <option value="alta">Alta</option>
-                <option value="media">Media</option>
-                <option value="baixa">Baixa</option>
-              </select>
+              <label className="text-sm font-medium text-foreground">Descricao</label>
+              <textarea
+                className="min-h-[120px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none"
+                value={descricao}
+                onChange={(event) => setDescricao(event.target.value)}
+              />
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-foreground">Descricao</label>
-            <textarea
-              className="min-h-[120px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none"
-              value={descricao}
-              onChange={(event) => setDescricao(event.target.value)}
-            />
+          <div className="flex shrink-0 gap-2 border-t border-border px-6 py-4">
+            <Button type="button" className="flex-1 gap-2" onClick={salvar} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarClock className="h-4 w-4" />}
+              Criar prazo
+            </Button>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancelar
+            </Button>
           </div>
-        </div>
-
-        <div className="flex gap-2 border-t border-border px-6 py-4">
-          <Button type="button" className="flex-1 gap-2" onClick={salvar} disabled={saving}>
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarClock className="h-4 w-4" />}
-            Criar prazo
-          </Button>
-          <Button type="button" variant="outline" onClick={onClose}>
-            Cancelar
-          </Button>
         </div>
       </div>
     </div>
@@ -240,14 +246,18 @@ function CriarPrazoEventoModal({
 export const InboxJuridicaView = () => {
   const { user } = useAuth();
   const [eventos, setEventos] = useState<EventoJuridico[]>([]);
+  const [usuariosResponsaveis, setUsuariosResponsaveis] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncingDomicilio, setSyncingDomicilio] = useState(false);
   const [assumindoId, setAssumindoId] = useState<string | null>(null);
   const [eventoEmVinculo, setEventoEmVinculo] = useState<string | null>(null);
+  const [eventoEmAtribuicao, setEventoEmAtribuicao] = useState<string | null>(null);
   const [buscaProcessoPorEvento, setBuscaProcessoPorEvento] = useState<Record<string, string>>({});
   const [resultadosProcessoPorEvento, setResultadosProcessoPorEvento] = useState<Record<string, Processo[]>>({});
+  const [responsavelSelecionadoPorEvento, setResponsavelSelecionadoPorEvento] = useState<Record<string, string>>({});
   const [buscandoProcessoId, setBuscandoProcessoId] = useState<string | null>(null);
   const [vinculandoProcessoId, setVinculandoProcessoId] = useState<string | null>(null);
+  const [atribuindoResponsavelId, setAtribuindoResponsavelId] = useState<string | null>(null);
   const [eventoPrazo, setEventoPrazo] = useState<EventoJuridico | null>(null);
   const [filtroStatus, setFiltroStatus] = useState<FiltroStatus>("TODOS");
   const [filtroFonte, setFiltroFonte] = useState<FiltroFonte>("TODAS");
@@ -278,6 +288,19 @@ export const InboxJuridicaView = () => {
   useEffect(() => {
     void carregarEventos();
   }, [carregarEventos]);
+
+  useEffect(() => {
+    usuariosApi
+      .listar()
+      .then((res: { content?: Usuario[] } | Usuario[]) => {
+        const items = (res as { content?: Usuario[] }).content ?? res;
+        const usuarios = (Array.isArray(items) ? items : [])
+          .filter((item) => item.ativo !== false)
+          .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }));
+        setUsuariosResponsaveis(usuarios);
+      })
+      .catch(() => setUsuariosResponsaveis([]));
+  }, []);
 
   const atualizarStatus = async (id: string, status: StatusEventoJuridico) => {
     try {
@@ -323,6 +346,36 @@ export const InboxJuridicaView = () => {
       toast.error("Nao foi possivel assumir este item.");
     } finally {
       setAssumindoId(null);
+    }
+  };
+
+  const abrirAtribuicao = (evento: EventoJuridico) => {
+    setEventoEmAtribuicao((current) => (current === evento.id ? null : evento.id));
+    setResponsavelSelecionadoPorEvento((current) => ({
+      ...current,
+      [evento.id]: current[evento.id] ?? evento.responsavelId ?? "",
+    }));
+  };
+
+  const atribuirResponsavel = async (eventoId: string) => {
+    setAtribuindoResponsavelId(eventoId);
+    try {
+      const atualizado = await eventosJuridicosApi.atribuirResponsavel(
+        eventoId,
+        responsavelSelecionadoPorEvento[eventoId] || null,
+      );
+      setEventos((current) => current.map((evento) => (evento.id === eventoId ? atualizado : evento)));
+      setEventoEmAtribuicao(null);
+      toast.success(
+        atualizado.responsavelNome
+          ? `Item atribuido para ${atualizado.responsavelNome}.`
+          : "Responsavel removido do item.",
+      );
+    } catch (error) {
+      console.error("Erro ao atribuir responsavel:", error);
+      toast.error("Nao foi possivel atualizar o responsavel deste item.");
+    } finally {
+      setAtribuindoResponsavelId(null);
     }
   };
 
@@ -624,6 +677,52 @@ export const InboxJuridicaView = () => {
                       </div>
                     </div>
                   )}
+
+                  {eventoEmAtribuicao === evento.id && (
+                    <div className="space-y-3 rounded-xl border border-border bg-background/60 p-4">
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-foreground">Atribuir responsavel</p>
+                        <p className="text-xs text-muted-foreground">
+                          Esta distribuicao e interna ao escritorio. Ela nao registra ciencia nem pratica qualquer ato no sistema oficial.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col gap-3 md:flex-row">
+                        <select
+                          value={responsavelSelecionadoPorEvento[evento.id] ?? ""}
+                          onChange={(event) =>
+                            setResponsavelSelecionadoPorEvento((current) => ({
+                              ...current,
+                              [evento.id]: event.target.value,
+                            }))
+                          }
+                          className="h-10 flex-1 rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none"
+                        >
+                          <option value="">Sem responsavel</option>
+                          {usuariosResponsaveis.map((usuario) => (
+                            <option key={usuario.id} value={usuario.id}>
+                              {usuario.nome}
+                              {usuario.unidadeNome ? ` - ${usuario.unidadeNome}` : ""}
+                            </option>
+                          ))}
+                        </select>
+
+                        <Button
+                          type="button"
+                          className="gap-2"
+                          onClick={() => atribuirResponsavel(evento.id)}
+                          disabled={atribuindoResponsavelId === evento.id}
+                        >
+                          {atribuindoResponsavelId === evento.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <UserCheck className="h-4 w-4" />
+                          )}
+                          Salvar atribuicao
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 lg:w-[240px] lg:justify-end">
@@ -638,6 +737,15 @@ export const InboxJuridicaView = () => {
                       Vincular processo
                     </Button>
                   )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="gap-2"
+                    onClick={() => abrirAtribuicao(evento)}
+                  >
+                    <ArrowRightLeft className="h-4 w-4" />
+                    Atribuir
+                  </Button>
                   {evento.responsavelId !== user?.id && (
                     <Button
                       type="button"

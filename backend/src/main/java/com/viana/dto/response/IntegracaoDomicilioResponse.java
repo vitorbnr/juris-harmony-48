@@ -20,13 +20,17 @@ public class IntegracaoDomicilioResponse {
     private boolean clientSecretConfigurado;
     private boolean tenantIdConfigurado;
     private boolean fallbackOnBehalfOfConfigurado;
+    private String tenantIdOrigem;
     private String cron;
+    private Integer lookbackDays;
     private OperadorResumo operadorInstitucional;
     private boolean operadorInstitucionalValido;
     private String mensagemOperador;
     private String origemOnBehalfOf;
     private String onBehalfOfMascarado;
     private SyncResumo ultimoSync;
+    private java.util.List<String> pendencias;
+    private java.util.List<String> checklistAtivacao;
 
     @Data
     @Builder

@@ -16,6 +16,8 @@ import org.springframework.data.repository.query.Param;
 public interface NotificacaoRepository extends JpaRepository<Notificacao, UUID> {
  
     Page<Notificacao> findByUsuarioIdOrderByCriadaEmDesc(UUID usuarioId, Pageable pageable);
+
+    java.util.Optional<Notificacao> findByIdAndUsuarioId(UUID id, UUID usuarioId);
  
     long countByUsuarioIdAndLidaFalse(UUID usuarioId);
 

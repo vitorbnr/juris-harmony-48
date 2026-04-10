@@ -63,7 +63,9 @@ export interface IntegracaoDomicilioResponse {
   clientSecretConfigurado: boolean;
   tenantIdConfigurado: boolean;
   fallbackOnBehalfOfConfigurado: boolean;
+  tenantIdOrigem?: string | null;
   cron?: string | null;
+  lookbackDays?: number | null;
   operadorInstitucional?: {
     id: string;
     nome: string;
@@ -74,6 +76,8 @@ export interface IntegracaoDomicilioResponse {
   mensagemOperador?: string | null;
   origemOnBehalfOf?: string | null;
   onBehalfOfMascarado?: string | null;
+  pendencias?: string[];
+  checklistAtivacao?: string[];
   ultimoSync?: {
     status?: string | null;
     ultimoSyncEm?: string | null;
@@ -82,6 +86,38 @@ export interface IntegracaoDomicilioResponse {
     tentativas?: number | null;
     mensagem?: string | null;
   } | null;
+}
+
+export interface IntegracaoDatajudResponse {
+  prontaParaConsumo: boolean;
+  baseUrl?: string | null;
+  baseUrlConfigurada: boolean;
+  apiKeyConfigurada: boolean;
+  cron?: string | null;
+  staleHours?: number | null;
+  processosMonitorados: number;
+  processosSaudaveis: number;
+  processosComErro: number;
+  processosPendentes: number;
+  ultimoSync?: {
+    status?: string | null;
+    ultimoSyncEm?: string | null;
+    ultimoSucessoEm?: string | null;
+    proximoSyncEm?: string | null;
+    tentativas?: number | null;
+    mensagem?: string | null;
+  } | null;
+  falhasRecentes: Array<{
+    syncId: string;
+    processoId?: string | null;
+    processoNumero?: string | null;
+    clienteNome?: string | null;
+    status?: string | null;
+    ultimoSyncEm?: string | null;
+    proximoSyncEm?: string | null;
+    tentativas?: number | null;
+    mensagem?: string | null;
+  }>;
 }
 
 export interface TesteIntegracaoDomicilioResponse {
@@ -116,6 +152,15 @@ export interface DashboardResponse {
     concluido: boolean;
   }>;
   processosRecentes: Processo[];
+}
+
+export interface CalcularPrazoResponse {
+  dataSugerida: string;
+  quantidadeDiasUteis: number;
+  contarDiaInicial: boolean;
+  feriadosNacionaisConsiderados: string[];
+  feriadosExtrasConsiderados: string[];
+  observacao: string;
 }
 
 function cleanParams<T extends ApiParams | undefined>(params: T): T {
@@ -214,6 +259,13 @@ export const prazosApi = {
     unidadeId?: string;
   }) => api.get("/prazos/calendario", { params: cleanParams(params) }).then(r => r.data),
 
+  calcularData: (data: {
+    dataInicial: string;
+    quantidadeDiasUteis: number;
+    contarDiaInicial?: boolean;
+    feriadosExtras?: string[];
+  }) => api.post("/prazos/calcular-data", data).then(r => r.data as CalcularPrazoResponse),
+
   criar: (data: Record<string, unknown>) =>
     api.post("/prazos", data).then(r => r.data),
 
@@ -310,6 +362,9 @@ export const eventosJuridicosApi = {
   assumir: (id: string) =>
     api.patch(`/eventos-juridicos/${id}/assumir`).then(r => r.data as EventoJuridicoResponse),
 
+  atribuirResponsavel: (id: string, responsavelId?: string | null) =>
+    api.patch(`/eventos-juridicos/${id}/atribuir-responsavel`, { responsavelId: responsavelId ?? null }).then(r => r.data as EventoJuridicoResponse),
+
   criarPrazo: (
     id: string,
     data: {
@@ -329,6 +384,9 @@ export const eventosJuridicosApi = {
 };
 
 export const integracoesApi = {
+  buscarDatajud: () =>
+    api.get("/integracoes/datajud").then(r => r.data as IntegracaoDatajudResponse),
+
   buscarDomicilio: () =>
     api.get("/integracoes/domicilio").then(r => r.data as IntegracaoDomicilioResponse),
 

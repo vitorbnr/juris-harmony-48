@@ -1,12 +1,15 @@
 package com.viana.controller;
 
 import com.viana.dto.request.AtualizarPrazoRequest;
+import com.viana.dto.request.CalcularPrazoRequest;
 import com.viana.dto.request.CriarPrazoRequest;
+import com.viana.dto.response.CalcularPrazoResponse;
 import com.viana.dto.response.PrazoResponse;
 import com.viana.model.Usuario;
 import com.viana.model.enums.UserRole;
 import com.viana.repository.UsuarioRepository;
 import com.viana.service.PrazoService;
+import com.viana.service.PrazoCalculadoraService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -30,6 +33,7 @@ import java.util.UUID;
 public class PrazoController {
 
     private final PrazoService prazoService;
+    private final PrazoCalculadoraService prazoCalculadoraService;
     private final UsuarioRepository usuarioRepository;
 
     @GetMapping
@@ -57,6 +61,11 @@ public class PrazoController {
 
         Usuario usuario = getUsuario(authentication);
         return ResponseEntity.ok(prazoService.getCalendario(usuario.getId(), unidadeId, inicio, fim));
+    }
+
+    @PostMapping("/calcular-data")
+    public ResponseEntity<CalcularPrazoResponse> calcularData(@Valid @RequestBody CalcularPrazoRequest request) {
+        return ResponseEntity.ok(prazoCalculadoraService.calcularDataLimite(request));
     }
 
     @PostMapping

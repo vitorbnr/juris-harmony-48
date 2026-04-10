@@ -34,8 +34,8 @@ public class NotificacaoService {
     }
 
     @Transactional
-    public NotificacaoResponse marcarComoLida(UUID id) {
-        Notificacao notificacao = notificacaoRepository.findById(id)
+    public NotificacaoResponse marcarComoLida(UUID id, UUID usuarioId) {
+        Notificacao notificacao = notificacaoRepository.findByIdAndUsuarioId(id, usuarioId)
                 .orElseThrow(() -> new ResourceNotFoundException("Notificacao nao encontrada"));
         notificacao.setLida(true);
         return toResponse(notificacaoRepository.save(notificacao));

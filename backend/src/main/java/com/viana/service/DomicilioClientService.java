@@ -68,6 +68,9 @@ public class DomicilioClientService {
                         if (numeroFiltro != null) {
                             uriBuilder.queryParam("numeroProcesso", numeroFiltro);
                         }
+                        if (properties.getPageSize() != null && properties.getPageSize() > 0) {
+                            uriBuilder.queryParam("size", properties.getPageSize());
+                        }
                         return uriBuilder.build();
                     })
                     .accept(MediaType.APPLICATION_JSON)
@@ -293,7 +296,11 @@ public class DomicilioClientService {
 
     private String normalizeAbsoluteUrl(String value, String property) {
         ensureConfigured(value, "api.domicilio." + property);
-        return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
+        String normalized = value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
+        if (!normalized.startsWith("https://")) {
+            throw new BusinessException("A URL do Domicilio deve usar HTTPS: api.domicilio." + property);
+        }
+        return normalized;
     }
 
     private String normalizeBaseUrl(String value) {

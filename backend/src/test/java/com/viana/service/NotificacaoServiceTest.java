@@ -24,9 +24,15 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class NotificacaoServiceTest {
@@ -66,8 +72,8 @@ class NotificacaoServiceTest {
     }
 
     @Test
-    @DisplayName("Deve listar notificações do usuário paginado")
-    void listarDoUsuario_Sucesso() {
+    @DisplayName("Deve listar notificacoes do usuario paginado")
+    void listarDoUsuarioSucesso() {
         Pageable pageable = PageRequest.of(0, 10);
         Page<Notificacao> page = new PageImpl<>(List.of(notificacao));
 
@@ -81,8 +87,8 @@ class NotificacaoServiceTest {
     }
 
     @Test
-    @DisplayName("Deve contar quantidade de notificações não lidas")
-    void contarNaoLidas_Sucesso() {
+    @DisplayName("Deve contar quantidade de notificacoes nao lidas")
+    void contarNaoLidasSucesso() {
         when(notificacaoRepository.countByUsuarioIdAndLidaFalse(usuarioId)).thenReturn(5L);
 
         long qtd = notificacaoService.contarNaoLidas(usuarioId);
@@ -91,28 +97,28 @@ class NotificacaoServiceTest {
     }
 
     @Test
-    @DisplayName("Deve marcar notificação como lida")
-    void marcarComoLida_Sucesso() {
-        when(notificacaoRepository.findById(notificacaoId)).thenReturn(Optional.of(notificacao));
-        when(notificacaoRepository.save(any(Notificacao.class))).thenAnswer(i -> i.getArgument(0));
+    @DisplayName("Deve marcar notificacao como lida apenas para o dono")
+    void marcarComoLidaSucesso() {
+        when(notificacaoRepository.findByIdAndUsuarioId(notificacaoId, usuarioId)).thenReturn(Optional.of(notificacao));
+        when(notificacaoRepository.save(any(Notificacao.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        NotificacaoResponse response = notificacaoService.marcarComoLida(notificacaoId);
+        NotificacaoResponse response = notificacaoService.marcarComoLida(notificacaoId, usuarioId);
 
         assertTrue(response.isLida());
         verify(notificacaoRepository, times(1)).save(notificacao);
     }
 
     @Test
-    @DisplayName("Deve falhar ao tentar marcar como lida uma notificacão que nao existe")
-    void marcarComoLida_FalhaNaoEncontrada() {
-        when(notificacaoRepository.findById(notificacaoId)).thenReturn(Optional.empty());
+    @DisplayName("Deve falhar ao tentar marcar como lida notificacao inexistente ou de outro usuario")
+    void marcarComoLidaFalhaNaoEncontrada() {
+        when(notificacaoRepository.findByIdAndUsuarioId(notificacaoId, usuarioId)).thenReturn(Optional.empty());
 
-        assertThrows(ResourceNotFoundException.class, () -> notificacaoService.marcarComoLida(notificacaoId));
+        assertThrows(ResourceNotFoundException.class, () -> notificacaoService.marcarComoLida(notificacaoId, usuarioId));
     }
 
     @Test
-    @DisplayName("Deve criar nova notificação com sucesso")
-    void criarNotificacao_Sucesso() {
+    @DisplayName("Deve criar nova notificacao com sucesso")
+    void criarNotificacaoSucesso() {
         when(usuarioRepository.findById(usuarioId)).thenReturn(Optional.of(usuario));
 
         notificacaoService.criarNotificacao(usuarioId, "Novo Arquivo", "Arquivo X upado", TipoNotificacao.SISTEMA, "/docs");
@@ -121,12 +127,12 @@ class NotificacaoServiceTest {
     }
 
     @Test
-    @DisplayName("Deve falhar ao criar notificação se usuário não existe")
-    void criarNotificacao_FalhaUsuarioNaoExiste() {
+    @DisplayName("Deve falhar ao criar notificacao se usuario nao existe")
+    void criarNotificacaoFalhaUsuarioNaoExiste() {
         when(usuarioRepository.findById(usuarioId)).thenReturn(Optional.empty());
 
-        assertThrows(ResourceNotFoundException.class, () -> 
-            notificacaoService.criarNotificacao(usuarioId, "Novo Arquivo", "Arquivo X upado", TipoNotificacao.SISTEMA, "/docs")
+        assertThrows(ResourceNotFoundException.class, () ->
+                notificacaoService.criarNotificacao(usuarioId, "Novo Arquivo", "Arquivo X upado", TipoNotificacao.SISTEMA, "/docs")
         );
         verify(notificacaoRepository, never()).save(any());
     }

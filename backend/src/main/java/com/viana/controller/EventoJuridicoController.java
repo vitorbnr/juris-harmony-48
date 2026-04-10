@@ -1,5 +1,6 @@
 package com.viana.controller;
 
+import com.viana.dto.request.AtribuirResponsavelEventoRequest;
 import com.viana.dto.request.CriarPrazoEventoRequest;
 import com.viana.dto.request.VincularEventoProcessoRequest;
 import com.viana.dto.response.EventoJuridicoResponse;
@@ -75,6 +76,15 @@ public class EventoJuridicoController {
             Authentication authentication
     ) {
         return ResponseEntity.ok(eventoJuridicoService.assumirResponsabilidade(id, authentication.getName()));
+    }
+
+    @PatchMapping("/{id}/atribuir-responsavel")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO', 'SECRETARIA')")
+    public ResponseEntity<EventoJuridicoResponse> atribuirResponsavel(
+            @PathVariable UUID id,
+            @RequestBody AtribuirResponsavelEventoRequest request
+    ) {
+        return ResponseEntity.ok(eventoJuridicoService.atribuirResponsavel(id, request.getResponsavelId()));
     }
 
     @org.springframework.web.bind.annotation.PostMapping("/{id}/criar-prazo")

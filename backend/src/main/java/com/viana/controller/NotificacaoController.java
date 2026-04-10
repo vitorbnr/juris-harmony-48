@@ -40,8 +40,9 @@ public class NotificacaoController {
     }
 
     @PatchMapping("/{id}/lida")
-    public ResponseEntity<NotificacaoResponse> marcarComoLida(@PathVariable UUID id) {
-        return ResponseEntity.ok(notificacaoService.marcarComoLida(id));
+    public ResponseEntity<NotificacaoResponse> marcarComoLida(@PathVariable UUID id, Authentication authentication) {
+        UUID usuarioId = getUsuarioId(authentication);
+        return ResponseEntity.ok(notificacaoService.marcarComoLida(id, usuarioId));
     }
  
     @PatchMapping("/lidas")

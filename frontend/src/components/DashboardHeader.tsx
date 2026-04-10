@@ -76,18 +76,37 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
   }, []);
 
   useEffect(() => {
-    notificacoesApi
-      .listar({ size: 10 })
-      .then((data) => {
-        const items = data.content ?? data;
-        setNotifs(Array.isArray(items) ? items : []);
-      })
-      .catch(() => setNotifs([]));
+    let ativo = true;
 
-    notificacoesApi
-      .contarNaoLidas()
-      .then(setUnreadCount)
-      .catch(() => setUnreadCount(0));
+    const carregarNotificacoes = () => {
+      notificacoesApi
+        .listar({ size: 10 })
+        .then((data) => {
+          if (!ativo) return;
+          const items = data.content ?? data;
+          setNotifs(Array.isArray(items) ? items : []);
+        })
+        .catch(() => {
+          if (ativo) setNotifs([]);
+        });
+
+      notificacoesApi
+        .contarNaoLidas()
+        .then((count) => {
+          if (ativo) setUnreadCount(count);
+        })
+        .catch(() => {
+          if (ativo) setUnreadCount(0);
+        });
+    };
+
+    carregarNotificacoes();
+    const interval = window.setInterval(carregarNotificacoes, 60000);
+
+    return () => {
+      ativo = false;
+      window.clearInterval(interval);
+    };
   }, []);
 
   const unidadeLabel =

@@ -21,6 +21,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -47,11 +49,12 @@ public class IntegracaoDomicilioService {
         FonteSync ultimoSync = fonteSyncRepository
                 .findFirstByFonteAndReferenciaTipoOrderByAtualizadoEmDesc(FonteIntegracao.DOMICILIO, TipoReferenciaIntegracao.INSTITUICAO)
                 .orElse(null);
+        List<String> pendencias = construirPendencias(configuracao, usuarioOperador, contexto);
 
         return IntegracaoDomicilioResponse.builder()
                 .enabled(properties.isEnabled())
                 .readOnly(true)
-                .prontaParaConsumo(isReady())
+                .prontaParaConsumo(pendencias.isEmpty())
                 .baseUrl(properties.getBaseUrl())
                 .baseUrlConfigurada(isConfigured(properties.getBaseUrl()))
                 .tokenUrlConfigurada(isConfigured(properties.getTokenUrl()))
@@ -59,7 +62,9 @@ public class IntegracaoDomicilioService {
                 .clientSecretConfigurado(isConfigured(properties.getClientSecret()))
                 .tenantIdConfigurado(isConfigured(properties.getTenantId()))
                 .fallbackOnBehalfOfConfigurado(domicilioOperadorResolver.hasFallbackOnBehalfOfConfigured())
+                .tenantIdOrigem(isConfigured(properties.getTenantId()) ? "CONFIGURADO" : "API_EU")
                 .cron(domicilioCron)
+                .lookbackDays(sanitizeLookbackDays())
                 .operadorInstitucional(toOperadorResumo(usuarioOperador))
                 .operadorInstitucionalValido(usuarioOperador == null || operadorValido)
                 .mensagemOperador(usuarioOperador != null && !operadorValido
@@ -68,6 +73,8 @@ public class IntegracaoDomicilioService {
                 .origemOnBehalfOf(contexto != null ? contexto.origem() : null)
                 .onBehalfOfMascarado(contexto != null ? domicilioOperadorResolver.maskCpf(contexto.cpf()) : null)
                 .ultimoSync(toSyncResumo(ultimoSync))
+                .pendencias(pendencias)
+                .checklistAtivacao(construirChecklistAtivacao(configuracao, contexto))
                 .build();
     }
 
@@ -119,17 +126,62 @@ public class IntegracaoDomicilioService {
                 .build();
     }
 
-    private boolean isReady() {
-        return properties.isEnabled()
-                && isConfigured(properties.getBaseUrl())
-                && isConfigured(properties.getTokenUrl())
-                && isConfigured(properties.getClientId())
-                && isConfigured(properties.getClientSecret())
-                && domicilioOperadorResolver.findContext().isPresent();
-    }
-
     private boolean isConfigured(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private int sanitizeLookbackDays() {
+        Integer value = properties.getLookbackDays();
+        if (value == null || value < 1) {
+            return 1;
+        }
+        return value;
+    }
+
+    private List<String> construirPendencias(IntegracaoConfiguracao configuracao, Usuario usuarioOperador,
+                                             DomicilioOperadorResolver.DomicilioOperadorContext contexto) {
+        List<String> pendencias = new ArrayList<>();
+
+        if (!properties.isEnabled()) {
+            pendencias.add("Integracao do Domicilio desabilitada no ambiente.");
+        }
+        if (!isConfigured(properties.getBaseUrl())) {
+            pendencias.add("DOMICILIO_BASE_URL nao configurado.");
+        }
+        if (!isConfigured(properties.getTokenUrl())) {
+            pendencias.add("DOMICILIO_TOKEN_URL nao configurado.");
+        }
+        if (!isConfigured(properties.getClientId())) {
+            pendencias.add("DOMICILIO_CLIENT_ID nao configurado.");
+        }
+        if (!isConfigured(properties.getClientSecret())) {
+            pendencias.add("DOMICILIO_CLIENT_SECRET nao configurado.");
+        }
+        if (contexto == null) {
+            pendencias.add("Nenhum CPF operador efetivo foi resolvido para o header On-behalf-Of.");
+        }
+        if (usuarioOperador != null && !domicilioOperadorResolver.isUsuarioOperadorValido(usuarioOperador)) {
+            pendencias.add(domicilioOperadorResolver.explainInvalidUsuarioOperador(usuarioOperador));
+        }
+        if (sanitizeLookbackDays() < 1) {
+            pendencias.add("Janela de sincronizacao do Domicilio invalida.");
+        }
+
+        return pendencias;
+    }
+
+    private List<String> construirChecklistAtivacao(IntegracaoConfiguracao configuracao,
+                                                    DomicilioOperadorResolver.DomicilioOperadorContext contexto) {
+        List<String> checklist = new ArrayList<>();
+        checklist.add("Confirmar que o CNPJ do escritorio esta habilitado no Domicilio Judicial Eletronico.");
+        checklist.add("Preencher DOMICILIO_BASE_URL e DOMICILIO_TOKEN_URL com os endpoints oficiais do ambiente.");
+        checklist.add("Preencher DOMICILIO_CLIENT_ID e DOMICILIO_CLIENT_SECRET com a credencial institucional.");
+        checklist.add("Selecionar um operador institucional valido ou definir DOMICILIO_ON_BEHALF_OF no ambiente.");
+        checklist.add("Executar o teste read-only na aba de Integracoes antes de ligar o scheduler em producao.");
+        checklist.add("Validar se o tenantId sera resolvido via /api/v1/eu ou se o escritorio prefere fixar DOMICILIO_TENANT_ID.");
+        checklist.add("Conferir se a janela de sincronizacao atende o escritorio. Atual: " + sanitizeLookbackDays() + " dia(s).");
+        checklist.add("Manter a operacao em read-only: sem abrir inteiro teor, sem registrar ciencia, sem aceite automatico.");
+        return checklist;
     }
 
     private IntegracaoDomicilioResponse.OperadorResumo toOperadorResumo(Usuario usuario) {

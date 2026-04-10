@@ -66,6 +66,8 @@ api:
     tenant-id: ${DOMICILIO_TENANT_ID:}
     eu-path: ${DOMICILIO_EU_PATH:/api/v1/eu}
     comunicacoes-path: ${DOMICILIO_COMUNICACOES_PATH:/comunicacoes}
+    lookback-days: ${DOMICILIO_LOOKBACK_DAYS:1}
+    page-size: ${DOMICILIO_PAGE_SIZE:100}
 
 app:
   sync:
@@ -78,3 +80,6 @@ app:
     prazos:
       cron: ${PRAZO_ALERTA_CRON:0 0 8,13 * * *}
       lookahead-days: ${PRAZO_ALERTA_LOOKAHEAD_DAYS:3}
+    integracoes:
+      cron: ${INTEGRACAO_ALERTA_CRON:0 0 * * * *}
+      thresholds: ${INTEGRACAO_ALERTA_THRESHOLDS:3,5,10}

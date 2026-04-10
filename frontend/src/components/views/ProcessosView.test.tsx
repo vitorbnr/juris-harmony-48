@@ -63,7 +63,7 @@ describe("ProcessosView", () => {
   it("deve filtrar processos por busca de texto", async () => {
     render(<ProcessosView />);
     
-    const inputBusca = screen.getByPlaceholderText(/Buscar por número/i);
+    const inputBusca = screen.getByPlaceholderText(/Buscar por numero ou cliente/i);
     fireEvent.change(inputBusca, { target: { value: "Inexistente" } });
     
     // O componente filtra localmente após carregar ou recarrega? 

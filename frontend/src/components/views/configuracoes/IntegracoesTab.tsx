@@ -23,7 +23,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { integracoesApi, usuariosApi, type IntegracaoDomicilioResponse } from "@/services/api";
+import {
+  integracoesApi,
+  processosApi,
+  usuariosApi,
+  type IntegracaoDatajudResponse,
+  type IntegracaoDomicilioResponse,
+} from "@/services/api";
 import type { Usuario } from "@/types";
 
 const AMBIENTE_VALUE = "__AMBIENTE__";
@@ -51,11 +57,14 @@ const traduzirStatus = (status?: string | null) => {
 
 export function IntegracoesTab() {
   const [config, setConfig] = useState<IntegracaoDomicilioResponse | null>(null);
+  const [datajud, setDatajud] = useState<IntegracaoDatajudResponse | null>(null);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [valorOperador, setValorOperador] = useState<string>(AMBIENTE_VALUE);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [syncingDatajudLote, setSyncingDatajudLote] = useState(false);
+  const [reprocessandoProcessoId, setReprocessandoProcessoId] = useState<string | null>(null);
 
   const operadoresElegiveis = useMemo(
     () =>
@@ -70,22 +79,14 @@ export function IntegracoesTab() {
 
   const pendencias = useMemo(() => {
     if (!config) return [];
-
-    const itens: string[] = [];
-    if (!config.enabled) itens.push("Integracao desabilitada no ambiente.");
-    if (!config.baseUrlConfigurada) itens.push("Base URL do Domicilio nao configurada.");
-    if (!config.tokenUrlConfigurada) itens.push("Token URL do Domicilio nao configurada.");
-    if (!config.clientIdConfigurado) itens.push("Client ID nao configurado.");
-    if (!config.clientSecretConfigurado) itens.push("Client secret nao configurado.");
-    if (!config.onBehalfOfMascarado) itens.push("Nenhum CPF operador efetivo foi resolvido.");
-    if (!config.operadorInstitucionalValido && config.mensagemOperador) itens.push(config.mensagemOperador);
-    return itens;
+    return config.pendencias ?? [];
   }, [config]);
 
   const carregar = async () => {
     setLoading(true);
     try {
-      const [configuracao, usuariosData] = await Promise.all([
+      const [datajudConfig, configuracao, usuariosData] = await Promise.all([
+        integracoesApi.buscarDatajud(),
         integracoesApi.buscarDomicilio(),
         usuariosApi.listar(),
       ]);
@@ -93,6 +94,7 @@ export function IntegracoesTab() {
       const items = (usuariosData as { content?: Usuario[] }).content ?? usuariosData;
       const listaUsuarios = Array.isArray(items) ? (items as Usuario[]) : [];
 
+      setDatajud(datajudConfig);
       setUsuarios(listaUsuarios);
       setConfig(configuracao);
       setValorOperador(configuracao.operadorInstitucional?.id ?? AMBIENTE_VALUE);
@@ -141,6 +143,40 @@ export function IntegracoesTab() {
     }
   };
 
+  const sincronizarDatajudEmLote = async () => {
+    setSyncingDatajudLote(true);
+    try {
+      const resumo = await processosApi.sincronizarDatajudEmLote();
+      toast.success(
+        `Datajud reprocessado: ${resumo.movimentacoesNovas} movimentacao(oes) nova(s), ${resumo.falhas} falha(s).`,
+      );
+      await carregar();
+    } catch (error) {
+      console.error("Erro ao reprocessar Datajud em lote:", error);
+      toast.error("Nao foi possivel reprocessar o Datajud agora.");
+    } finally {
+      setSyncingDatajudLote(false);
+    }
+  };
+
+  const reprocessarProcessoDatajud = async (processoId?: string | null) => {
+    if (!processoId) return;
+
+    setReprocessandoProcessoId(processoId);
+    try {
+      const resultado = await processosApi.sincronizarDatajud(processoId);
+      toast.success(
+        `Processo reprocessado no Datajud. ${resultado.movimentacoesNovas} movimentacao(oes) nova(s).`,
+      );
+      await carregar();
+    } catch (error) {
+      console.error("Erro ao reprocessar processo no Datajud:", error);
+      toast.error("Nao foi possivel reprocessar este processo no Datajud.");
+    } finally {
+      setReprocessandoProcessoId(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-[320px] items-center justify-center">
@@ -149,19 +185,20 @@ export function IntegracoesTab() {
     );
   }
 
-  if (!config) {
+  if (!config || !datajud) {
     return (
       <Alert className="border-destructive/30 bg-destructive/5">
         <AlertTriangle className="h-4 w-4" />
         <AlertTitle>Falha ao carregar integracoes</AlertTitle>
         <AlertDescription>
-          Nao foi possivel carregar o diagnostico do Domicilio. Tente novamente.
+          Nao foi possivel carregar o diagnostico das integracoes. Tente novamente.
         </AlertDescription>
       </Alert>
     );
   }
 
   const pronto = config.prontaParaConsumo;
+  const datajudPronto = datajud.prontaParaConsumo;
 
   return (
     <div className="space-y-6">
@@ -174,6 +211,132 @@ export function IntegracoesTab() {
           iniciar prazo automaticamente.
         </AlertDescription>
       </Alert>
+
+      <div className="rounded-2xl border border-border bg-card p-5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-semibold text-foreground">Saude do Datajud</h3>
+              <Badge
+                variant="outline"
+                className={cn(
+                  datajudPronto
+                    ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
+                    : "border-amber-500/20 bg-amber-500/10 text-amber-400",
+                )}
+              >
+                {datajudPronto ? "Operacional" : "Pendente"}
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              O Datajud alimenta capa e movimentacoes publicas. Aqui o escritorio acompanha falhas e reprocessa processos sem depender do log do servidor.
+            </p>
+          </div>
+
+          <Button type="button" variant="outline" className="gap-2" onClick={sincronizarDatajudEmLote} disabled={syncingDatajudLote}>
+            {syncingDatajudLote ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+            Reprocessar Datajud
+          </Button>
+        </div>
+
+        <div className="mt-5 grid gap-4 xl:grid-cols-4">
+          <div className="rounded-xl border border-border bg-background/60 p-4">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Processos monitorados</p>
+            <p className="mt-2 text-2xl font-semibold text-foreground">{datajud.processosMonitorados}</p>
+          </div>
+          <div className="rounded-xl border border-border bg-background/60 p-4">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Saudaveis</p>
+            <p className="mt-2 text-2xl font-semibold text-foreground">{datajud.processosSaudaveis}</p>
+          </div>
+          <div className="rounded-xl border border-border bg-background/60 p-4">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Com erro</p>
+            <p className="mt-2 text-2xl font-semibold text-foreground">{datajud.processosComErro}</p>
+          </div>
+          <div className="rounded-xl border border-border bg-background/60 p-4">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Pendentes</p>
+            <p className="mt-2 text-2xl font-semibold text-foreground">{datajud.processosPendentes}</p>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-3 md:grid-cols-2">
+          <div className="rounded-xl border border-border bg-background/60 p-4 text-sm text-muted-foreground">
+            <p className="font-medium text-foreground">Config tecnica</p>
+            <div className="mt-2 space-y-1">
+              <p>Base URL: {datajud.baseUrl ?? "Nao configurada"}</p>
+              <p>Cron atual: {datajud.cron ?? "Nao informado"}</p>
+              <p>Janela de defasagem: {datajud.staleHours ?? 4} hora(s)</p>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Badge variant="outline" className={datajud.baseUrlConfigurada ? "text-emerald-400" : "text-amber-400"}>
+                base-url
+              </Badge>
+              <Badge variant="outline" className={datajud.apiKeyConfigurada ? "text-emerald-400" : "text-amber-400"}>
+                api-key
+              </Badge>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-border bg-background/60 p-4 text-sm text-muted-foreground">
+            <p className="font-medium text-foreground">Ultimo sync do Datajud</p>
+            <div className="mt-2 space-y-1">
+              <p>Status: {traduzirStatus(datajud.ultimoSync?.status)}</p>
+              <p>Ultima execucao: {formatarDataHora(datajud.ultimoSync?.ultimoSyncEm)}</p>
+              <p>Ultimo sucesso: {formatarDataHora(datajud.ultimoSync?.ultimoSucessoEm)}</p>
+              <p>Proxima tentativa: {formatarDataHora(datajud.ultimoSync?.proximoSyncEm)}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <h4 className="text-sm font-semibold text-foreground">Falhas recentes do Datajud</h4>
+            <span className="text-xs text-muted-foreground">
+              {datajud.falhasRecentes.length} item(ns)
+            </span>
+          </div>
+
+          {datajud.falhasRecentes.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
+              Nenhuma falha recente registrada para processos monitorados no Datajud.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {datajud.falhasRecentes.map((falha) => (
+                <div key={falha.syncId} className="rounded-xl border border-border bg-background/60 p-4">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-foreground">{falha.processoNumero ?? "Processo nao identificado"}</p>
+                      <p className="text-xs text-muted-foreground">{falha.clienteNome ?? "Cliente nao identificado"}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Ultimo sync: {formatarDataHora(falha.ultimoSyncEm)} • Proxima tentativa: {formatarDataHora(falha.proximoSyncEm)}
+                      </p>
+                      <p className="text-xs text-amber-400">
+                        Tentativas: {falha.tentativas ?? 0}
+                      </p>
+                      {falha.mensagem && <p className="text-xs text-muted-foreground">{falha.mensagem}</p>}
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="gap-2"
+                      onClick={() => reprocessarProcessoDatajud(falha.processoId)}
+                      disabled={!falha.processoId || reprocessandoProcessoId === falha.processoId}
+                    >
+                      {reprocessandoProcessoId === falha.processoId ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCcw className="h-4 w-4" />
+                      )}
+                      Reprocessar processo
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
 
       <div className="grid gap-4 xl:grid-cols-3">
         <div className="rounded-2xl border border-border bg-card p-5">
@@ -195,13 +358,15 @@ export function IntegracoesTab() {
               {config.enabled ? "Habilitada" : "Desabilitada"}
             </Badge>
           </div>
-          <div className="mt-4 space-y-2 text-sm text-muted-foreground">
-            <p>Modo: somente leitura</p>
-            <p>Origem efetiva do CPF: {traduzirOrigem(config.origemOnBehalfOf)}</p>
-            <p>CPF efetivo: {config.onBehalfOfMascarado ?? "Nao resolvido"}</p>
-            <p>Cron atual: {config.cron ?? "Nao informado"}</p>
+            <div className="mt-4 space-y-2 text-sm text-muted-foreground">
+              <p>Modo: somente leitura</p>
+              <p>Origem efetiva do CPF: {traduzirOrigem(config.origemOnBehalfOf)}</p>
+              <p>CPF efetivo: {config.onBehalfOfMascarado ?? "Nao resolvido"}</p>
+              <p>Origem do tenantId: {config.tenantIdOrigem === "CONFIGURADO" ? "Variavel de ambiente" : "API /eu"}</p>
+              <p>Cron atual: {config.cron ?? "Nao informado"}</p>
+              <p>Janela de sync: {config.lookbackDays ?? 1} dia(s)</p>
+            </div>
           </div>
-        </div>
 
         <div className="rounded-2xl border border-border bg-card p-5">
           <div className="flex items-start justify-between gap-3">
@@ -276,6 +441,28 @@ export function IntegracoesTab() {
             </div>
           </AlertDescription>
         </Alert>
+      )}
+
+      {config.checklistAtivacao && config.checklistAtivacao.length > 0 && (
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <div className="space-y-2">
+            <h3 className="text-base font-semibold text-foreground">Checklist de ativacao</h3>
+            <p className="text-sm text-muted-foreground">
+              Este e o roteiro objetivo para segunda-feira, quando as credenciais reais do escritorio estiverem em maos.
+            </p>
+          </div>
+
+          <div className="mt-4 space-y-2">
+            {config.checklistAtivacao.map((item, index) => (
+              <div key={item} className="flex items-start gap-3 rounded-xl border border-border bg-background/60 px-4 py-3 text-sm">
+                <span className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-[11px] font-semibold text-primary">
+                  {index + 1}
+                </span>
+                <span className="text-muted-foreground">{item}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       <div className="rounded-2xl border border-border bg-card p-5">

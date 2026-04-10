@@ -127,10 +127,10 @@ public class ProcessoService {
     public ProcessoResponse criar(CriarProcessoRequest request) {
         String numeroProcesso = request.getNumero() != null ? request.getNumero().trim() : null;
         if (numeroProcesso == null || numeroProcesso.isBlank()) {
-            throw new BusinessException("NÃºmero do processo Ã© obrigatÃ³rio");
+            throw new BusinessException("Número do processo é obrigatório");
         }
         if (processoRepository.existsByNumero(numeroProcesso)) {
-            throw new BusinessException("JÃ¡ existe um processo cadastrado com esse nÃºmero.");
+            throw new BusinessException("Já existe um processo cadastrado com esse número.");
         }
 
         Cliente cliente = clienteRepository.findById(request.getClienteId())
@@ -163,7 +163,7 @@ public class ProcessoService {
         try {
             processo = processoRepository.save(processo);
         } catch (DataIntegrityViolationException ex) {
-            throw new BusinessException("JÃ¡ existe um processo cadastrado com esse nÃºmero.");
+            throw new BusinessException("Já existe um processo cadastrado com esse número.");
         }
         sincronizarMovimentacoesDatajud(processo, false);
 

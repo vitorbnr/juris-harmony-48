@@ -19,7 +19,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -39,14 +45,24 @@ public class DocumentoController {
     private final LogAuditoriaService logAuditoriaService;
     private final StorageService storageService;
 
-    /** Listagem geral com filtros opcionais */
     @GetMapping
     public ResponseEntity<Page<DocumentoResponse>> listar(
             @RequestParam(required = false) UUID clienteId,
             @RequestParam(required = false) UUID processoId,
             @RequestParam(required = false) String busca,
-            @PageableDefault(size = 20, sort = "dataUpload", direction = Sort.Direction.DESC) Pageable pageable) {
-        return ResponseEntity.ok(documentoService.listar(clienteId, processoId, busca, pageable));
+            @PageableDefault(size = 20, sort = "dataUpload", direction = Sort.Direction.DESC) Pageable pageable,
+            Authentication authentication) {
+        Usuario usuario = getUsuario(authentication);
+        return ResponseEntity.ok(
+                documentoService.listar(
+                        clienteId,
+                        processoId,
+                        busca,
+                        pageable,
+                        getUnidadeEscopo(usuario),
+                        isAdmin(authentication)
+                )
+        );
     }
 
     @PostMapping(consumes = "multipart/form-data")
@@ -64,33 +80,43 @@ public class DocumentoController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    /** Download: retorna URL pré-assinada (PROD) ou URL de stream local (DEV) */
     @GetMapping("/{id}/download")
     public ResponseEntity<Map<String, String>> download(
             @PathVariable UUID id,
             Authentication authentication) {
-        Documento doc = documentoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Documento não encontrado"));
-        String url = documentoService.getDownloadUrl(id);
+        Usuario usuario = getUsuario(authentication);
+        UUID unidadeEscopo = getUnidadeEscopo(usuario);
+        boolean admin = isAdmin(authentication);
 
-        // Auditoria de download
+        Documento doc = documentoService.findDocumentoAutorizado(id, unidadeEscopo, admin);
+        String url = documentoService.getDownloadUrl(id, unidadeEscopo, admin);
+
         try {
-            UUID usuarioId = getUsuarioId(authentication);
-            logAuditoriaService.registrar(usuarioId,
+            logAuditoriaService.registrar(
+                    usuario.getId(),
                     com.viana.model.enums.TipoAcao.BAIXOU,
                     com.viana.model.enums.ModuloLog.DOCUMENTOS,
-                    "Download: " + doc.getNome());
-        } catch (Exception ignored) {}
+                    "Download: " + doc.getNome()
+            );
+        } catch (Exception ignored) {
+        }
 
         return ResponseEntity.ok(Map.of("url", url, "nome", doc.getNome()));
     }
 
-    /** Stream direto para modo DEV (local storage) */
     @GetMapping("/stream/{encodedKey}")
     public ResponseEntity<InputStreamResource> streamLocal(
-            @PathVariable String encodedKey) throws IOException {
-        // Decodifica o storageKey (__ → /)
+            @PathVariable String encodedKey,
+            Authentication authentication) throws IOException {
         String storageKey = encodedKey.replace("__", "/");
+        Usuario usuario = getUsuario(authentication);
+
+        documentoService.findDocumentoAutorizadoPorStorageKey(
+                storageKey,
+                getUnidadeEscopo(usuario),
+                isAdmin(authentication)
+        );
+
         InputStream stream = storageService.getLocalStream(storageKey);
         String filename = storageService.getOriginalFilename(storageKey);
 
@@ -103,28 +129,42 @@ public class DocumentoController {
     @GetMapping("/pasta/{pastaId}")
     public ResponseEntity<Page<DocumentoResponse>> listarPorPasta(
             @PathVariable UUID pastaId,
-            @PageableDefault(size = 20, sort = "dataUpload", direction = Sort.Direction.DESC) Pageable pageable) {
-        return ResponseEntity.ok(documentoService.listarPorPasta(pastaId, pageable));
+            @PageableDefault(size = 20, sort = "dataUpload", direction = Sort.Direction.DESC) Pageable pageable,
+            Authentication authentication) {
+        Usuario usuario = getUsuario(authentication);
+        return ResponseEntity.ok(
+                documentoService.listarPorPasta(pastaId, pageable, getUnidadeEscopo(usuario), isAdmin(authentication))
+        );
     }
 
     @GetMapping("/cliente/{clienteId}")
     public ResponseEntity<Page<DocumentoResponse>> listarPorCliente(
             @PathVariable UUID clienteId,
-            @PageableDefault(size = 200, sort = "dataUpload", direction = Sort.Direction.DESC) Pageable pageable) {
-        return ResponseEntity.ok(documentoService.listarPorCliente(clienteId, pageable));
+            @PageableDefault(size = 200, sort = "dataUpload", direction = Sort.Direction.DESC) Pageable pageable,
+            Authentication authentication) {
+        Usuario usuario = getUsuario(authentication);
+        return ResponseEntity.ok(
+                documentoService.listarPorCliente(clienteId, pageable, getUnidadeEscopo(usuario), isAdmin(authentication))
+        );
     }
 
     @GetMapping("/processo/{processoId}")
     public ResponseEntity<Page<DocumentoResponse>> listarPorProcesso(
             @PathVariable UUID processoId,
-            @PageableDefault(size = 20, sort = "dataUpload", direction = Sort.Direction.DESC) Pageable pageable) {
-        return ResponseEntity.ok(documentoService.listarPorProcesso(processoId, pageable));
+            @PageableDefault(size = 20, sort = "dataUpload", direction = Sort.Direction.DESC) Pageable pageable,
+            Authentication authentication) {
+        Usuario usuario = getUsuario(authentication);
+        return ResponseEntity.ok(
+                documentoService.listarPorProcesso(processoId, pageable, getUnidadeEscopo(usuario), isAdmin(authentication))
+        );
     }
 
-    /** Retorna lista simples (sem paginação) de todos os clientes que possuem documentos */
     @GetMapping("/clientes-com-documentos")
-    public ResponseEntity<List<Map<String, String>>> clientesComDocumentos() {
-        return ResponseEntity.ok(documentoService.listarClientesComDocumentos());
+    public ResponseEntity<List<Map<String, String>>> clientesComDocumentos(Authentication authentication) {
+        Usuario usuario = getUsuario(authentication);
+        return ResponseEntity.ok(
+                documentoService.listarClientesComDocumentos(getUnidadeEscopo(usuario), isAdmin(authentication))
+        );
     }
 
     @DeleteMapping("/{id}")
@@ -133,13 +173,11 @@ public class DocumentoController {
         Documento doc = documentoRepository.findById(id)
                 .orElseThrow(() -> new com.viana.exception.ResourceNotFoundException("Documento não encontrado"));
 
-        // Apenas ADMINISTRADOR ou o próprio uploader podem deletar
-        boolean isAdmin = authentication.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMINISTRADOR"));
+        boolean admin = isAdmin(authentication);
         boolean isUploader = doc.getUploadedPor().getId().equals(usuarioId);
 
-        if (!isAdmin && !isUploader) {
-            return ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN).build();
+        if (!admin && !isUploader) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
 
         documentoService.excluir(id);
@@ -147,9 +185,21 @@ public class DocumentoController {
     }
 
     private UUID getUsuarioId(Authentication authentication) {
+        return getUsuario(authentication).getId();
+    }
+
+    private Usuario getUsuario(Authentication authentication) {
         String email = authentication.getName();
-        Usuario usuario = usuarioRepository.findByEmailIgnoreCase(email)
+        return usuarioRepository.findByEmailIgnoreCase(email)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
-        return usuario.getId();
+    }
+
+    private UUID getUnidadeEscopo(Usuario usuario) {
+        return usuario.getUnidade() != null ? usuario.getUnidade().getId() : null;
+    }
+
+    private boolean isAdmin(Authentication authentication) {
+        return authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMINISTRADOR"));
     }
 }

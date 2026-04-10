@@ -20,4 +20,6 @@ public class DomicilioApiProperties {
     private String tenantId;
     private String euPath = "/api/v1/eu";
     private String comunicacoesPath = "/comunicacoes";
+    private Integer lookbackDays = 1;
+    private Integer pageSize = 100;
 }
