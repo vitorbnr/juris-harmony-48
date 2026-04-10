@@ -69,6 +69,8 @@ Construir no Juris Harmony uma base gratuita e segura para monitoramento juridic
 - A criacao do prazo a partir do evento coloca o item em `EM_TRIAGEM`, sem concluir automaticamente o fluxo.
 - Eventos de `intimacao` e `publicacao` agora geram automaticamente uma `tarefa interna de triagem` para o responsavel, sem criar prazo fatal automaticamente.
 - A tela de `Prazos & Tarefas` agora possui um quadro `Kanban` para tarefas internas, com etapas `A Fazer`, `Em andamento` e `Concluido`.
+- O sistema agora gera alertas internos deduplicados para prazos e tarefas que estao atrasados, vencem hoje, vencem amanha ou se aproximam em 3 dias.
+- O dashboard passou a mostrar um `Painel de urgencia` com contadores de atrasos, vencimentos do dia e tarefas abertas.
 
 ## Fase 5
 

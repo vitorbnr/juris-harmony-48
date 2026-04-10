@@ -71,6 +71,21 @@ public class PrazoService {
                 .map(this::toResponse);
     }
 
+    @Transactional(readOnly = true)
+    public long contarAtrasados(UUID advogadoId) {
+        return prazoRepository.countByAdvogadoIdAndConcluidoFalseAndDataLessThan(advogadoId, LocalDate.now());
+    }
+
+    @Transactional(readOnly = true)
+    public long contarVencendoHoje(UUID advogadoId) {
+        return prazoRepository.countByAdvogadoIdAndConcluidoFalseAndData(advogadoId, LocalDate.now());
+    }
+
+    @Transactional(readOnly = true)
+    public long contarTarefasAbertas(UUID advogadoId) {
+        return prazoRepository.countByAdvogadoIdAndTipoAndConcluidoFalse(advogadoId, TipoPrazo.TAREFA_INTERNA);
+    }
+
     @Transactional
     public PrazoResponse criar(CriarPrazoRequest request, UUID usuarioLogadoId) {
         Prazo prazo = criarPrazoInterno(

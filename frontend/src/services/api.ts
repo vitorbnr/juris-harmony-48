@@ -1,4 +1,5 @@
 import api from "@/lib/api";
+import type { Processo } from "@/types";
 
 type ApiParams = Record<string, unknown>;
 
@@ -100,6 +101,23 @@ export interface SincronizacaoDomicilioResponse {
   readOnly: boolean;
 }
 
+export interface DashboardResponse {
+  totalClientes: number;
+  processosAtivos: number;
+  prazosSemana: number;
+  prazosAtrasados: number;
+  prazosHoje: number;
+  tarefasAbertas: number;
+  proximosPrazos: Array<{
+    id: string;
+    titulo: string;
+    data: string;
+    prioridade: string;
+    concluido: boolean;
+  }>;
+  processosRecentes: Processo[];
+}
+
 function cleanParams<T extends ApiParams | undefined>(params: T): T {
   if (!params) return params;
   const out: ApiParams = {};
@@ -118,7 +136,7 @@ function cleanParams<T extends ApiParams | undefined>(params: T): T {
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 export const dashboardApi = {
-  get: () => api.get("/dashboard").then(r => r.data),
+  get: () => api.get("/dashboard").then(r => r.data as DashboardResponse),
 };
 
 // ─── Processos ────────────────────────────────────────────────────────────────

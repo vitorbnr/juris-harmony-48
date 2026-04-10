@@ -5,6 +5,7 @@ import { DashboardHeader } from "@/components/DashboardHeader";
 import { StatCard } from "@/components/StatCard";
 import { RecentProcesses } from "@/components/RecentProcesses";
 import { UpcomingDeadlines } from "@/components/UpcomingDeadlines";
+import { UrgencyPanel } from "@/components/UrgencyPanel";
 import { QuickActions } from "@/components/QuickActions";
 import { ProcessosView } from "@/components/views/ProcessosView";
 import { InboxJuridicaView } from "@/components/views/InboxJuridicaView";
@@ -19,10 +20,20 @@ interface DashboardStats {
   totalClientes: number;
   processosAtivos: number;
   prazosSemana: number;
+  prazosAtrasados: number;
+  prazosHoje: number;
+  tarefasAbertas: number;
 }
 
 const DashboardContent = ({ onNavigate }: { onNavigate: (id: string) => void }) => {
-  const [stats, setStats] = useState<DashboardStats>({ totalClientes: 0, processosAtivos: 0, prazosSemana: 0 });
+  const [stats, setStats] = useState<DashboardStats>({
+    totalClientes: 0,
+    processosAtivos: 0,
+    prazosSemana: 0,
+    prazosAtrasados: 0,
+    prazosHoje: 0,
+    tarefasAbertas: 0,
+  });
 
   useEffect(() => {
     api.get("/dashboard").then(res => setStats(res.data)).catch(() => {});
@@ -40,6 +51,7 @@ const DashboardContent = ({ onNavigate }: { onNavigate: (id: string) => void }) 
           <RecentProcesses onNavigate={onNavigate} />
         </div>
         <div className="space-y-6">
+          <UrgencyPanel />
           <UpcomingDeadlines />
           <QuickActions />
         </div>

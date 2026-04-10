@@ -74,3 +74,7 @@ app:
       stale-hours: ${DATAJUD_SYNC_STALE_HOURS:4}
     domicilio:
       cron: ${DOMICILIO_SYNC_CRON:0 0 */2 * * *}
+  alertas:
+    prazos:
+      cron: ${PRAZO_ALERTA_CRON:0 0 8,13 * * *}
+      lookahead-days: ${PRAZO_ALERTA_LOOKAHEAD_DAYS:3}

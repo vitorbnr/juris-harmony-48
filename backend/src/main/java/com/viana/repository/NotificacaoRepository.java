@@ -18,6 +18,8 @@ public interface NotificacaoRepository extends JpaRepository<Notificacao, UUID> 
     Page<Notificacao> findByUsuarioIdOrderByCriadaEmDesc(UUID usuarioId, Pageable pageable);
  
     long countByUsuarioIdAndLidaFalse(UUID usuarioId);
+
+    boolean existsByUsuarioIdAndChaveExterna(UUID usuarioId, String chaveExterna);
  
     @Modifying
     @Query("UPDATE Notificacao n SET n.lida = true WHERE n.usuario.id = :usuarioId AND n.lida = false")

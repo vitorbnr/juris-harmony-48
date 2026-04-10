@@ -54,7 +54,15 @@ public interface PrazoRepository extends JpaRepository<Prazo, UUID> {
 
     long countByAdvogadoIdAndConcluidoFalseAndDataBetween(UUID advogadoId, LocalDate inicio, LocalDate fim);
 
+    long countByAdvogadoIdAndConcluidoFalseAndDataLessThan(UUID advogadoId, LocalDate data);
+
+    long countByAdvogadoIdAndConcluidoFalseAndData(UUID advogadoId, LocalDate data);
+
+    long countByAdvogadoIdAndTipoAndConcluidoFalse(UUID advogadoId, com.viana.model.enums.TipoPrazo tipo);
+
     Optional<Prazo> findFirstByProcessoIdAndConcluidoFalseOrderByDataAscHoraAsc(UUID processoId);
 
     boolean existsByEventoJuridicoIdAndTipo(UUID eventoJuridicoId, com.viana.model.enums.TipoPrazo tipo);
+
+    List<Prazo> findByConcluidoFalseAndAdvogadoIsNotNullAndDataLessThanEqual(LocalDate data);
 }

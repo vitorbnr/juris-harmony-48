@@ -45,6 +45,9 @@ public class DashboardController {
                 List.of(StatusProcesso.EM_ANDAMENTO, StatusProcesso.URGENTE, StatusProcesso.AGUARDANDO));
         
         long prazosSemana = prazoRepository.countByAdvogadoIdAndConcluidoFalseAndDataBetween(usuarioId, inicioSemana, fimSemana);
+        long prazosAtrasados = prazoService.contarAtrasados(usuarioId);
+        long prazosHoje = prazoService.contarVencendoHoje(usuarioId);
+        long tarefasAbertas = prazoService.contarTarefasAbertas(usuarioId);
 
         List<ProcessoResponse> processosRecentes = processoService.listarRecentes(5);
 
@@ -52,6 +55,9 @@ public class DashboardController {
                 "totalClientes", totalClientes,
                 "processosAtivos", processosAtivos,
                 "prazosSemana", prazosSemana,
+                "prazosAtrasados", prazosAtrasados,
+                "prazosHoje", prazosHoje,
+                "tarefasAbertas", tarefasAbertas,
                 "proximosPrazos", prazoService.listarProximos(usuarioId, 5),
                 "processosRecentes", processosRecentes
         ));

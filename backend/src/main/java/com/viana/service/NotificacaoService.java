@@ -36,11 +36,11 @@ public class NotificacaoService {
     @Transactional
     public NotificacaoResponse marcarComoLida(UUID id) {
         Notificacao notificacao = notificacaoRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Notificação não encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Notificacao nao encontrada"));
         notificacao.setLida(true);
         return toResponse(notificacaoRepository.save(notificacao));
     }
- 
+
     @Transactional
     public void marcarTodasComoLidas(UUID usuarioId) {
         notificacaoRepository.marcarTodasComoLidas(usuarioId);
@@ -48,8 +48,27 @@ public class NotificacaoService {
 
     @Transactional
     public void criarNotificacao(UUID usuarioId, String titulo, String descricao, TipoNotificacao tipo, String link) {
+        criarNotificacao(usuarioId, titulo, descricao, tipo, link, null, null, null);
+    }
+
+    @Transactional
+    public void criarNotificacao(
+            UUID usuarioId,
+            String titulo,
+            String descricao,
+            TipoNotificacao tipo,
+            String link,
+            String chaveExterna,
+            String referenciaTipo,
+            UUID referenciaId
+    ) {
+        if (chaveExterna != null && !chaveExterna.isBlank()
+                && notificacaoRepository.existsByUsuarioIdAndChaveExterna(usuarioId, chaveExterna)) {
+            return;
+        }
+
         Usuario usuario = usuarioRepository.findById(usuarioId)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
 
         Notificacao notificacao = Notificacao.builder()
                 .usuario(usuario)
@@ -57,20 +76,23 @@ public class NotificacaoService {
                 .descricao(descricao)
                 .tipo(tipo)
                 .link(link)
+                .chaveExterna(chaveExterna)
+                .referenciaTipo(referenciaTipo)
+                .referenciaId(referenciaId)
                 .build();
 
         notificacaoRepository.save(notificacao);
     }
 
-    private NotificacaoResponse toResponse(Notificacao n) {
+    private NotificacaoResponse toResponse(Notificacao notificacao) {
         return NotificacaoResponse.builder()
-                .id(n.getId().toString())
-                .titulo(n.getTitulo())
-                .descricao(n.getDescricao())
-                .tipo(n.getTipo().name())
-                .lida(n.getLida())
-                .criadaEm(n.getCriadaEm().toString())
-                .link(n.getLink())
+                .id(notificacao.getId().toString())
+                .titulo(notificacao.getTitulo())
+                .descricao(notificacao.getDescricao())
+                .tipo(notificacao.getTipo().name())
+                .lida(Boolean.TRUE.equals(notificacao.getLida()))
+                .criadaEm(notificacao.getCriadaEm().toString())
+                .link(notificacao.getLink())
                 .build();
     }
 }
