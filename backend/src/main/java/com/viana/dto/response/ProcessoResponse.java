@@ -19,26 +19,17 @@ public class ProcessoResponse {
     private String tipo;
     private String vara;
     private String tribunal;
-
-    /** Lista completa de advogados responsáveis. */
     private List<AdvogadoInfo> advogados;
-
-    /**
-     * Compatibilidade: ID do primeiro advogado da lista (pode ser null se não houver nenhum).
-     */
     private String advogadoId;
-
-    /**
-     * Compatibilidade: nome do primeiro advogado da lista (pode ser null).
-     */
     private String advogadoNome;
-
     private String status;
     private String dataDistribuicao;
     private String ultimaMovimentacao;
     private String proximoPrazo;
     private String valorCausa;
     private String descricao;
+    private List<String> etiquetas;
+    private List<ParteInfo> partes;
     private String unidadeId;
     private String unidadeNome;
     private List<MovimentacaoResponse> movimentacoes;
@@ -64,5 +55,34 @@ public class ProcessoResponse {
         private String tipo;
         private String origem;
         private String orgaoJulgador;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ParteInfo {
+        private String id;
+        private String nome;
+        private String documento;
+        private String tipo;
+        private String polo;
+        private Boolean principal;
+        private String observacao;
+        private List<RepresentanteInfo> representantes;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class RepresentanteInfo {
+        private String id;
+        private String nome;
+        private String cpf;
+        private String oab;
+        private Boolean principal;
+        private String usuarioInternoId;
+        private String usuarioInternoNome;
     }
 }

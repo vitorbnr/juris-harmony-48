@@ -27,6 +27,9 @@ public class TokenResponse {
         private String email;
         private String papel;
         private String cargo;
+        private String oab;
+        private String cpf;
+        private Boolean habilitadoDomicilio;
         private String initials;
         private String unidadeId;
         private String unidadeNome;

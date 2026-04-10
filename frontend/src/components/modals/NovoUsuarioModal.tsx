@@ -1,19 +1,21 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { X } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
-import { usuariosApi, unidadesApi } from "@/services/api";
-import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
+import { maskCPF } from "@/lib/masks";
+import { unidadesApi, usuariosApi } from "@/services/api";
 import type { UserRole } from "@/types";
+import { toast } from "sonner";
 
 interface Props {
   onClose: () => void;
   onSaved?: () => void;
 }
 
-const papeisCookie = [
+const papeis = [
   { value: "ADMINISTRADOR", label: "Administrador" },
   { value: "ADVOGADO", label: "Advogado" },
   { value: "SECRETARIA", label: "Secretaria" },
@@ -22,7 +24,6 @@ const papeisCookie = [
 export function NovoUsuarioModal({ onClose, onSaved }: Props) {
   const [loading, setLoading] = useState(false);
   const [unidades, setUnidades] = useState<{ id: string; nome: string }[]>([]);
-
   const [form, setForm] = useState({
     nome: "",
     email: "",
@@ -30,30 +31,45 @@ export function NovoUsuarioModal({ onClose, onSaved }: Props) {
     papel: "ADVOGADO" as UserRole,
     cargo: "Advogado",
     oab: "",
+    cpf: "",
+    habilitadoDomicilio: false,
     unidadeId: "",
   });
 
   useEffect(() => {
-    unidadesApi.listar().then(setUnidades).catch(() => {});
+    unidadesApi
+      .listar()
+      .then((data: { id: string; nome: string }[] | { content?: { id: string; nome: string }[] }) => {
+        const items = (data as { content?: { id: string; nome: string }[] }).content ?? data;
+        setUnidades(Array.isArray(items) ? items : []);
+      })
+      .catch(() => setUnidades([]));
   }, []);
 
-  const set = (key: string, value: string) => setForm(f => ({ ...f, [key]: value }));
+  const set = (key: string, value: string) => setForm((current) => ({ ...current, [key]: value }));
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+
     if (!form.nome || !form.email || !form.senha || !form.unidadeId) {
-      toast.error("Nome, email, senha e unidade são obrigatórios");
+      toast.error("Nome, e-mail, senha e unidade sao obrigatorios.");
       return;
     }
+
+    if (form.habilitadoDomicilio && form.cpf.replace(/\D/g, "").length !== 11) {
+      toast.error("Informe um CPF valido para habilitar o usuario no Domicilio.");
+      return;
+    }
+
     setLoading(true);
     try {
       await usuariosApi.criar(form);
-      toast.success("Usuário cadastrado com sucesso!");
+      toast.success("Usuario cadastrado com sucesso.");
       onSaved?.();
       onClose();
-    } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { mensagem?: string } } };
-      toast.error(axiosErr.response?.data?.mensagem || "Erro ao cadastrar usuário");
+    } catch (error: unknown) {
+      const axiosErr = error as { response?: { data?: { mensagem?: string } } };
+      toast.error(axiosErr.response?.data?.mensagem || "Erro ao cadastrar usuario.");
     } finally {
       setLoading(false);
     }
@@ -62,40 +78,46 @@ export function NovoUsuarioModal({ onClose, onSaved }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-card rounded-2xl border border-border shadow-2xl w-full max-w-lg mx-4 animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between px-6 py-5 border-b border-border">
-          <h2 className="font-heading text-lg font-semibold text-foreground">Novo Usuário</h2>
-          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8"><X className="h-4 w-4" /></Button>
+      <div className="relative mx-4 flex max-h-[90vh] w-full max-w-lg flex-col rounded-2xl border border-border bg-card shadow-2xl">
+        <div className="flex items-center justify-between border-b border-border px-6 py-5">
+          <h2 className="font-heading text-lg font-semibold text-foreground">Novo Usuario</h2>
+          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
+            <X className="h-4 w-4" />
+          </Button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="flex-1 space-y-4 overflow-y-auto p-6">
           <div className="space-y-1.5">
             <Label>Nome completo *</Label>
-            <Input placeholder="" value={form.nome} onChange={e => set("nome", e.target.value)} required />
+            <Input value={form.nome} onChange={(e) => set("nome", e.target.value)} required />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>E-mail *</Label>
-              <Input type="email" placeholder="" value={form.email} onChange={e => set("email", e.target.value)} required />
+              <Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} required />
             </div>
             <div className="space-y-1.5">
               <Label>Senha forte *</Label>
-              <Input type="password" placeholder="Min 8 caracteres..." value={form.senha} onChange={e => set("senha", e.target.value)} required />
+              <Input type="password" value={form.senha} onChange={(e) => set("senha", e.target.value)} required />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label>Papel (Permissões) *</Label>
+            <Label>Papel *</Label>
             <div className="flex gap-2">
-              {papeisCookie.map(p => (
+              {papeis.map((papel) => (
                 <button
-                  key={p.value} type="button" onClick={() => set("papel", p.value)}
-                  className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border transition-all ${
-                    form.papel === p.value ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/40"
+                  key={papel.value}
+                  type="button"
+                  onClick={() => set("papel", papel.value)}
+                  className={`flex-1 rounded-lg border px-3 py-2 text-xs font-medium transition-all ${
+                    form.papel === papel.value
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border text-muted-foreground hover:border-primary/40"
                   }`}
                 >
-                  {p.label}
+                  {papel.label}
                 </button>
               ))}
             </div>
@@ -104,29 +126,66 @@ export function NovoUsuarioModal({ onClose, onSaved }: Props) {
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Cargo</Label>
-              <Input placeholder="Ex: Advogado Sênior" value={form.cargo} onChange={e => set("cargo", e.target.value)} />
+              <Input value={form.cargo} onChange={(e) => set("cargo", e.target.value)} />
             </div>
             <div className="space-y-1.5">
               <Label>OAB</Label>
-              <Input placeholder="Opcional" value={form.oab} onChange={e => set("oab", e.target.value)} />
+              <Input value={form.oab} onChange={(e) => set("oab", e.target.value)} />
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>CPF</Label>
+              <Input
+                placeholder="000.000.000-00"
+                value={form.cpf}
+                onChange={(e) => set("cpf", maskCPF(e.target.value))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Operacao Domicilio</Label>
+              <div className="flex h-10 items-center justify-between rounded-md bg-secondary px-3">
+                <span className="text-sm text-foreground">Habilitado</span>
+                <Switch
+                  checked={form.habilitadoDomicilio}
+                  onCheckedChange={(checked) =>
+                    setForm((current) => ({ ...current, habilitadoDomicilio: checked }))
+                  }
+                />
+              </div>
+            </div>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            Marque essa opcao apenas para usuarios autorizados a operar a integracao institucional do Domicilio.
+          </p>
+
           <div className="space-y-1.5">
             <Label>Unidade *</Label>
-            <select value={form.unidadeId} onChange={e => set("unidadeId", e.target.value)} required
-              className="w-full h-10 px-3 rounded-md bg-secondary text-foreground text-sm border-none outline-none">
+            <select
+              value={form.unidadeId}
+              onChange={(e) => set("unidadeId", e.target.value)}
+              required
+              className="h-10 w-full rounded-md bg-secondary px-3 text-sm text-foreground outline-none"
+            >
               <option value="">Selecione a unidade</option>
-              {unidades.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
+              {unidades.map((unidade) => (
+                <option key={unidade.id} value={unidade.id}>
+                  {unidade.nome}
+                </option>
+              ))}
             </select>
           </div>
         </form>
 
-        <div className="px-6 py-4 border-t border-border flex gap-2">
+        <div className="flex gap-2 border-t border-border px-6 py-4">
           <Button className="flex-1" onClick={handleSubmit} disabled={loading}>
-            {loading ? "Salvando..." : "Criar Usuário"}
+            {loading ? "Salvando..." : "Criar Usuario"}
           </Button>
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button variant="outline" onClick={onClose}>
+            Cancelar
+          </Button>
         </div>
       </div>
     </div>

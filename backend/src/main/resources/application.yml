@@ -56,3 +56,21 @@ api:
   datajud:
     base-url: https://api-publica.datajud.cnj.jus.br
     api-key: ${DATAJUD_API_KEY}
+  domicilio:
+    enabled: ${DOMICILIO_ENABLED:false}
+    base-url: ${DOMICILIO_BASE_URL:}
+    token-url: ${DOMICILIO_TOKEN_URL:}
+    client-id: ${DOMICILIO_CLIENT_ID:}
+    client-secret: ${DOMICILIO_CLIENT_SECRET:}
+    on-behalf-of: ${DOMICILIO_ON_BEHALF_OF:}
+    tenant-id: ${DOMICILIO_TENANT_ID:}
+    eu-path: ${DOMICILIO_EU_PATH:/api/v1/eu}
+    comunicacoes-path: ${DOMICILIO_COMUNICACOES_PATH:/comunicacoes}
+
+app:
+  sync:
+    datajud:
+      cron: ${DATAJUD_SYNC_CRON:0 0 */4 * * *}
+      stale-hours: ${DATAJUD_SYNC_STALE_HOURS:4}
+    domicilio:
+      cron: ${DOMICILIO_SYNC_CRON:0 0 */2 * * *}

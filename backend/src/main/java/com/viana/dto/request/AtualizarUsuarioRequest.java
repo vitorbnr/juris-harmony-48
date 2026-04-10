@@ -16,7 +16,7 @@ public class AtualizarUsuarioRequest {
     @Size(max = 150)
     private String nome;
 
-    @Email(message = "E-mail inválido")
+    @Email(message = "E-mail invalido")
     private String email;
 
     @Size(max = 100)
@@ -24,6 +24,10 @@ public class AtualizarUsuarioRequest {
 
     @Size(max = 20)
     private String oab;
+
+    private String cpf;
+
+    private Boolean habilitadoDomicilio;
 
     private String papel;
 

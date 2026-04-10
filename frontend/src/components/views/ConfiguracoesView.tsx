@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { User, Building2, Users, Plus, Activity, Check, Save, Pencil, UserX, UserCheck } from "lucide-react";
+import { User, Building2, Users, Plus, Activity, Check, Save, Pencil, UserX, UserCheck, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +10,7 @@ import { useAuth } from "@/context/AuthContext";
 import { usuariosApi, logsApi } from "@/services/api";
 import { NovoUsuarioModal } from "@/components/modals/NovoUsuarioModal";
 import { EditarUsuarioModal } from "@/components/modals/EditarUsuarioModal";
+import { IntegracoesTab } from "@/components/views/configuracoes/IntegracoesTab";
 import type { UserRole } from "@/types";
 
 // --- INTERFACES ADICIONADAS ---
@@ -18,6 +19,10 @@ interface Usuario {
   nome: string;
   email: string;
   papel: string;
+  cargo?: string;
+  oab?: string;
+  cpf?: string;
+  habilitadoDomicilio?: boolean;
   initials?: string;
   unidadeNome?: string;
   ativo?: boolean;
@@ -34,10 +39,11 @@ interface LogAcesso {
 }
 // ------------------------------
 
-type Aba = "perfil" | "equipe" | "logs";
+type Aba = "perfil" | "integracoes" | "equipe" | "logs";
 
 const abas: { id: Aba; label: string; icon: React.ElementType }[] = [
   { id: "perfil",       label: "Perfil",       icon: User },
+  { id: "integracoes",  label: "Integracoes",  icon: Link2 },
   { id: "equipe",       label: "Equipe",       icon: Users },
   { id: "logs",         label: "Logs de Acesso", icon: Activity },
 ];
@@ -94,6 +100,13 @@ const moduloLabel: Record<string, string> = {
 function TabPerfil() {
   const { user } = useAuth();
   const [salvo, setSalvo] = useState(false);
+
+  const formatarCpf = (cpf?: string) => {
+    if (!cpf) return "";
+    const v = cpf.replace(/\D/g, "");
+    if (v.length !== 11) return cpf;
+    return v.replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d{2})$/, "$1-$2");
+  };
   
   const salvar = () => { setSalvo(true); setTimeout(() => setSalvo(false), 2000); };
 
@@ -132,8 +145,19 @@ function TabPerfil() {
           <Input id="oab" defaultValue={user.oab || ""} disabled />
         </div>
         <div className="space-y-1.5">
+          <Label htmlFor="cpf">CPF</Label>
+          <Input id="cpf" defaultValue={formatarCpf(user.cpf) || ""} disabled />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1.5">
           <Label htmlFor="unidade">Unidade Base</Label>
           <Input id="unidade" defaultValue={user.unidadeNome} disabled />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="domicilio">Operacao Domicilio</Label>
+          <Input id="domicilio" defaultValue={user.habilitadoDomicilio ? "Habilitado" : "Nao habilitado"} disabled />
         </div>
       </div>
 
@@ -229,6 +253,9 @@ function TabEquipe() {
                         <div>
                           <p className="font-semibold text-foreground">{u.nome}</p>
                           <p className="text-[10px] text-muted-foreground">{u.email}</p>
+                          {u.cpf && (
+                            <p className="text-[10px] text-muted-foreground">CPF: {u.cpf}</p>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -238,9 +265,16 @@ function TabEquipe() {
                       </Badge>
                     </td>
                     <td className="px-5 py-4 hidden lg:table-cell text-muted-foreground">
-                      <div className="flex items-center gap-1.5">
-                        <Building2 className="h-3.5 w-3.5" />
-                        {u.unidadeNome ?? "N/A"}
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5">
+                          <Building2 className="h-3.5 w-3.5" />
+                          {u.unidadeNome ?? "N/A"}
+                        </div>
+                        {u.habilitadoDomicilio && (
+                          <span className="inline-flex rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400">
+                            Domicilio habilitado
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-5 py-4">
@@ -362,7 +396,7 @@ export const ConfiguracoesView = () => {
       {/* Conflito de CSS resolvido aqui: Removido o '-mb-px' que brigava com o 'mb-8' */}
       <div className="flex gap-1 mb-8 border-b border-border pb-0">
         {abas
-          .filter(aba => (aba.id === "equipe" || aba.id === "logs") ? user?.papel === "ADMINISTRADOR" : true)
+          .filter(aba => (aba.id === "integracoes" || aba.id === "equipe" || aba.id === "logs") ? user?.papel === "ADMINISTRADOR" : true)
           .map(a => {
           const Icon = a.icon;
           return (
@@ -385,6 +419,7 @@ export const ConfiguracoesView = () => {
 
       <div>
         {abaAtiva === "perfil"       && <TabPerfil />}
+        {abaAtiva === "integracoes"  && <IntegracoesTab />}
         {abaAtiva === "equipe"       && <TabEquipe />}
         {abaAtiva === "logs"         && <TabLogs />}
       </div>

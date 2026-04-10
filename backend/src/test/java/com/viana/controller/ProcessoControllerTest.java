@@ -67,7 +67,7 @@ class ProcessoControllerTest {
 
         Page<ProcessoResponse> pageResponse = new PageImpl<>(List.of(resp), PageRequest.of(0, 10), 1);
 
-        when(processoService.listar(any(), any(), any(), any(), any())).thenReturn(pageResponse);
+        when(processoService.listar(any(), any(), any(), any(), any(), any())).thenReturn(pageResponse);
 
         mockMvc.perform(get("/api/processos?page=0&size=10"))
                 .andExpect(status().isOk())

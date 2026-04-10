@@ -35,6 +35,7 @@ export function EditarPrazoModal({ prazo, onClose, onSaved }: Props) {
     hora: prazo.hora ?? "",
     tipo: prazo.tipo,
     prioridade: prazo.prioridade,
+    etapa: prazo.etapa ?? (prazo.concluido ? "concluido" : "a_fazer"),
     descricao: prazo.descricao ?? "",
   });
 
@@ -54,6 +55,7 @@ export function EditarPrazoModal({ prazo, onClose, onSaved }: Props) {
         hora: form.hora || null,
         tipo: form.tipo.toUpperCase(),
         prioridade: form.prioridade.toUpperCase(),
+        etapa: form.tipo === "tarefa_interna" ? form.etapa.toUpperCase() : null,
         descricao: form.descricao || null,
       });
       toast.success("Prazo atualizado com sucesso!");
@@ -120,6 +122,21 @@ export function EditarPrazoModal({ prazo, onClose, onSaved }: Props) {
               ))}
             </div>
           </div>
+
+          {form.tipo === "tarefa_interna" && (
+            <div className="space-y-1.5">
+              <Label>Etapa</Label>
+              <select
+                value={form.etapa}
+                onChange={e => set("etapa", e.target.value)}
+                className="w-full h-10 px-3 rounded-md bg-secondary text-foreground text-sm border-none outline-none"
+              >
+                <option value="a_fazer">A Fazer</option>
+                <option value="em_andamento">Em andamento</option>
+                <option value="concluido">Concluido</option>
+              </select>
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <Label>Descrição</Label>

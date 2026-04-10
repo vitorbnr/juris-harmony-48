@@ -4,6 +4,7 @@ import com.viana.model.enums.StatusProcesso;
 import com.viana.model.enums.TipoProcesso;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.BatchSize;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -79,6 +80,18 @@ public class Processo {
     @OrderBy("data DESC")
     @Builder.Default
     private List<Movimentacao> movimentacoes = new ArrayList<>();
+
+    @OneToMany(mappedBy = "processo", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("nome ASC")
+    @BatchSize(size = 50)
+    @Builder.Default
+    private List<ProcessoEtiqueta> etiquetas = new ArrayList<>();
+
+    @OneToMany(mappedBy = "processo", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("principal DESC, nome ASC")
+    @BatchSize(size = 50)
+    @Builder.Default
+    private List<ProcessoParte> partes = new ArrayList<>();
 
     @Column(nullable = false, updatable = false)
     @Builder.Default

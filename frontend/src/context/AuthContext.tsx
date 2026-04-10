@@ -11,6 +11,8 @@ interface AuthUser {
   initials: string;
   nacionalidade?: string;
   oab?: string;
+  cpf?: string;
+  habilitadoDomicilio?: boolean;
   unidadeId: string;
   unidadeNome: string;
 }

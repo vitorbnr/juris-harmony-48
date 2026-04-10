@@ -1,11 +1,14 @@
 package com.viana.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.viana.dto.response.DatajudCapaResponse;
 import com.viana.dto.response.DatajudMovimentacaoResponse;
 import com.viana.exception.BusinessException;
 import com.viana.exception.ResourceNotFoundException;
 import com.viana.util.CnjUtils;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -26,18 +29,22 @@ import java.util.List;
 import java.util.Map;
 
 @Service
+@Slf4j
 public class DatajudClientService {
 
     private final RestClient restClient;
+    private final ObjectMapper objectMapper;
     private final String baseUrl;
     private final String apiKey;
 
     public DatajudClientService(
             RestClient.Builder restClientBuilder,
+            ObjectMapper objectMapper,
             @Value("${api.datajud.base-url}") String baseUrl,
             @Value("${api.datajud.api-key}") String apiKey
     ) {
         this.restClient = restClientBuilder.build();
+        this.objectMapper = objectMapper;
         this.baseUrl = normalizeBaseUrl(baseUrl);
         this.apiKey = apiKey;
     }
@@ -47,14 +54,16 @@ public class DatajudClientService {
         String url = CnjUtils.buildDatajudSearchUrl(baseUrl, numeroCnjLimpo);
 
         try {
-            JsonNode response = restClient.post()
+            String responseBody = restClient.post()
                     .uri(url)
                     .contentType(MediaType.APPLICATION_JSON)
+                    .accept(MediaType.APPLICATION_JSON)
                     .header(HttpHeaders.AUTHORIZATION, buildAuthorizationHeader())
                     .body(buildPayload(numeroCnjLimpo))
                     .retrieve()
-                    .body(JsonNode.class);
+                    .body(String.class);
 
+            JsonNode response = parseResponseBody(responseBody, numeroCnjLimpo, url);
             JsonNode source = extractSource(response);
 
             return DatajudCapaResponse.builder()
@@ -70,9 +79,53 @@ public class DatajudClientService {
         } catch (IllegalArgumentException ex) {
             throw new BusinessException(ex.getMessage());
         } catch (RestClientResponseException ex) {
+            log.warn(
+                    "Falha HTTP ao consultar Datajud. numeroCnj={}, url={}, status={}, body={}",
+                    numeroCnjLimpo,
+                    url,
+                    ex.getStatusCode().value(),
+                    truncate(ex.getResponseBodyAsString())
+            );
             throw new BusinessException("Falha ao consultar o Datajud. Status: " + ex.getStatusCode().value());
         } catch (RestClientException ex) {
-            throw new BusinessException("Não foi possível consultar o Datajud no momento.");
+            log.error(
+                    "Falha de comunicacao ao consultar Datajud. numeroCnj={}, url={}, causa={}",
+                    numeroCnjLimpo,
+                    url,
+                    ex.getMessage(),
+                    ex
+            );
+            throw new BusinessException("Nao foi possivel consultar o Datajud no momento.");
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            log.error(
+                    "Falha inesperada ao processar resposta do Datajud. numeroCnj={}, url={}, causa={}",
+                    numeroCnjLimpo,
+                    url,
+                    ex.getMessage(),
+                    ex
+            );
+            throw new BusinessException("Falha ao processar a resposta do Datajud.");
+        }
+    }
+
+    private JsonNode parseResponseBody(String responseBody, String numeroCnjLimpo, String url) {
+        if (responseBody == null || responseBody.isBlank()) {
+            throw new BusinessException("Resposta vazia ao consultar o Datajud.");
+        }
+
+        try {
+            return objectMapper.readTree(responseBody);
+        } catch (JsonProcessingException ex) {
+            log.error(
+                    "Resposta nao JSON recebida do Datajud. numeroCnj={}, url={}, body={}",
+                    numeroCnjLimpo,
+                    url,
+                    truncate(responseBody),
+                    ex
+            );
+            throw new BusinessException("Resposta invalida ao consultar o Datajud.");
         }
     }
 
@@ -93,7 +146,7 @@ public class DatajudClientService {
 
         JsonNode hits = response.path("hits").path("hits");
         if (!hits.isArray() || hits.isEmpty()) {
-            throw new ResourceNotFoundException("Processo não encontrado no Datajud.");
+            throw new ResourceNotFoundException("Processo nao encontrado no Datajud.");
         }
 
         JsonNode source = hits.get(0).path("_source");
@@ -133,7 +186,7 @@ public class DatajudClientService {
     }
 
     private String buildMovimentacaoDescricao(JsonNode movimento, String nomeBase) {
-        String nome = nomeBase != null ? nomeBase : "Movimentação";
+        String nome = nomeBase != null ? nomeBase : "Movimentacao";
         JsonNode complementos = movimento.path("complementosTabelados");
         if (!complementos.isArray() || complementos.isEmpty()) {
             return nome;
@@ -164,7 +217,6 @@ public class DatajudClientService {
         if (normalized.contains("audi")) return "AUDIENCIA";
         if (normalized.contains("peti")) return "PETICAO";
         if (normalized.contains("publica")
-                || normalized.contains("diário")
                 || normalized.contains("diario")
                 || normalized.contains("disponibiliza")) {
             return "PUBLICACAO";
@@ -358,12 +410,12 @@ public class DatajudClientService {
 
     private String limparNumeroCnj(String numeroCnj) {
         if (numeroCnj == null || numeroCnj.isBlank()) {
-            throw new BusinessException("Número CNJ é obrigatório para consultar o Datajud.");
+            throw new BusinessException("Numero CNJ e obrigatorio para consultar o Datajud.");
         }
 
         String numeroCnjLimpo = numeroCnj.replaceAll("\\D", "");
         if (numeroCnjLimpo.length() != 20) {
-            throw new BusinessException("O número CNJ deve conter 20 dígitos.");
+            throw new BusinessException("O numero CNJ deve conter 20 digitos.");
         }
 
         return numeroCnjLimpo;
@@ -402,7 +454,7 @@ public class DatajudClientService {
 
     private String buildAuthorizationHeader() {
         if (apiKey == null || apiKey.isBlank()) {
-            throw new BusinessException("DATAJUD_API_KEY não configurada.");
+            throw new BusinessException("DATAJUD_API_KEY nao configurada.");
         }
 
         return apiKey.regionMatches(true, 0, "APIKey ", 0, 7)
@@ -412,9 +464,17 @@ public class DatajudClientService {
 
     private String normalizeBaseUrl(String url) {
         if (url == null || url.isBlank()) {
-            throw new BusinessException("A base URL do Datajud não está configurada.");
+            throw new BusinessException("A base URL do Datajud nao esta configurada.");
         }
 
         return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+    }
+
+    private String truncate(String value) {
+        if (value == null) {
+            return null;
+        }
+        String sanitized = value.replaceAll("\\s+", " ").trim();
+        return sanitized.length() <= 400 ? sanitized : sanitized.substring(0, 400) + "...";
     }
 }

@@ -15,16 +15,16 @@ import java.util.UUID;
 @AllArgsConstructor
 public class CriarUsuarioRequest {
 
-    @NotBlank(message = "Nome é obrigatório")
+    @NotBlank(message = "Nome e obrigatorio")
     @Size(max = 150)
     private String nome;
 
-    @NotBlank(message = "E-mail é obrigatório")
-    @Email(message = "E-mail inválido")
+    @NotBlank(message = "E-mail e obrigatorio")
+    @Email(message = "E-mail invalido")
     private String email;
 
-    @NotBlank(message = "Senha é obrigatória")
-    @Size(min = 8, message = "Senha deve ter no mínimo 8 caracteres")
+    @NotBlank(message = "Senha e obrigatoria")
+    @Size(min = 8, message = "Senha deve ter no minimo 8 caracteres")
     private String senha;
 
     @Size(max = 100)
@@ -33,9 +33,13 @@ public class CriarUsuarioRequest {
     @Size(max = 20)
     private String oab;
 
-    @NotBlank(message = "Papel é obrigatório")
-    private String papel; // ADMINISTRADOR, ADVOGADO, SECRETARIA
+    private String cpf;
 
-    @NotNull(message = "Unidade é obrigatória")
+    private Boolean habilitadoDomicilio;
+
+    @NotBlank(message = "Papel e obrigatorio")
+    private String papel;
+
+    @NotNull(message = "Unidade e obrigatoria")
     private UUID unidadeId;
 }

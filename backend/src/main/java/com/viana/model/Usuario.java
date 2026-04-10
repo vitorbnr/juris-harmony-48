@@ -33,6 +33,13 @@ public class Usuario {
     @Column(length = 20)
     private String oab;
 
+    @Column(length = 11, unique = true)
+    private String cpf;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean habilitadoDomicilio = false;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private UserRole papel;

@@ -61,6 +61,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
                 // ── Admin only ──
+                .requestMatchers("/api/integracoes/**").hasRole("ADMINISTRADOR")
                 .requestMatchers("/api/usuarios/**").hasRole("ADMINISTRADOR")
                 .requestMatchers("/api/logs/**").hasRole("ADMINISTRADOR")
 

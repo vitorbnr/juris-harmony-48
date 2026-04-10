@@ -3,7 +3,6 @@ package com.viana.repository;
 import com.viana.model.Cliente;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -18,16 +17,17 @@ public interface ClienteRepository extends JpaRepository<Cliente, UUID> {
 
     /**
      * Lista clientes com filtros opcionais.
-     * Usa @EntityGraph para eager-load de relacionamentos sem colidir com a paginação
-     * (evita o HHH90003004 do Hibernate que paginava em memória causando lista vazia).
+     * Usa '' = :busca em vez de :busca IS NULL para forçar o Hibernate 6 a tipar
+     * o parâmetro como String (evita SemanticException com LIKE predicates).
      */
-    @EntityGraph(attributePaths = {"unidade", "advogadoResponsavel"})
     @Query("""
         SELECT c FROM Cliente c
+        LEFT JOIN FETCH c.unidade
+        LEFT JOIN FETCH c.advogadoResponsavel
         WHERE c.ativo = true
         AND (:unidadeId IS NULL OR c.unidade.id = :unidadeId)
         AND (
-            COALESCE(:busca, '') = ''
+            '' = :busca
             OR LOWER(c.nome) LIKE LOWER(CONCAT('%', :busca, '%'))
             OR LOWER(COALESCE(c.email, '')) LIKE LOWER(CONCAT('%', :busca, '%'))
             OR COALESCE(c.cpfCnpj, '') LIKE CONCAT('%', :busca, '%')

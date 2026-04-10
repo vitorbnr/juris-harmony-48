@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { Plus, UserPlus, X } from "lucide-react";
 
+import { EtiquetasEditor } from "@/components/EtiquetasEditor";
+import { PartesProcessoEditor, mapProcessoPartesToForm, sanitizeProcessoPartesForApi } from "@/components/PartesProcessoEditor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { maskCurrency, parseCurrency } from "@/lib/masks";
 import { processosApi, usuariosApi } from "@/services/api";
-import type { Processo } from "@/types";
+import type { Processo, ProcessoParteFormValue } from "@/types";
 import { toast } from "sonner";
 
 const statusOpcoes = [
@@ -40,6 +42,8 @@ export function EditarProcessoModal({ processo, onClose, onSaved }: Props) {
   const [loading, setLoading] = useState(false);
   const [todosAdvogados, setTodosAdvogados] = useState<{ id: string; nome: string }[]>([]);
   const [advogadosError, setAdvogadosError] = useState("");
+  const [etiquetas, setEtiquetas] = useState<string[]>(processo.etiquetas ?? []);
+  const [partes, setPartes] = useState<ProcessoParteFormValue[]>(() => mapProcessoPartesToForm(processo.partes));
 
   const [form, setForm] = useState({
     vara: processo.vara ?? "",
@@ -65,6 +69,21 @@ export function EditarProcessoModal({ processo, onClose, onSaved }: Props) {
       setTodosAdvogados(data.filter(u => u.papel === "ADVOGADO" || u.papel === "ADMINISTRADOR"));
     }).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    setEtiquetas(processo.etiquetas ?? []);
+    setPartes(mapProcessoPartesToForm(processo.partes));
+    setForm({
+      vara: processo.vara ?? "",
+      tribunal: processo.tribunal ?? "",
+      valorCausa: processo.valorCausa ? maskCurrency(Number(processo.valorCausa).toFixed(2).replace(".", "")) : "",
+      descricao: processo.descricao ?? "",
+      status: processo.status,
+    });
+    setAdvogadosSelecionados(
+      processo.advogados ?? (processo.advogadoId ? [{ id: processo.advogadoId, nome: processo.advogadoNome ?? "" }] : []),
+    );
+  }, [processo]);
 
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
@@ -100,6 +119,8 @@ export function EditarProcessoModal({ processo, onClose, onSaved }: Props) {
         valorCausa: form.valorCausa ? parseCurrency(form.valorCausa) : null,
         descricao: form.descricao || null,
         advogadoIds: advogadosSelecionados.map(a => a.id),
+        etiquetas,
+        partes: sanitizeProcessoPartesForApi(partes),
       });
       toast.success("Processo atualizado!");
       onSaved();
@@ -268,6 +289,14 @@ export function EditarProcessoModal({ processo, onClose, onSaved }: Props) {
                   onChange={e => set("descricao", e.target.value)}
                 />
               </div>
+
+              <EtiquetasEditor value={etiquetas} onChange={setEtiquetas} />
+
+              <PartesProcessoEditor
+                value={partes}
+                onChange={setPartes}
+                advogadosInternos={advogadosSelecionados}
+              />
             </>
           )}
 

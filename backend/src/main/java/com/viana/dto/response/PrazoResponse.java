@@ -13,12 +13,14 @@ public class PrazoResponse {
     private String id;
     private String titulo;
     private String processoId;
+    private String eventoJuridicoId;
     private String processoNumero;
     private String clienteNome;
     private String data;
     private String hora;
     private String tipo;
     private String prioridade;
+    private String etapa;
     private boolean concluido;
     private String advogadoId;
     private String advogadoNome;

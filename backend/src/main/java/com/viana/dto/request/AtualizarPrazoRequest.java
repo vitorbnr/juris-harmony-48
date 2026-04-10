@@ -17,6 +17,7 @@ public class AtualizarPrazoRequest {
     private LocalTime hora;
     private String tipo;
     private String prioridade;
+    private String etapa;
     private UUID processoId;
     private UUID advogadoId;
     private UUID unidadeId;

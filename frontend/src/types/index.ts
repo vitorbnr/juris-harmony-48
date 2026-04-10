@@ -17,10 +17,13 @@ export interface Usuario {
   email: string;
   cargo: string;
   oab?: string;
+  cpf?: string;
+  habilitadoDomicilio?: boolean;
   papel: UserRole;
   ativo: boolean;
   initials: string;
   unidadeId: string;
+  unidadeNome?: string;
 }
 
 // ─── Clientes ────────────────────────────────────────────────────────────────
@@ -82,9 +85,50 @@ export interface Processo {
   proximoPrazo?: string;
   valorCausa?: string;
   descricao?: string;
+  etiquetas?: string[];
+  partes?: ProcessoParte[];
   movimentacoes?: Movimentacao[];
   unidadeId: string;
   unidadeNome?: string;
+}
+
+export interface ProcessoParte {
+  id: string;
+  nome: string;
+  documento?: string;
+  tipo?: string;
+  polo?: string;
+  principal?: boolean;
+  observacao?: string;
+  representantes?: ProcessoParteRepresentante[];
+}
+
+export interface ProcessoParteRepresentante {
+  id: string;
+  nome: string;
+  cpf?: string;
+  oab?: string;
+  principal?: boolean;
+  usuarioInternoId?: string;
+  usuarioInternoNome?: string;
+}
+
+export interface ProcessoParteFormValue {
+  nome: string;
+  documento: string;
+  tipo: string;
+  polo: string;
+  principal: boolean;
+  observacao: string;
+  representantes: ProcessoParteRepresentanteFormValue[];
+}
+
+export interface ProcessoParteRepresentanteFormValue {
+  nome: string;
+  cpf: string;
+  oab: string;
+  principal: boolean;
+  usuarioInternoId: string;
 }
 
 export interface Movimentacao {
@@ -97,21 +141,48 @@ export interface Movimentacao {
   orgaoJulgador?: string;
 }
 
+export type FonteEventoJuridico = "DATAJUD" | "DOMICILIO" | "DJEN";
+export type TipoEventoJuridico = "MOVIMENTACAO" | "PUBLICACAO" | "INTIMACAO";
+export type StatusEventoJuridico = "NOVO" | "EM_TRIAGEM" | "CONCLUIDO" | "ARQUIVADO";
+
+export interface EventoJuridico {
+  id: string;
+  processoId?: string;
+  processoNumero?: string;
+  clienteNome?: string;
+  fonte: FonteEventoJuridico;
+  tipo: TipoEventoJuridico;
+  status: StatusEventoJuridico;
+  titulo: string;
+  descricao: string;
+  orgaoJulgador?: string;
+  referenciaExterna?: string;
+  destinatario?: string;
+  parteRelacionada?: string;
+  dataEvento?: string;
+  responsavelId?: string;
+  responsavelNome?: string;
+  criadoEm: string;
+}
+
 // ─── Prazos & Tarefas ────────────────────────────────────────────────────────
 
 export type TipoPrazo = "prazo_processual" | "audiencia" | "tarefa_interna" | "reuniao";
 export type PrioridadePrazo = "alta" | "media" | "baixa";
+export type EtapaPrazo = "a_fazer" | "em_andamento" | "concluido";
 
 export interface Prazo {
   id: string;
   titulo: string;
   processoId?: string;
+  eventoJuridicoId?: string;
   processoNumero?: string;
   clienteNome?: string;
   data: string;
   hora?: string;
   tipo: TipoPrazo;
   prioridade: PrioridadePrazo;
+  etapa?: EtapaPrazo;
   concluido: boolean;
   advogadoId?: string;
   descricao?: string;

@@ -24,6 +24,82 @@ export interface DatajudMovimentacaoResponse {
   chaveExterna: string | null;
 }
 
+export interface DatajudSyncResumoResponse {
+  processosAvaliados: number;
+  processosComNovidade: number;
+  movimentacoesNovas: number;
+  falhas: number;
+}
+
+export interface EventoJuridicoResponse {
+  id: string;
+  processoId?: string | null;
+  processoNumero?: string | null;
+  clienteNome?: string | null;
+  fonte: string;
+  tipo: string;
+  status: string;
+  titulo: string;
+  descricao: string;
+  orgaoJulgador?: string | null;
+  referenciaExterna?: string | null;
+  destinatario?: string | null;
+  parteRelacionada?: string | null;
+  dataEvento?: string | null;
+  responsavelId?: string | null;
+  responsavelNome?: string | null;
+  criadoEm: string;
+}
+
+export interface IntegracaoDomicilioResponse {
+  enabled: boolean;
+  readOnly: boolean;
+  prontaParaConsumo: boolean;
+  baseUrl?: string | null;
+  baseUrlConfigurada: boolean;
+  tokenUrlConfigurada: boolean;
+  clientIdConfigurado: boolean;
+  clientSecretConfigurado: boolean;
+  tenantIdConfigurado: boolean;
+  fallbackOnBehalfOfConfigurado: boolean;
+  cron?: string | null;
+  operadorInstitucional?: {
+    id: string;
+    nome: string;
+    email: string;
+    cpfMascarado?: string | null;
+  } | null;
+  operadorInstitucionalValido: boolean;
+  mensagemOperador?: string | null;
+  origemOnBehalfOf?: string | null;
+  onBehalfOfMascarado?: string | null;
+  ultimoSync?: {
+    status?: string | null;
+    ultimoSyncEm?: string | null;
+    ultimoSucessoEm?: string | null;
+    proximoSyncEm?: string | null;
+    tentativas?: number | null;
+    mensagem?: string | null;
+  } | null;
+}
+
+export interface TesteIntegracaoDomicilioResponse {
+  sucesso: boolean;
+  readOnly: boolean;
+  comunicacoesEncontradas: number;
+  dataInicio: string;
+  dataFim: string;
+  origemOnBehalfOf?: string | null;
+  onBehalfOfMascarado?: string | null;
+}
+
+export interface SincronizacaoDomicilioResponse {
+  eventosNovos: number;
+  dataInicio: string;
+  dataFim: string;
+  readOnly: boolean;
+}
+
 function cleanParams<T extends ApiParams | undefined>(params: T): T {
   if (!params) return params;
   const out: ApiParams = {};
@@ -51,6 +127,7 @@ export const processosApi = {
     unidadeId?: string;
     status?: string;
     tipo?: string;
+    etiqueta?: string;
     busca?: string;
     page?: number;
     size?: number;
@@ -73,6 +150,12 @@ export const processosApi = {
 
   adicionarMovimentacao: (id: string, data: Record<string, unknown>) =>
     api.post(`/processos/${id}/movimentacoes`, data).then(r => r.data),
+
+  sincronizarDatajud: (id: string) =>
+    api.post(`/processos/${id}/sincronizar-datajud`).then(r => r.data as { movimentacoesNovas: number }),
+
+  sincronizarDatajudEmLote: () =>
+    api.post("/processos/sincronizar-datajud").then(r => r.data as DatajudSyncResumoResponse),
 };
 
 // ─── Clientes ────────────────────────────────────────────────────────────────
@@ -118,6 +201,9 @@ export const prazosApi = {
 
   atualizar: (id: string, data: Record<string, unknown>) =>
     api.put(`/prazos/${id}`, data).then(r => r.data),
+
+  atualizarEtapa: (id: string, etapa: string) =>
+    api.patch(`/prazos/${id}/etapa`, { etapa }).then(r => r.data),
 
   concluir: (id: string) =>
     api.patch(`/prazos/${id}/concluir`).then(r => r.data),
@@ -185,6 +271,54 @@ export const notificacoesApi = {
     api.patch("/notificacoes/lidas").then(r => r.data),
   contarNaoLidas: () =>
     api.get("/notificacoes/count").then(r => r.data.naoLidas as number),
+};
+
+export const eventosJuridicosApi = {
+  listar: (params?: {
+    status?: string;
+    fonte?: string;
+    processoId?: string;
+    responsavelId?: string;
+    page?: number;
+    size?: number;
+  }) => api.get("/eventos-juridicos", { params: cleanParams(params) }).then(r => r.data),
+
+  atualizarStatus: (id: string, status: string) =>
+    api.patch(`/eventos-juridicos/${id}/status`, { status }).then(r => r.data as EventoJuridicoResponse),
+
+  vincularProcesso: (id: string, processoId: string) =>
+    api.patch(`/eventos-juridicos/${id}/vincular-processo`, { processoId }).then(r => r.data as EventoJuridicoResponse),
+
+  assumir: (id: string) =>
+    api.patch(`/eventos-juridicos/${id}/assumir`).then(r => r.data as EventoJuridicoResponse),
+
+  criarPrazo: (
+    id: string,
+    data: {
+      titulo: string;
+      data: string;
+      hora?: string | null;
+      tipo: string;
+      prioridade: string;
+      advogadoId?: string | null;
+      descricao?: string | null;
+    },
+  ) => api.post(`/eventos-juridicos/${id}/criar-prazo`, data).then(r => r.data),
+
+  sincronizarDomicilio: (params?: { dataInicio?: string; dataFim?: string; numeroProcesso?: string }) =>
+    api.post("/eventos-juridicos/sincronizar-domicilio", null, { params: cleanParams(params) })
+      .then(r => r.data as SincronizacaoDomicilioResponse),
+};
+
+export const integracoesApi = {
+  buscarDomicilio: () =>
+    api.get("/integracoes/domicilio").then(r => r.data as IntegracaoDomicilioResponse),
+
+  atualizarDomicilio: (data: { usuarioOperadorId: string | null }) =>
+    api.patch("/integracoes/domicilio", data).then(r => r.data as IntegracaoDomicilioResponse),
+
+  testarDomicilio: () =>
+    api.post("/integracoes/domicilio/testar").then(r => r.data as TesteIntegracaoDomicilioResponse),
 };
 
 // ─── Logs de Auditoria ────────────────────────────────────────────────────────

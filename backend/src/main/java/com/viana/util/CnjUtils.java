@@ -77,4 +77,22 @@ public class CnjUtils {
         String sigla = getSiglaDatajud(numeroCnj);
         return String.format("%s/api_publica_%s/_search", baseUrl, sigla);
     }
+
+    public static String formatNumeroCnj(String numeroCnj) {
+        if (numeroCnj == null) return null;
+
+        String cleanCnj = numeroCnj.replaceAll("\\D", "");
+        if (cleanCnj.length() != 20) {
+            return numeroCnj;
+        }
+
+        return "%s-%s.%s.%s.%s.%s".formatted(
+                cleanCnj.substring(0, 7),
+                cleanCnj.substring(7, 9),
+                cleanCnj.substring(9, 13),
+                cleanCnj.substring(13, 14),
+                cleanCnj.substring(14, 16),
+                cleanCnj.substring(16, 20)
+        );
+    }
 }

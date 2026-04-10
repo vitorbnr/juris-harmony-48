@@ -151,7 +151,7 @@ class ProcessoServiceTest {
     @DisplayName("Deve buscar processo por ID e retornar DTO")
     void buscarPorId_ComSucesso() {
         when(processoRepository.findById(processoId)).thenReturn(Optional.of(processoSalvo));
-        when(movimentacaoRepository.findByProcessoIdOrderByDataDesc(processoId)).thenReturn(Collections.emptyList());
+        when(movimentacaoRepository.findTimelineByProcessoId(processoId)).thenReturn(Collections.emptyList());
 
         ProcessoResponse response = processoService.buscarPorId(processoId);
 

@@ -1,27 +1,50 @@
-import { useState, useEffect } from "react";
-import { Bell, MapPin, ChevronDown, Check, LogOut } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
+import { Bell, Check, ChevronDown, LogOut, MapPin } from "lucide-react";
+
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { cn } from "@/lib/utils";
-import { useUnidade } from "@/context/UnidadeContext";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
+import { useUnidade } from "@/context/UnidadeContext";
+import { cn } from "@/lib/utils";
 import { notificacoesApi, unidadesApi } from "@/services/api";
 import type { Notificacao, Unidade } from "@/types";
 
 const getSectionTitles = (userName: string): Record<string, { title: string; subtitle: string }> => ({
-  dashboard:    { title: `Olá, ${userName}`, subtitle: "Aqui está o resumo do escritório hoje. ㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤBuild v2.36.1" },
-  processos:    { title: "Processos",          subtitle: "Gerencie todos os processos do escritório." },
-  clientes:     { title: "Clientes",           subtitle: "Carteira de clientes do escritório." },
-  prazos:       { title: "Prazos & Tarefas",   subtitle: "Acompanhe prazos processuais, audiências e tarefas." },
-  documentos:   { title: "Documentos",         subtitle: "Repositório central de arquivos e documentos." },
-  configuracoes:{ title: "Configurações",      subtitle: "Gerencie perfil, equipe e preferências do sistema." },
+  dashboard: {
+    title: `Ola, ${userName}`,
+    subtitle: "Aqui esta o resumo do escritorio hoje.",
+  },
+  inbox: {
+    title: "Inbox Juridica",
+    subtitle: "Central de eventos juridicos novos para triagem e acompanhamento.",
+  },
+  processos: {
+    title: "Processos",
+    subtitle: "Gerencie todos os processos do escritorio.",
+  },
+  clientes: {
+    title: "Clientes",
+    subtitle: "Carteira de clientes do escritorio.",
+  },
+  prazos: {
+    title: "Prazos e Tarefas",
+    subtitle: "Acompanhe prazos processuais, audiencias e tarefas.",
+  },
+  documentos: {
+    title: "Documentos",
+    subtitle: "Repositorio central de arquivos e documentos.",
+  },
+  configuracoes: {
+    title: "Configuracoes",
+    subtitle: "Gerencie perfil, equipe e preferencias do sistema.",
+  },
 });
 
 const tipoCor: Record<string, string> = {
-  prazo:      "bg-red-500/15 text-red-400",
+  prazo: "bg-red-500/15 text-red-400",
   financeiro: "bg-yellow-500/15 text-yellow-400",
-  documento:  "bg-blue-500/15 text-blue-400",
-  sistema:    "bg-muted text-muted-foreground",
+  documento: "bg-blue-500/15 text-blue-400",
+  sistema: "bg-muted text-muted-foreground",
 };
 
 interface Props {
@@ -31,18 +54,20 @@ interface Props {
 
 export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
   const { user, logout } = useAuth();
-  const sectionTitles = getSectionTitles(user?.nome?.split(" ").slice(0, 2).join(" ") ?? "");
-  const section = sectionTitles[activeItem] ?? sectionTitles.dashboard;
   const { unidadeSelecionada, setUnidadeSelecionada } = useUnidade();
+
   const [unidadeOpen, setUnidadeOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifs, setNotifs] = useState<Notificacao[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [unidades, setUnidades] = useState<Unidade[]>([]);
 
-  // Carrega unidades reais da API (não mais mockData)
+  const sectionTitles = getSectionTitles(user?.nome?.split(" ").slice(0, 2).join(" ") ?? "");
+  const section = sectionTitles[activeItem] ?? sectionTitles.dashboard;
+
   useEffect(() => {
-    unidadesApi.listar()
+    unidadesApi
+      .listar()
       .then((data: Unidade[] | { content?: Unidade[] }) => {
         const items = (data as { content?: Unidade[] }).content ?? data;
         setUnidades(Array.isArray(items) ? (items as Unidade[]) : []);
@@ -50,60 +75,67 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
       .catch(() => setUnidades([]));
   }, []);
 
-  // Carrega notificações
   useEffect(() => {
-    notificacoesApi.listar({ size: 10 })
+    notificacoesApi
+      .listar({ size: 10 })
       .then((data) => {
         const items = data.content ?? data;
         setNotifs(Array.isArray(items) ? items : []);
       })
       .catch(() => setNotifs([]));
 
-    notificacoesApi.contarNaoLidas()
+    notificacoesApi
+      .contarNaoLidas()
       .then(setUnreadCount)
       .catch(() => setUnreadCount(0));
   }, []);
 
-  const unidadeLabel = unidadeSelecionada === "todas"
-    ? "Todas as Unidades"
-    : unidades.find(u => u.id === unidadeSelecionada)?.nome ?? "Unidade";
+  const unidadeLabel =
+    unidadeSelecionada === "todas"
+      ? "Todas as Unidades"
+      : unidades.find((unidade) => unidade.id === unidadeSelecionada)?.nome ?? "Unidade";
+
+  const normalizarTipoNotificacao = (tipo: string) => tipo.toLowerCase();
 
   const marcarLida = (id: string) => {
-    notificacoesApi.marcarLida(id)
+    notificacoesApi
+      .marcarLida(id)
       .then(() => {
-        setNotifs(prev => prev.map(n => n.id === id ? { ...n, lida: true } : n));
-        setUnreadCount(prev => Math.max(0, prev - 1));
+        setNotifs((prev) => prev.map((notificacao) => (notificacao.id === id ? { ...notificacao, lida: true } : notificacao)));
+        setUnreadCount((prev) => Math.max(0, prev - 1));
       })
-      .catch(err => console.error("Erro ao marcar lida:", err));
+      .catch((err) => console.error("Erro ao marcar notificacao como lida:", err));
   };
 
   const marcarTodasLidas = () => {
-    notificacoesApi.marcarTodasLidas()
+    notificacoesApi
+      .marcarTodasLidas()
       .then(() => {
-        setNotifs(prev => prev.map(n => ({ ...n, lida: true })));
+        setNotifs((prev) => prev.map((notificacao) => ({ ...notificacao, lida: true })));
         setUnreadCount(0);
       })
-      .catch(err => console.error("Erro ao marcar todas lidas:", err));
+      .catch((err) => console.error("Erro ao marcar todas as notificacoes como lidas:", err));
   };
 
   return (
-    <header className="flex items-center justify-between px-6 py-3.5 border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10 gap-3">
-      {/* Título */}
+    <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border bg-card/50 px-6 py-3.5 backdrop-blur-sm">
       <div className="min-w-0">
-        <h2 className="font-heading text-xl font-semibold text-foreground truncate">{section.title}</h2>
-        <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">{section.subtitle}</p>
+        <h2 className="truncate font-heading text-xl font-semibold text-foreground">{section.title}</h2>
+        <p className="mt-0.5 hidden text-xs text-muted-foreground sm:block">{section.subtitle}</p>
       </div>
 
-      <div className="flex items-center gap-2 shrink-0">
-        {/* Seletor de Unidade — dados reais da API */}
+      <div className="flex shrink-0 items-center gap-2">
         <div className="relative">
           <button
-            onClick={() => { setUnidadeOpen(!unidadeOpen); setNotifOpen(false); }}
+            onClick={() => {
+              setUnidadeOpen(!unidadeOpen);
+              setNotifOpen(false);
+            }}
             className={cn(
-              "flex items-center gap-1.5 px-3 h-9 rounded-lg text-sm font-medium border transition-all",
+              "flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-all",
               unidadeSelecionada !== "todas"
-                ? "bg-primary/10 border-primary/30 text-primary"
-                : "bg-secondary border-transparent text-muted-foreground hover:text-foreground"
+                ? "border-primary/30 bg-primary/10 text-primary"
+                : "border-transparent bg-secondary text-muted-foreground hover:text-foreground",
             )}
           >
             <MapPin className="h-3.5 w-3.5" />
@@ -114,17 +146,21 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
           {unidadeOpen && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setUnidadeOpen(false)} />
-              <div className="absolute right-0 top-11 z-20 w-52 rounded-xl border border-border bg-card shadow-xl overflow-hidden">
-                {["todas", ...unidades.map(u => u.id)].map(id => {
-                  const label = id === "todas" ? "Todas as Unidades" : unidades.find(u => u.id === id)?.nome;
+              <div className="absolute right-0 top-11 z-20 w-52 overflow-hidden rounded-xl border border-border bg-card shadow-xl">
+                {["todas", ...unidades.map((unidade) => unidade.id)].map((id) => {
+                  const label = id === "todas" ? "Todas as Unidades" : unidades.find((unidade) => unidade.id === id)?.nome;
                   const selecionado = unidadeSelecionada === id;
+
                   return (
                     <button
                       key={id}
-                      onClick={() => { setUnidadeSelecionada(id); setUnidadeOpen(false); }}
+                      onClick={() => {
+                        setUnidadeSelecionada(id);
+                        setUnidadeOpen(false);
+                      }}
                       className={cn(
-                        "w-full flex items-center justify-between px-4 py-2.5 text-sm text-left hover:bg-muted/50 transition-colors",
-                        selecionado && "text-primary bg-primary/5"
+                        "flex w-full items-center justify-between px-4 py-2.5 text-left text-sm transition-colors hover:bg-muted/50",
+                        selecionado && "bg-primary/5 text-primary",
                       )}
                     >
                       <div className="flex items-center gap-2">
@@ -140,17 +176,19 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
           )}
         </div>
 
-        {/* Notificações */}
         <div className="relative">
           <Button
             variant="ghost"
             size="icon"
             className="relative h-9 w-9"
-            onClick={() => { setNotifOpen(!notifOpen); setUnidadeOpen(false); }}
+            onClick={() => {
+              setNotifOpen(!notifOpen);
+              setUnidadeOpen(false);
+            }}
           >
             <Bell className="h-5 w-5 text-muted-foreground" />
             {unreadCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 min-w-[16px] h-4 bg-destructive rounded-full text-[9px] font-bold text-white flex items-center justify-center px-0.5">
+              <span className="absolute right-1.5 top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-0.5 text-[9px] font-bold text-white">
                 {unreadCount > 99 ? "99+" : unreadCount}
               </span>
             )}
@@ -159,9 +197,9 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
           {notifOpen && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setNotifOpen(false)} />
-              <div className="absolute right-0 top-11 z-20 w-80 rounded-xl border border-border bg-card shadow-xl overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-                  <p className="font-semibold text-sm text-foreground">Notificações</p>
+              <div className="absolute right-0 top-11 z-20 w-80 overflow-hidden rounded-xl border border-border bg-card shadow-xl">
+                <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                  <p className="text-sm font-semibold text-foreground">Notificacoes</p>
                   {unreadCount > 0 && (
                     <button onClick={marcarTodasLidas} className="text-xs text-primary hover:underline">
                       Marcar todas como lidas
@@ -171,33 +209,54 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
                 <div className="max-h-80 overflow-y-auto">
                   {notifs.length === 0 ? (
                     <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
-                      Nenhuma notificação
+                      Nenhuma notificacao
                     </div>
                   ) : (
-                    notifs.map(n => (
-                      <button
-                        key={n.id}
-                        onClick={() => { marcarLida(n.id); setNotifOpen(false); if (n.link && onNavigate) onNavigate(n.link); }}
-                        className={cn(
-                          "w-full text-left px-4 py-3 hover:bg-muted/40 transition-colors flex items-start gap-3 border-b border-border/50 last:border-0",
-                          !n.lida && "bg-primary/3"
-                        )}
-                      >
-                        <span className={cn("shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold mt-0.5", tipoCor[n.tipo])}>
-                          {n.tipo === "prazo" ? "PRAZO" : n.tipo === "financeiro" ? "FIN" : n.tipo === "documento" ? "DOC" : "SIS"}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className={cn("text-sm font-medium truncate", n.lida ? "text-muted-foreground" : "text-foreground")}>
-                            {n.titulo}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.descricao}</p>
-                          <p className="text-[10px] text-muted-foreground mt-1">
-                            {n.criadaEm ? new Date(n.criadaEm).toLocaleString("pt-BR", { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : "—"}
-                          </p>
-                        </div>
-                        {!n.lida && <span className="shrink-0 w-2 h-2 rounded-full bg-primary mt-1.5" />}
-                      </button>
-                    ))
+                    notifs.map((notificacao) => {
+                      const tipoNormalizado = normalizarTipoNotificacao(notificacao.tipo);
+
+                      return (
+                        <button
+                          key={notificacao.id}
+                          onClick={() => {
+                            marcarLida(notificacao.id);
+                            setNotifOpen(false);
+                            if (notificacao.link && onNavigate) onNavigate(notificacao.link);
+                          }}
+                          className={cn(
+                            "flex w-full items-start gap-3 border-b border-border/50 px-4 py-3 text-left transition-colors last:border-0 hover:bg-muted/40",
+                            !notificacao.lida && "bg-primary/3",
+                          )}
+                        >
+                          <span className={cn("mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold", tipoCor[tipoNormalizado] ?? tipoCor.sistema)}>
+                            {tipoNormalizado === "prazo"
+                              ? "PRAZO"
+                              : tipoNormalizado === "financeiro"
+                                ? "FIN"
+                                : tipoNormalizado === "documento"
+                                  ? "DOC"
+                                  : "SIS"}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className={cn("truncate text-sm font-medium", notificacao.lida ? "text-muted-foreground" : "text-foreground")}>
+                              {notificacao.titulo}
+                            </p>
+                            <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{notificacao.descricao}</p>
+                            <p className="mt-1 text-[10px] text-muted-foreground">
+                              {notificacao.criadaEm
+                                ? new Date(notificacao.criadaEm).toLocaleString("pt-BR", {
+                                    day: "2-digit",
+                                    month: "2-digit",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })
+                                : "—"}
+                            </p>
+                          </div>
+                          {!notificacao.lida && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />}
+                        </button>
+                      );
+                    })
                   )}
                 </div>
               </div>
@@ -205,12 +264,12 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
           )}
         </div>
 
-        {/* Avatar + Logout */}
-        <Avatar className="h-9 w-9 border-2 border-primary/30 cursor-pointer" title={user?.nome}>
-          <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">
+        <Avatar className="h-9 w-9 cursor-pointer border-2 border-primary/30" title={user?.nome}>
+          <AvatarFallback className="bg-primary text-sm font-semibold text-primary-foreground">
             {user?.initials ?? "??"}
           </AvatarFallback>
         </Avatar>
+
         <Button variant="ghost" size="icon" className="h-9 w-9" onClick={logout} title="Sair">
           <LogOut className="h-4 w-4 text-muted-foreground" />
         </Button>

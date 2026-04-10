@@ -99,18 +99,18 @@ class ProcessoRepositoryTest {
     void findAllWithFilters() {
         // Busca sem nenhum filtro (apenas a unidade correta)
         Page<Processo> resultTodos = processoRepository.findAllWithFilters(
-                unidade.getId(), null, null, null, PageRequest.of(0, 10));
+                unidade.getId(), null, null, "", "", "", PageRequest.of(0, 10));
         assertThat(resultTodos.getContent()).hasSize(2);
 
         // Filtro por STATUS = EM_ANDAMENTO
         Page<Processo> resultStatus = processoRepository.findAllWithFilters(
-                unidade.getId(), StatusProcesso.EM_ANDAMENTO, null, null, PageRequest.of(0, 10));
+                unidade.getId(), StatusProcesso.EM_ANDAMENTO.name(), null, null, "", "", PageRequest.of(0, 10));
         assertThat(resultStatus.getContent()).hasSize(1);
         assertThat(resultStatus.getContent().get(0).getNumero()).isEqualTo("0000001-00.2024.8.26.0000");
 
         // Filtro por BUSCA (Numero do processo p2)
         Page<Processo> resultBusca = processoRepository.findAllWithFilters(
-                unidade.getId(), null, null, "0000002", PageRequest.of(0, 10));
+                unidade.getId(), null, null, "", "0000002", "0000002", PageRequest.of(0, 10));
         assertThat(resultBusca.getContent()).hasSize(1);
         assertThat(resultBusca.getContent().get(0).getTipo()).isEqualTo(TipoProcesso.TRABALHISTA);
     }

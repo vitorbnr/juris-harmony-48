@@ -7,12 +7,15 @@ import {
   ChevronRight,
   Clock,
   Filter,
+  Loader2,
   MapPin,
   Pause,
   Pencil,
   Plus,
+  RefreshCcw,
   Scale,
   Search,
+  Tag,
   X,
 } from "lucide-react";
 
@@ -124,6 +127,34 @@ const formatarValorCausa = (valor?: string) => {
   return `R$ ${parsed.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 };
 
+const poloParteLabel = (polo?: string) => {
+  switch ((polo ?? "").toUpperCase()) {
+    case "ATIVO":
+      return "Polo ativo";
+    case "PASSIVO":
+      return "Polo passivo";
+    case "TERCEIRO":
+      return "Terceiro";
+    case "OUTRO":
+      return "Outro";
+    default:
+      return polo || "Nao informado";
+  }
+};
+
+const tipoParteLabel = (tipo?: string) => {
+  switch ((tipo ?? "").toUpperCase()) {
+    case "PESSOA_FISICA":
+      return "Pessoa fisica";
+    case "PESSOA_JURIDICA":
+      return "Pessoa juridica";
+    case "NAO_IDENTIFICADO":
+      return "Nao identificado";
+    default:
+      return tipo || "Nao informado";
+  }
+};
+
 function ProcessoDrawer({
   processo,
   onClose,
@@ -215,6 +246,75 @@ function ProcessoDrawer({
               </div>
             )}
 
+            {processo.etiquetas && processo.etiquetas.length > 0 && (
+              <div className="rounded-lg bg-muted/40 px-3 py-2.5">
+                <p className="mb-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">Etiquetas</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {processo.etiquetas.map((etiqueta) => (
+                    <span
+                      key={etiqueta}
+                      className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+                    >
+                      <Tag className="h-3 w-3" />
+                      {etiqueta}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {processo.partes && processo.partes.length > 0 && (
+              <div className="rounded-lg bg-muted/40 px-3 py-2.5">
+                <p className="mb-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+                  Partes e Representantes
+                </p>
+                <div className="space-y-3">
+                  {processo.partes.map((parte) => (
+                    <div key={parte.id} className="rounded-lg border border-border/60 bg-background/70 px-3 py-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-semibold text-foreground">{parte.nome}</p>
+                        <span className="rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground">
+                          {poloParteLabel(parte.polo)}
+                        </span>
+                        <span className="rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground">
+                          {tipoParteLabel(parte.tipo)}
+                        </span>
+                        {parte.principal && (
+                          <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                            Principal
+                          </span>
+                        )}
+                      </div>
+
+                      {parte.documento && (
+                        <p className="mt-1 text-xs text-muted-foreground">Documento: {parte.documento}</p>
+                      )}
+
+                      {parte.observacao && (
+                        <p className="mt-1 text-xs text-muted-foreground">{parte.observacao}</p>
+                      )}
+
+                      {parte.representantes && parte.representantes.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {parte.representantes.map((representante) => (
+                            <div
+                              key={representante.id}
+                              className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs text-primary"
+                            >
+                              <span className="font-medium">{representante.nome}</span>
+                              {representante.oab ? ` • ${representante.oab}` : ""}
+                              {representante.usuarioInternoNome ? ` • interno: ${representante.usuarioInternoNome}` : ""}
+                              {representante.principal ? " • principal" : ""}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {processo.proximoPrazo && (
               <div className="flex items-center gap-3 rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3">
                 <CalendarClock className="h-4 w-4 shrink-0 text-destructive" />
@@ -230,7 +330,7 @@ function ProcessoDrawer({
 
           {processo.movimentacoes && processo.movimentacoes.length > 0 && (
             <div className="px-6 pb-6">
-              <h3 className="mb-3 font-heading text-base font-semibold text-foreground">Movimentacoes</h3>
+              <h3 className="mb-3 font-heading text-base font-semibold text-foreground">Movimentações</h3>
               <div className="relative space-y-0">
                 {processo.movimentacoes.map((mov, i) => (
                   <div key={mov.id} className="flex gap-3">
@@ -276,10 +376,12 @@ export const ProcessosView = () => {
   const [busca, setBusca] = useState("");
   const [filtroStatus, setFiltroStatus] = useState<StatusProcesso | "Todos">("Todos");
   const [filtroTipo, setFiltroTipo] = useState<TipoProcesso | "Todos">("Todos");
+  const [filtroEtiqueta, setFiltroEtiqueta] = useState("Todas");
   const [processoSelecionado, setProcessoSelecionado] = useState<Processo | null>(null);
   const [editando, setEditando] = useState(false);
   const [processos, setProcessos] = useState<Processo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncingDatajud, setSyncingDatajud] = useState(false);
   const [modalAberto, setModalAberto] = useState(false);
 
   const isSecretaria = user?.papel?.toUpperCase() === "SECRETARIA";
@@ -288,7 +390,7 @@ export const ProcessosView = () => {
     setLoading(true);
 
     const buscaNorm = busca.trim();
-    const params: { unidadeId?: string; busca?: string; size?: number } = { size: 1000 };
+    const params: { unidadeId?: string; busca?: string; etiqueta?: string; size?: number } = { size: 1000 };
 
     if (unidadeSelecionada && unidadeSelecionada !== "todas") {
       params.unidadeId = unidadeSelecionada;
@@ -296,6 +398,10 @@ export const ProcessosView = () => {
 
     if (buscaNorm) {
       params.busca = buscaNorm;
+    }
+
+    if (filtroEtiqueta !== "Todas") {
+      params.etiqueta = filtroEtiqueta;
     }
 
     processosApi
@@ -310,7 +416,7 @@ export const ProcessosView = () => {
         setProcessos([]);
       })
       .finally(() => setLoading(false));
-  }, [busca, unidadeSelecionada]);
+  }, [busca, filtroEtiqueta, unidadeSelecionada]);
 
   useEffect(() => {
     carregarProcessos();
@@ -326,6 +432,14 @@ export const ProcessosView = () => {
     "ARQUIVADO",
   ];
 
+  const etiquetasDisponiveis = Array.from(
+    new Set(processos.flatMap((processo) => processo.etiquetas ?? [])),
+  ).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  const opcoesEtiqueta =
+    filtroEtiqueta !== "Todas" && !etiquetasDisponiveis.includes(filtroEtiqueta)
+      ? [filtroEtiqueta, ...etiquetasDisponiveis]
+      : etiquetasDisponiveis;
+
   const processosFiltrados = processos.filter((processo) => {
     const matchStatus = filtroStatus === "Todos" || processo.status === filtroStatus;
     const matchTipo = filtroTipo === "Todos" || processo.tipo === filtroTipo;
@@ -338,6 +452,22 @@ export const ProcessosView = () => {
       setProcessoSelecionado(completo);
     } catch {
       setProcessoSelecionado(processo);
+    }
+  };
+
+  const sincronizarMovimentacoes = async () => {
+    setSyncingDatajud(true);
+    try {
+      const resumo = await processosApi.sincronizarDatajudEmLote();
+      toast.success(
+        `Datajud sincronizado: ${resumo.movimentacoesNovas} nova(s) movimentacao(oes) em ${resumo.processosComNovidade} processo(s).`,
+      );
+      carregarProcessos();
+    } catch (error) {
+      console.error("Erro ao sincronizar Datajud em lote:", error);
+      toast.error("Nao foi possivel sincronizar as movimentacoes do Datajud agora.");
+    } finally {
+      setSyncingDatajud(false);
     }
   };
 
@@ -379,10 +509,38 @@ export const ProcessosView = () => {
           ))}
         </select>
 
+        <select
+          value={filtroEtiqueta}
+          onChange={(event) => setFiltroEtiqueta(event.target.value)}
+          className="h-10 cursor-pointer rounded-md border-none bg-secondary px-3 text-sm text-foreground outline-none"
+        >
+          <option value="Todas">Todas as etiquetas</option>
+          {opcoesEtiqueta.map((etiqueta) => (
+            <option key={etiqueta} value={etiqueta}>
+              {etiqueta}
+            </option>
+          ))}
+        </select>
+
         {!isSecretaria && (
-          <Button className="ml-auto gap-2" onClick={() => setModalAberto(true)}>
-            <Plus className="h-4 w-4" /> Novo Processo
-          </Button>
+          <>
+            <Button
+              variant="outline"
+              className="ml-auto gap-2"
+              onClick={sincronizarMovimentacoes}
+              disabled={syncingDatajud}
+            >
+              {syncingDatajud ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCcw className="h-4 w-4" />
+              )}
+              Sincronizar movimentacoes
+            </Button>
+            <Button className="gap-2" onClick={() => setModalAberto(true)}>
+              <Plus className="h-4 w-4" /> Novo Processo
+            </Button>
+          </>
         )}
       </div>
 
@@ -467,7 +625,7 @@ export const ProcessosView = () => {
                         </div>
                       </td>
                       <td className="px-5 py-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-start gap-2">
                           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-semibold text-primary">
                             {processo.clienteNome
                               .split(" ")
@@ -475,7 +633,26 @@ export const ProcessosView = () => {
                               .map((nome) => nome[0])
                               .join("")}
                           </div>
-                          <span className="font-medium text-foreground">{processo.clienteNome}</span>
+                          <div className="min-w-0">
+                            <span className="font-medium text-foreground">{processo.clienteNome}</span>
+                            {processo.etiquetas && processo.etiquetas.length > 0 && (
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {processo.etiquetas.slice(0, 2).map((etiqueta) => (
+                                  <span
+                                    key={etiqueta}
+                                    className="inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary"
+                                  >
+                                    {etiqueta}
+                                  </span>
+                                ))}
+                                {processo.etiquetas.length > 2 && (
+                                  <span className="inline-flex items-center rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground">
+                                    +{processo.etiquetas.length - 2}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </td>
                       <td className="hidden px-5 py-4 text-muted-foreground md:table-cell">{processo.tipo}</td>

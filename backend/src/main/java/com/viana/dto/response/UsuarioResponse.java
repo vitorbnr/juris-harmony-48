@@ -15,6 +15,8 @@ public class UsuarioResponse {
     private String email;
     private String cargo;
     private String oab;
+    private String cpf;
+    private Boolean habilitadoDomicilio;
     private String papel;
     private boolean ativo;
     private String initials;

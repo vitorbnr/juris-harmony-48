@@ -3,36 +3,52 @@ package com.viana.service;
 import com.viana.dto.request.AtualizarProcessoRequest;
 import com.viana.dto.request.CriarMovimentacaoRequest;
 import com.viana.dto.request.CriarProcessoRequest;
+import com.viana.dto.request.ParteProcessoRequest;
+import com.viana.dto.request.RepresentanteParteRequest;
 import com.viana.dto.response.DatajudCapaResponse;
 import com.viana.dto.response.DatajudMovimentacaoResponse;
 import com.viana.dto.response.ProcessoResponse;
 import com.viana.exception.BusinessException;
 import com.viana.exception.ResourceNotFoundException;
 import com.viana.model.Cliente;
+import com.viana.model.FonteSync;
 import com.viana.model.Movimentacao;
 import com.viana.model.Processo;
+import com.viana.model.ProcessoEtiqueta;
+import com.viana.model.ProcessoParte;
+import com.viana.model.ProcessoParteRepresentante;
 import com.viana.model.Unidade;
 import com.viana.model.Usuario;
 import com.viana.model.enums.ModuloLog;
 import com.viana.model.enums.OrigemMovimentacao;
+import com.viana.model.enums.PoloProcessual;
+import com.viana.model.enums.FonteIntegracao;
+import com.viana.model.enums.StatusIntegracao;
 import com.viana.model.enums.StatusProcesso;
+import com.viana.model.enums.TipoParteProcessual;
 import com.viana.model.enums.TipoAcao;
 import com.viana.model.enums.TipoMovimentacao;
+import com.viana.model.enums.TipoNotificacao;
 import com.viana.model.enums.TipoProcesso;
+import com.viana.model.enums.TipoReferenciaIntegracao;
 import com.viana.repository.ClienteRepository;
+import com.viana.repository.FonteSyncRepository;
 import com.viana.repository.MovimentacaoRepository;
 import com.viana.repository.ProcessoRepository;
 import com.viana.repository.UnidadeRepository;
 import com.viana.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -52,14 +68,33 @@ public class ProcessoService {
     private final MovimentacaoRepository movimentacaoRepository;
     private final LogAuditoriaService logAuditoriaService;
     private final DatajudClientService datajudClientService;
+    private final FonteSyncService fonteSyncService;
+    private final FonteSyncRepository fonteSyncRepository;
+    private final NotificacaoService notificacaoService;
+    private final EventoJuridicoService eventoJuridicoService;
+
+    @Value("${app.sync.datajud.stale-hours:4}")
+    private long datajudStaleHours;
 
     @Transactional(readOnly = true)
-    public Page<ProcessoResponse> listar(UUID unidadeId, String status, String tipo, String busca, Pageable pageable) {
+    public Page<ProcessoResponse> listar(UUID unidadeId, String status, String tipo, String busca, String etiqueta, Pageable pageable) {
         StatusProcesso statusEnum = parseEnum(StatusProcesso.class, status);
         TipoProcesso tipoEnum = parseEnum(TipoProcesso.class, tipo);
-        String buscaNorm = (busca != null && !busca.isBlank()) ? busca : null;
+        String buscaNorm = (busca != null && !busca.isBlank()) ? busca : "";
+        String buscaNumero = normalizarBuscaNumero(busca != null && !busca.isBlank() ? busca : null);
+        buscaNumero = buscaNumero != null ? buscaNumero : "";
+        String etiquetaNorm = normalizarEtiquetaFiltro(etiqueta);
+        etiquetaNorm = etiquetaNorm != null ? etiquetaNorm : null; // null = sem filtro de etiqueta
 
-        return processoRepository.findAllWithFilters(unidadeId, statusEnum, tipoEnum, buscaNorm, pageable)
+        return processoRepository.findAllWithFilters(
+                        unidadeId,
+                        statusEnum != null ? statusEnum.name() : null,
+                        tipoEnum != null ? tipoEnum.name() : null,
+                        etiquetaNorm,
+                        buscaNorm,
+                        buscaNumero,
+                        pageable
+                )
                 .map(this::toResponse);
     }
 
@@ -76,7 +111,7 @@ public class ProcessoService {
         Processo processo = findOrThrow(id);
 
         if (deveSincronizarMovimentacoesDatajud(processo)) {
-            sincronizarMovimentacoesDatajud(processo);
+            sincronizarMovimentacoesDatajud(processo, false);
         }
 
         ProcessoResponse response = toResponse(processo);
@@ -122,13 +157,15 @@ public class ProcessoService {
                 .descricao(request.getDescricao())
                 .unidade(unidade)
                 .build();
+        aplicarEtiquetas(processo, request.getEtiquetas());
+        aplicarPartes(processo, request.getPartes());
 
         try {
             processo = processoRepository.save(processo);
         } catch (DataIntegrityViolationException ex) {
             throw new BusinessException("JÃ¡ existe um processo cadastrado com esse nÃºmero.");
         }
-        sincronizarMovimentacoesDatajud(processo);
+        sincronizarMovimentacoesDatajud(processo, false);
 
         // Log de auditoria (best-effort)
         try {
@@ -164,11 +201,14 @@ public class ProcessoService {
         if (request.getDataDistribuicao() != null) processo.setDataDistribuicao(request.getDataDistribuicao());
         if (request.getValorCausa() != null) processo.setValorCausa(request.getValorCausa());
         if (request.getDescricao() != null) processo.setDescricao(request.getDescricao());
+        if (request.getEtiquetas() != null) aplicarEtiquetas(processo, request.getEtiquetas());
+        if (request.getPartes() != null) aplicarPartes(processo, request.getPartes());
 
         if (request.getAdvogadoIds() != null) {
             validarAdvogadosObrigatorios(request.getAdvogadoIds());
             processo.getAdvogados().clear();
             processo.getAdvogados().addAll(resolverAdvogados(request.getAdvogadoIds()));
+            validarRepresentantesInternos(processo);
         }
 
         if (request.getUnidadeId() != null) {
@@ -213,27 +253,95 @@ public class ProcessoService {
                 StatusProcesso.EM_ANDAMENTO, StatusProcesso.URGENTE, StatusProcesso.AGUARDANDO));
     }
 
-    private boolean deveSincronizarMovimentacoesDatajud(Processo processo) {
-        return isNumeroCnj(processo.getNumero())
-                && movimentacaoRepository.findChavesExternasByProcessoId(processo.getId()).isEmpty();
+    @Transactional
+    public int sincronizarMovimentacoesDatajud(UUID processoId, boolean notificarResponsaveis) {
+        Processo processo = findOrThrow(processoId);
+        return sincronizarMovimentacoesDatajud(processo, notificarResponsaveis);
     }
 
-    private void sincronizarMovimentacoesDatajud(Processo processo) {
+    @Transactional
+    public DatajudSyncResumo sincronizarProcessosAtivosDatajud(boolean notificarResponsaveis) {
+        List<UUID> processosIds = processoRepository.findIdsByStatusIn(List.of(
+                StatusProcesso.EM_ANDAMENTO,
+                StatusProcesso.URGENTE,
+                StatusProcesso.AGUARDANDO,
+                StatusProcesso.SUSPENSO
+        ));
+
+        int processosAvaliados = 0;
+        int processosComNovidade = 0;
+        int movimentacoesNovas = 0;
+        int falhas = 0;
+
+        for (UUID processoId : processosIds) {
+            processosAvaliados++;
+            try {
+                int novas = sincronizarMovimentacoesDatajud(processoId, notificarResponsaveis);
+                movimentacoesNovas += novas;
+                if (novas > 0) {
+                    processosComNovidade++;
+                }
+            } catch (Exception ex) {
+                falhas++;
+            }
+        }
+
+        return new DatajudSyncResumo(processosAvaliados, processosComNovidade, movimentacoesNovas, falhas);
+    }
+
+    private boolean deveSincronizarMovimentacoesDatajud(Processo processo) {
         if (!isNumeroCnj(processo.getNumero())) {
-            return;
+            return false;
+        }
+
+        FonteSync fonteSync = fonteSyncRepository.findByFonteAndReferenciaTipoAndReferenciaId(
+                        FonteIntegracao.DATAJUD,
+                        TipoReferenciaIntegracao.PROCESSO,
+                        processo.getId()
+                )
+                .orElse(null);
+
+        if (fonteSync == null) {
+            return true;
+        }
+
+        if (fonteSync.getStatus() == StatusIntegracao.ERRO) {
+            LocalDateTime ultimoSync = fonteSync.getUltimoSyncEm();
+            return ultimoSync == null || ultimoSync.isBefore(LocalDateTime.now().minus(1, ChronoUnit.HOURS));
+        }
+
+        LocalDateTime ultimoSucesso = fonteSync.getUltimoSucessoEm();
+        if (ultimoSucesso == null) {
+            return true;
+        }
+
+        return ultimoSucesso.isBefore(LocalDateTime.now().minus(datajudStaleHours, ChronoUnit.HOURS));
+    }
+
+    private int sincronizarMovimentacoesDatajud(Processo processo, boolean notificarResponsaveis) {
+        if (!isNumeroCnj(processo.getNumero())) {
+            return 0;
         }
 
         try {
             DatajudCapaResponse datajud = datajudClientService.buscarCapaProcesso(processo.getNumero());
-            importarMovimentacoesDatajud(processo, datajud.getMovimentacoes());
-        } catch (BusinessException | ResourceNotFoundException ignored) {
-            // O processo local não deve falhar por indisponibilidade ou ausência de dados no Datajud.
+            int novasMovimentacoes = importarMovimentacoesDatajud(processo, datajud.getMovimentacoes());
+            fonteSyncService.registrarSucessoDatajud(processo, novasMovimentacoes, "Sincronizacao do Datajud executada");
+
+            if (notificarResponsaveis && novasMovimentacoes > 0) {
+                notificarResponsaveisSobreSyncDatajud(processo, novasMovimentacoes);
+            }
+
+            return novasMovimentacoes;
+        } catch (BusinessException | ResourceNotFoundException ex) {
+            fonteSyncService.registrarErroDatajud(processo, ex.getMessage());
+            return 0;
         }
     }
 
-    private void importarMovimentacoesDatajud(Processo processo, List<DatajudMovimentacaoResponse> movimentacoesDatajud) {
+    private int importarMovimentacoesDatajud(Processo processo, List<DatajudMovimentacaoResponse> movimentacoesDatajud) {
         if (movimentacoesDatajud == null || movimentacoesDatajud.isEmpty()) {
-            return;
+            return 0;
         }
 
         Set<String> chavesExistentes = new HashSet<>(movimentacaoRepository.findChavesExternasByProcessoId(processo.getId()));
@@ -265,14 +373,38 @@ public class ProcessoService {
         }
 
         if (novasMovimentacoes.isEmpty()) {
-            return;
+            return 0;
         }
 
         movimentacaoRepository.saveAll(novasMovimentacoes);
+        eventoJuridicoService.registrarMovimentacoesDatajud(processo, novasMovimentacoes);
         novasMovimentacoes.stream()
                 .map(Movimentacao::getData)
                 .max(LocalDate::compareTo)
                 .ifPresent(data -> atualizarUltimaMovimentacao(processo, data));
+        return novasMovimentacoes.size();
+    }
+
+    private void notificarResponsaveisSobreSyncDatajud(Processo processo, int novasMovimentacoes) {
+        if (processo.getAdvogados() == null || processo.getAdvogados().isEmpty()) {
+            return;
+        }
+
+        String descricao = String.format(
+                "O processo %s recebeu %d nova(s) movimentacao(oes) do Datajud.",
+                processo.getNumero(),
+                novasMovimentacoes
+        );
+
+        for (Usuario advogado : processo.getAdvogados()) {
+            notificacaoService.criarNotificacao(
+                    advogado.getId(),
+                    "Novas movimentacoes sincronizadas",
+                    descricao,
+                    TipoNotificacao.SISTEMA,
+                    "inbox"
+            );
+        }
     }
 
     private void atualizarUltimaMovimentacao(Processo processo, LocalDate data) {
@@ -357,6 +489,12 @@ public class ProcessoService {
                 .proximoPrazo(p.getProximoPrazo() != null ? p.getProximoPrazo().toString() : null)
                 .valorCausa(p.getValorCausa() != null ? p.getValorCausa().toString() : null)
                 .descricao(p.getDescricao())
+                .etiquetas(p.getEtiquetas() == null
+                        ? List.of()
+                        : p.getEtiquetas().stream().map(ProcessoEtiqueta::getNome).toList())
+                .partes(p.getPartes() == null
+                        ? List.of()
+                        : p.getPartes().stream().map(this::toParteResponse).toList())
                 .unidadeId(p.getUnidade().getId().toString())
                 .unidadeNome(p.getUnidade().getNome())
                 .build();
@@ -389,5 +527,266 @@ public class ProcessoService {
         } catch (IllegalArgumentException e) {
             throw new BusinessException(fieldName + " inválido: " + value);
         }
+    }
+    private void aplicarEtiquetas(Processo processo, List<String> etiquetas) {
+        processo.getEtiquetas().clear();
+
+        if (etiquetas == null || etiquetas.isEmpty()) {
+            return;
+        }
+
+        if (etiquetas.size() > 10) {
+            throw new BusinessException("Um processo pode ter no maximo 10 etiquetas.");
+        }
+
+        Set<String> etiquetasNormalizadas = new HashSet<>();
+
+        for (String etiqueta : etiquetas) {
+            String etiquetaExibicao = normalizarEtiquetaExibicao(etiqueta);
+            if (etiquetaExibicao == null || etiquetaExibicao.isBlank()) {
+                continue;
+            }
+
+            String etiquetaFiltro = normalizarEtiquetaFiltro(etiquetaExibicao);
+            if (!etiquetasNormalizadas.add(etiquetaFiltro)) {
+                continue;
+            }
+
+            processo.getEtiquetas().add(ProcessoEtiqueta.builder()
+                    .processo(processo)
+                    .nome(etiquetaExibicao)
+                    .nomeNormalizado(etiquetaFiltro)
+                    .build());
+        }
+    }
+
+    private String normalizarEtiquetaExibicao(String etiqueta) {
+        if (etiqueta == null) {
+            return null;
+        }
+
+        String trimmed = etiqueta.trim().replaceAll("\\s+", " ");
+        if (trimmed.isBlank()) {
+            return null;
+        }
+
+        if (trimmed.length() > 40) {
+            throw new BusinessException("Cada etiqueta deve ter no maximo 40 caracteres.");
+        }
+
+        return trimmed;
+    }
+
+    private String normalizarEtiquetaFiltro(String etiqueta) {
+        if (etiqueta == null) {
+            return null;
+        }
+
+        String sanitized = etiqueta.trim().replaceAll("\\s+", " ");
+        if (sanitized.isBlank()) {
+            return null;
+        }
+
+        return Normalizer.normalize(sanitized, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .toLowerCase();
+    }
+
+    private String normalizarBuscaNumero(String busca) {
+        if (busca == null || busca.isBlank()) {
+            return null;
+        }
+
+        String clean = busca.replaceAll("\\D", "");
+        return clean.isBlank() ? null : clean;
+    }
+
+    private void aplicarPartes(Processo processo, List<ParteProcessoRequest> partes) {
+        processo.getPartes().clear();
+
+        if (partes == null || partes.isEmpty()) {
+            return;
+        }
+
+        if (partes.size() > 20) {
+            throw new BusinessException("Um processo pode ter no maximo 20 partes estruturadas.");
+        }
+
+        for (ParteProcessoRequest parteRequest : partes) {
+            if (parteRequest == null) {
+                continue;
+            }
+
+            String nomeParte = normalizeTextoObrigatorio(parteRequest.getNome(), "Nome da parte");
+            TipoParteProcessual tipoParte = parseEnumRequired(
+                    TipoParteProcessual.class,
+                    defaultIfBlank(parteRequest.getTipo(), TipoParteProcessual.NAO_IDENTIFICADO.name()),
+                    "Tipo da parte"
+            );
+            PoloProcessual polo = parseEnumRequired(
+                    PoloProcessual.class,
+                    defaultIfBlank(parteRequest.getPolo(), PoloProcessual.OUTRO.name()),
+                    "Polo da parte"
+            );
+
+            ProcessoParte parte = ProcessoParte.builder()
+                    .processo(processo)
+                    .nome(nomeParte)
+                    .documento(normalizeDocumento(parteRequest.getDocumento()))
+                    .tipo(tipoParte)
+                    .polo(polo)
+                    .principal(Boolean.TRUE.equals(parteRequest.getPrincipal()))
+                    .observacao(normalizeTextoOpcional(parteRequest.getObservacao(), 500))
+                    .build();
+
+            List<RepresentanteParteRequest> representantes = parteRequest.getRepresentantes();
+            if (representantes != null) {
+                if (representantes.size() > 10) {
+                    throw new BusinessException("Cada parte pode ter no maximo 10 representantes.");
+                }
+
+                for (RepresentanteParteRequest representanteRequest : representantes) {
+                    if (representanteRequest == null) {
+                        continue;
+                    }
+
+                    String nomeRepresentante = normalizeTextoObrigatorio(
+                            representanteRequest.getNome(),
+                            "Nome do representante da parte"
+                    );
+
+                    Usuario usuarioInterno = null;
+                    if (representanteRequest.getUsuarioInternoId() != null) {
+                        usuarioInterno = usuarioRepository.findById(representanteRequest.getUsuarioInternoId())
+                                .orElseThrow(() -> new ResourceNotFoundException("Usuario interno do representante nao encontrado"));
+                        if (!processo.getAdvogados().contains(usuarioInterno)) {
+                            throw new BusinessException("O usuario interno do representante precisa estar entre os advogados responsaveis do processo.");
+                        }
+                    }
+
+                    parte.getRepresentantes().add(ProcessoParteRepresentante.builder()
+                            .parte(parte)
+                            .nome(nomeRepresentante)
+                            .cpf(normalizeCpf(representanteRequest.getCpf()))
+                            .oab(normalizeOab(representanteRequest.getOab()))
+                            .usuarioInterno(usuarioInterno)
+                            .principal(Boolean.TRUE.equals(representanteRequest.getPrincipal()))
+                            .build());
+                }
+            }
+
+            processo.getPartes().add(parte);
+        }
+    }
+
+    private void validarRepresentantesInternos(Processo processo) {
+        if (processo.getPartes() == null || processo.getPartes().isEmpty()) {
+            return;
+        }
+
+        for (ProcessoParte parte : processo.getPartes()) {
+            if (parte.getRepresentantes() == null) {
+                continue;
+            }
+
+            for (ProcessoParteRepresentante representante : parte.getRepresentantes()) {
+                Usuario usuarioInterno = representante.getUsuarioInterno();
+                if (usuarioInterno != null && !processo.getAdvogados().contains(usuarioInterno)) {
+                    throw new BusinessException("Nao e possivel remover dos advogados responsaveis um usuario vinculado como representante interno de parte.");
+                }
+            }
+        }
+    }
+
+    private ProcessoResponse.ParteInfo toParteResponse(ProcessoParte parte) {
+        return ProcessoResponse.ParteInfo.builder()
+                .id(parte.getId() != null ? parte.getId().toString() : null)
+                .nome(parte.getNome())
+                .documento(parte.getDocumento())
+                .tipo(parte.getTipo() != null ? parte.getTipo().name() : null)
+                .polo(parte.getPolo() != null ? parte.getPolo().name() : null)
+                .principal(parte.getPrincipal())
+                .observacao(parte.getObservacao())
+                .representantes(parte.getRepresentantes() == null
+                        ? List.of()
+                        : parte.getRepresentantes().stream().map(this::toRepresentanteResponse).toList())
+                .build();
+    }
+
+    private ProcessoResponse.RepresentanteInfo toRepresentanteResponse(ProcessoParteRepresentante representante) {
+        return ProcessoResponse.RepresentanteInfo.builder()
+                .id(representante.getId() != null ? representante.getId().toString() : null)
+                .nome(representante.getNome())
+                .cpf(representante.getCpf())
+                .oab(representante.getOab())
+                .principal(representante.getPrincipal())
+                .usuarioInternoId(representante.getUsuarioInterno() != null ? representante.getUsuarioInterno().getId().toString() : null)
+                .usuarioInternoNome(representante.getUsuarioInterno() != null ? representante.getUsuarioInterno().getNome() : null)
+                .build();
+    }
+
+    private String normalizeTextoObrigatorio(String value, String fieldName) {
+        String normalized = normalizeTextoOpcional(value, 200);
+        if (normalized == null) {
+            throw new BusinessException(fieldName + " e obrigatorio.");
+        }
+        return normalized;
+    }
+
+    private String normalizeTextoOpcional(String value, int maxLength) {
+        if (value == null) {
+            return null;
+        }
+
+        String trimmed = value.trim().replaceAll("\\s+", " ");
+        if (trimmed.isBlank()) {
+            return null;
+        }
+        if (trimmed.length() > maxLength) {
+            throw new BusinessException("Valor excede o limite de " + maxLength + " caracteres.");
+        }
+        return trimmed;
+    }
+
+    private String normalizeDocumento(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String clean = value.replaceAll("\\D", "");
+        return clean.isBlank() ? null : clean;
+    }
+
+    private String normalizeCpf(String value) {
+        String clean = normalizeDocumento(value);
+        if (clean == null) {
+            return null;
+        }
+        if (clean.length() != 11) {
+            throw new BusinessException("CPF do representante deve conter 11 digitos.");
+        }
+        return clean;
+    }
+
+    private String normalizeOab(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String normalized = value.trim().toUpperCase();
+        if (normalized.length() > 20) {
+            throw new BusinessException("OAB do representante deve ter no maximo 20 caracteres.");
+        }
+        return normalized;
+    }
+
+    private String defaultIfBlank(String value, String defaultValue) {
+        return value == null || value.isBlank() ? defaultValue : value;
+    }
+
+    public record DatajudSyncResumo(
+            int processosAvaliados,
+            int processosComNovidade,
+            int movimentacoesNovas,
+            int falhas
+    ) {
     }
 }

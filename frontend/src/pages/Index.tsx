@@ -7,6 +7,7 @@ import { RecentProcesses } from "@/components/RecentProcesses";
 import { UpcomingDeadlines } from "@/components/UpcomingDeadlines";
 import { QuickActions } from "@/components/QuickActions";
 import { ProcessosView } from "@/components/views/ProcessosView";
+import { InboxJuridicaView } from "@/components/views/InboxJuridicaView";
 import { ClientesView } from "@/components/views/ClientesView";
 import { PrazosView } from "@/components/views/PrazosView";
 import { DocumentosView } from "@/components/views/DocumentosView";
@@ -49,6 +50,8 @@ const DashboardContent = ({ onNavigate }: { onNavigate: (id: string) => void }) 
 
 const renderContent = (activeItem: string, onNavigate: (id: string) => void) => {
   switch (activeItem) {
+    case "inbox":
+      return <InboxJuridicaView />;
     case "processos":
       return <ProcessosView />;
     case "clientes":

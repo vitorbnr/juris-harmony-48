@@ -33,7 +33,8 @@ public class ClienteService {
 
     @Transactional(readOnly = true)
     public Page<ClienteResponse> listar(UUID unidadeId, String busca, Pageable pageable) {
-        return clienteRepository.findAllWithFilters(unidadeId, busca, pageable)
+        String buscaSafe = (busca == null || busca.isBlank()) ? "" : busca;
+        return clienteRepository.findAllWithFilters(unidadeId, buscaSafe, pageable)
                 .map(this::toResponse);
     }
 

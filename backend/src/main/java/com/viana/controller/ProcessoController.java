@@ -36,8 +36,9 @@ public class ProcessoController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String tipo,
             @RequestParam(required = false) String busca,
-            @PageableDefault(size = 20, sort = "criadoEm", direction = Sort.Direction.DESC) Pageable pageable) {
-        return ResponseEntity.ok(processoService.listar(unidadeId, status, tipo, busca, pageable));
+            @RequestParam(required = false) String etiqueta,
+            @PageableDefault(size = 20, sort = "criado_em", direction = Sort.Direction.DESC) Pageable pageable) {
+        return ResponseEntity.ok(processoService.listar(unidadeId, status, tipo, busca, etiqueta, pageable));
     }
 
     @GetMapping("/{id}")
@@ -82,5 +83,24 @@ public class ProcessoController {
             @Valid @RequestBody CriarMovimentacaoRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(processoService.adicionarMovimentacao(id, request));
+    }
+
+    @PostMapping("/{id}/sincronizar-datajud")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO')")
+    public ResponseEntity<Map<String, Object>> sincronizarDatajud(@PathVariable UUID id) {
+        int movimentacoesNovas = processoService.sincronizarMovimentacoesDatajud(id, true);
+        return ResponseEntity.ok(Map.of("movimentacoesNovas", movimentacoesNovas));
+    }
+
+    @PostMapping("/sincronizar-datajud")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO')")
+    public ResponseEntity<Map<String, Object>> sincronizarDatajudEmLote() {
+        ProcessoService.DatajudSyncResumo resumo = processoService.sincronizarProcessosAtivosDatajud(true);
+        return ResponseEntity.ok(Map.of(
+                "processosAvaliados", resumo.processosAvaliados(),
+                "processosComNovidade", resumo.processosComNovidade(),
+                "movimentacoesNovas", resumo.movimentacoesNovas(),
+                "falhas", resumo.falhas()
+        ));
     }
 }

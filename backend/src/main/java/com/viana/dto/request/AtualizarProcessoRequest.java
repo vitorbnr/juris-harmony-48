@@ -16,16 +16,12 @@ public class AtualizarProcessoRequest {
     private String tipo;
     private String vara;
     private String tribunal;
-
-    /**
-     * Se presente (não-null), substitui completamente a lista de advogados responsáveis.
-     * Pode ser uma lista vazia para remover todos os advogados.
-     */
     private List<UUID> advogadoIds;
-
     private String status;
     private LocalDate dataDistribuicao;
     private BigDecimal valorCausa;
     private String descricao;
+    private List<String> etiquetas;
+    private List<ParteProcessoRequest> partes;
     private UUID unidadeId;
 }

@@ -4,11 +4,14 @@ import { useForm } from "react-hook-form";
 
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
+import { EtiquetasEditor } from "@/components/EtiquetasEditor";
+import { PartesProcessoEditor, sanitizeProcessoPartesForApi } from "@/components/PartesProcessoEditor";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { maskCurrency, maskProcesso, parseCurrency } from "@/lib/masks";
 import { clientesApi, processosApi, unidadesApi, usuariosApi } from "@/services/api";
+import type { ProcessoParteFormValue } from "@/types";
 import { toast } from "sonner";
 
 interface Props {
@@ -116,6 +119,8 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
   const [advogadosSelecionados, setAdvogadosSelecionados] = useState<{ id: string; nome: string }[]>([]);
   const [advogadoSelecionarId, setAdvogadoSelecionarId] = useState("");
   const [advogadosError, setAdvogadosError] = useState("");
+  const [etiquetas, setEtiquetas] = useState<string[]>([]);
+  const [partes, setPartes] = useState<ProcessoParteFormValue[]>([]);
 
   const form = useForm<ProcessoFormValues>({
     defaultValues: {
@@ -252,6 +257,8 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
       await processosApi.criar({
         ...values,
         advogadoIds: advogadosSelecionados.map(item => item.id),
+        etiquetas,
+        partes: sanitizeProcessoPartesForApi(partes),
         valorCausa: values.valorCausa ? parseCurrency(values.valorCausa) : null,
       });
 
@@ -512,7 +519,15 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
                   </FormControl>
                   <FormMessage />
                 </FormItem>
-              )}
+                )}
+              />
+
+            <EtiquetasEditor value={etiquetas} onChange={setEtiquetas} />
+
+            <PartesProcessoEditor
+              value={partes}
+              onChange={setPartes}
+              advogadosInternos={advogadosSelecionados}
             />
 
             <FormField

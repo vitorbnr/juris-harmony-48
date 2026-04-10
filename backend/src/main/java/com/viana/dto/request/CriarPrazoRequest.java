@@ -15,22 +15,23 @@ import java.util.UUID;
 @AllArgsConstructor
 public class CriarPrazoRequest {
 
-    @NotBlank(message = "Título é obrigatório")
+    @NotBlank(message = "Titulo e obrigatorio")
     private String titulo;
 
     private UUID processoId;
 
-    @NotNull(message = "Data é obrigatória")
+    @NotNull(message = "Data e obrigatoria")
     private LocalDate data;
 
     private LocalTime hora;
 
-    @NotBlank(message = "Tipo é obrigatório")
+    @NotBlank(message = "Tipo e obrigatorio")
     private String tipo;
 
-    @NotBlank(message = "Prioridade é obrigatória")
+    @NotBlank(message = "Prioridade e obrigatoria")
     private String prioridade;
 
+    private String etapa;
     private UUID advogadoId;
     private String descricao;
     private UUID unidadeId;

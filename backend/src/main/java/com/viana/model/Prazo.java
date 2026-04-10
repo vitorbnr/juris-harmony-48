@@ -1,6 +1,7 @@
 package com.viana.model;
 
 import com.viana.model.enums.PrioridadePrazo;
+import com.viana.model.enums.EtapaPrazo;
 import com.viana.model.enums.TipoPrazo;
 import jakarta.persistence.*;
 import lombok.*;
@@ -28,6 +29,10 @@ public class Prazo {
     @JoinColumn(name = "processo_id")
     private Processo processo;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "evento_juridico_id")
+    private EventoJuridico eventoJuridico;
+
     @Column(nullable = false)
     private LocalDate data;
 
@@ -40,6 +45,11 @@ public class Prazo {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)
     private PrioridadePrazo prioridade;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private EtapaPrazo etapa = EtapaPrazo.A_FAZER;
 
     @Column(nullable = false)
     @Builder.Default

@@ -17,31 +17,30 @@ import java.util.UUID;
 @AllArgsConstructor
 public class CriarProcessoRequest {
 
-    @NotBlank(message = "Número do processo é obrigatório")
+    @NotBlank(message = "Numero do processo e obrigatorio")
     private String numero;
 
-    @NotNull(message = "Cliente é obrigatório")
+    @NotNull(message = "Cliente e obrigatorio")
     private UUID clienteId;
 
-    @NotBlank(message = "Tipo é obrigatório")
+    @NotBlank(message = "Tipo e obrigatorio")
     private String tipo;
 
     private String vara;
     private String tribunal;
 
-    /**
-     * Lista de IDs dos advogados responsáveis (opcional — pode ser null ou vazia).
-     */
-    @NotEmpty(message = "Pelo menos um advogado responsÃ¡vel Ã© obrigatÃ³rio")
+    @NotEmpty(message = "Pelo menos um advogado responsavel e obrigatorio")
     private List<UUID> advogadoIds;
 
-    @NotBlank(message = "Status é obrigatório")
+    @NotBlank(message = "Status e obrigatorio")
     private String status;
 
     private LocalDate dataDistribuicao;
     private BigDecimal valorCausa;
     private String descricao;
+    private List<String> etiquetas;
+    private List<ParteProcessoRequest> partes;
 
-    @NotNull(message = "Unidade é obrigatória")
+    @NotNull(message = "Unidade e obrigatoria")
     private UUID unidadeId;
 }

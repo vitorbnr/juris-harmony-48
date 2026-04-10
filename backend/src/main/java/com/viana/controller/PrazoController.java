@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -78,6 +79,16 @@ public class PrazoController {
     public ResponseEntity<PrazoResponse> concluir(@PathVariable UUID id, Authentication authentication) {
         Usuario usuario = getUsuario(authentication);
         return ResponseEntity.ok(prazoService.marcarConcluido(id, usuario.getId()));
+    }
+
+    @PatchMapping("/{id}/etapa")
+    public ResponseEntity<PrazoResponse> atualizarEtapa(
+            @PathVariable UUID id,
+            @RequestBody Map<String, String> body,
+            Authentication authentication
+    ) {
+        Usuario usuario = getUsuario(authentication);
+        return ResponseEntity.ok(prazoService.atualizarEtapa(id, body.get("etapa"), usuario.getId()));
     }
 
     @DeleteMapping("/{id}")

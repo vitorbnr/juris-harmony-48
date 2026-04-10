@@ -1,4 +1,5 @@
 import {
+  Inbox,
   LayoutDashboard,
   Users,
   Scale,
@@ -14,6 +15,7 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard",     id: "dashboard" },
+  { icon: Inbox,           label: "Inbox Juridica", id: "inbox" },
   { icon: Scale,           label: "Processos",     id: "processos" },
   { icon: Users,           label: "Clientes",      id: "clientes" },
   { icon: CalendarClock,   label: "Prazos & Tarefas", id: "prazos" },
