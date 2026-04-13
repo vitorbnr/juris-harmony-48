@@ -5,9 +5,11 @@ import {
   CalendarClock,
   CheckCircle2,
   Clock3,
+  ExternalLink,
   Filter,
   Inbox,
   Loader2,
+  PlusCircle,
   Search,
   UserCheck,
   RefreshCcw,
@@ -243,12 +245,250 @@ function CriarPrazoEventoModal({
   );
 }
 
+function RegistrarPublicacaoDjenModal({
+  usuariosResponsaveis,
+  onClose,
+  onSaved,
+}: {
+  usuariosResponsaveis: Usuario[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [buscaProcesso, setBuscaProcesso] = useState("");
+  const [buscando, setBuscando] = useState(false);
+  const [resultados, setResultados] = useState<Processo[]>([]);
+  const [processoSelecionadoId, setProcessoSelecionadoId] = useState("");
+  const [titulo, setTitulo] = useState("");
+  const [descricao, setDescricao] = useState("");
+  const [orgaoJulgador, setOrgaoJulgador] = useState("");
+  const [referenciaExterna, setReferenciaExterna] = useState("");
+  const [linkOficial, setLinkOficial] = useState("");
+  const [destinatario, setDestinatario] = useState("");
+  const [parteRelacionada, setParteRelacionada] = useState("");
+  const [dataEvento, setDataEvento] = useState(new Date().toISOString().slice(0, 10));
+  const [horaEvento, setHoraEvento] = useState("");
+  const [responsavelId, setResponsavelId] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const buscarProcessos = async () => {
+    const busca = buscaProcesso.trim();
+    if (!busca) {
+      toast.error("Informe um numero CNJ ou cliente para localizar o processo.");
+      return;
+    }
+
+    setBuscando(true);
+    try {
+      const data = await processosApi.listar({ busca, size: 8, sort: "criadoEm,desc" });
+      const items = data.content ?? data;
+      const processos = Array.isArray(items) ? items : [];
+      setResultados(processos);
+      if (processos.length === 1) {
+        setProcessoSelecionadoId(processos[0].id);
+      }
+    } catch (error) {
+      console.error("Erro ao buscar processos para publicacao DJEN:", error);
+      toast.error("Nao foi possivel buscar processos.");
+    } finally {
+      setBuscando(false);
+    }
+  };
+
+  const salvar = async () => {
+    if (!processoSelecionadoId) {
+      toast.error("Selecione um processo para registrar a publicacao.");
+      return;
+    }
+    if (!titulo.trim() || !descricao.trim()) {
+      toast.error("Titulo e descricao sao obrigatorios.");
+      return;
+    }
+    if (linkOficial.trim() && !/^https?:\/\//i.test(linkOficial.trim())) {
+      toast.error("Informe um link oficial valido iniciando com http:// ou https://.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await eventosJuridicosApi.registrarPublicacaoDjen({
+        processoId: processoSelecionadoId,
+        responsavelId: responsavelId || null,
+        titulo: titulo.trim(),
+        descricao: descricao.trim(),
+        orgaoJulgador: orgaoJulgador.trim() || null,
+        referenciaExterna: referenciaExterna.trim() || null,
+        linkOficial: linkOficial.trim() || null,
+        destinatario: destinatario.trim() || null,
+        parteRelacionada: parteRelacionada.trim() || null,
+        dataEvento: dataEvento || null,
+        horaEvento: horaEvento || null,
+      });
+      toast.success("Publicacao DJEN registrada na Inbox Juridica.");
+      onSaved();
+    } catch (error) {
+      console.error("Erro ao registrar publicacao DJEN:", error);
+      toast.error("Nao foi possivel registrar a publicacao.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="flex min-h-full items-start justify-center py-4 md:items-center">
+        <div className="relative flex w-full max-w-3xl max-h-[calc(100vh-2rem)] flex-col rounded-2xl border border-border bg-card shadow-2xl">
+          <div className="flex items-center justify-between border-b border-border px-6 py-5">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Registrar publicacao DJEN</h2>
+              <p className="text-sm text-muted-foreground">
+                Fluxo assistido: registra a publicacao na inbox, sem automatizar leitura, ciencia ou qualquer ato processual.
+              </p>
+            </div>
+            <Button type="button" variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="space-y-5 overflow-y-auto p-6">
+            <div className="space-y-3 rounded-xl border border-border bg-background/50 p-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-foreground">Processo</p>
+                <p className="text-xs text-muted-foreground">
+                  Busque o processo para vincular a publicacao diretamente ao painel correto.
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 md:flex-row">
+                <Input
+                  placeholder="Buscar por CNJ, cliente ou numero"
+                  value={buscaProcesso}
+                  onChange={(event) => setBuscaProcesso(event.target.value)}
+                />
+                <Button type="button" variant="outline" className="gap-2" onClick={buscarProcessos} disabled={buscando}>
+                  {buscando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                  Buscar processo
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {resultados.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Nenhum processo carregado ainda.</p>
+                ) : (
+                  resultados.map((processo) => (
+                    <label
+                      key={processo.id}
+                      className={cn(
+                        "flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-3",
+                        processoSelecionadoId === processo.id ? "border-primary bg-primary/5" : "border-border",
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="processo-djen"
+                        className="mt-1"
+                        checked={processoSelecionadoId === processo.id}
+                        onChange={() => setProcessoSelecionadoId(processo.id)}
+                      />
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-foreground">{processo.numero}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {processo.clienteNome} • {processo.tribunal} • {processo.vara}
+                        </p>
+                      </div>
+                    </label>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="text-sm font-medium text-foreground">Titulo</label>
+                <Input value={titulo} onChange={(event) => setTitulo(event.target.value)} placeholder="Ex.: Publicacao DJEN - intimacao para manifestacao" />
+              </div>
+
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="text-sm font-medium text-foreground">Descricao</label>
+                <textarea
+                  className="min-h-[120px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none"
+                  value={descricao}
+                  onChange={(event) => setDescricao(event.target.value)}
+                  placeholder="Cole ou resuma o teor util da publicacao para triagem interna."
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">Data da publicacao</label>
+                <Input type="date" value={dataEvento} onChange={(event) => setDataEvento(event.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">Hora</label>
+                <Input type="time" value={horaEvento} onChange={(event) => setHoraEvento(event.target.value)} />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">Orgao julgador</label>
+                <Input value={orgaoJulgador} onChange={(event) => setOrgaoJulgador(event.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">Referencia externa</label>
+                <Input value={referenciaExterna} onChange={(event) => setReferenciaExterna(event.target.value)} placeholder="idDjen, codigo ou numero do ato" />
+              </div>
+
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="text-sm font-medium text-foreground">Link oficial</label>
+                <Input value={linkOficial} onChange={(event) => setLinkOficial(event.target.value)} placeholder="https://..." />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">Destinatario</label>
+                <Input value={destinatario} onChange={(event) => setDestinatario(event.target.value)} placeholder="Advogado, parte ou destinatario exibido no portal" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">Parte relacionada</label>
+                <Input value={parteRelacionada} onChange={(event) => setParteRelacionada(event.target.value)} />
+              </div>
+
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="text-sm font-medium text-foreground">Responsavel interno</label>
+                <select
+                  value={responsavelId}
+                  onChange={(event) => setResponsavelId(event.target.value)}
+                  className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none"
+                >
+                  <option value="">Distribuicao automatica/padrao</option>
+                  {usuariosResponsaveis.map((usuario) => (
+                    <option key={usuario.id} value={usuario.id}>
+                      {usuario.nome}
+                      {usuario.unidadeNome ? ` - ${usuario.unidadeNome}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 gap-2 border-t border-border px-6 py-4">
+            <Button type="button" className="flex-1 gap-2" onClick={salvar} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlusCircle className="h-4 w-4" />}
+              Registrar publicacao
+            </Button>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancelar
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export const InboxJuridicaView = () => {
   const { user } = useAuth();
   const [eventos, setEventos] = useState<EventoJuridico[]>([]);
   const [usuariosResponsaveis, setUsuariosResponsaveis] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncingDomicilio, setSyncingDomicilio] = useState(false);
+  const [registrandoPublicacao, setRegistrandoPublicacao] = useState(false);
   const [assumindoId, setAssumindoId] = useState<string | null>(null);
   const [eventoEmVinculo, setEventoEmVinculo] = useState<string | null>(null);
   const [eventoEmAtribuicao, setEventoEmAtribuicao] = useState<string | null>(null);
@@ -497,6 +737,16 @@ export const InboxJuridicaView = () => {
           {somenteMeus ? "Mostrando meus itens" : "Somente meus"}
         </Button>
 
+        <Button
+          type="button"
+          variant="outline"
+          className="gap-2"
+          onClick={() => setRegistrandoPublicacao(true)}
+        >
+          <PlusCircle className="h-4 w-4" />
+          Registrar publicacao DJEN
+        </Button>
+
         {podeSincronizarDomicilio && (
           <Button
             type="button"
@@ -589,12 +839,32 @@ export const InboxJuridicaView = () => {
                         {evento.parteRelacionada}
                       </div>
                     )}
+                    {evento.linkOficial && (
+                      <div>
+                        <span className="font-medium text-foreground">Link oficial:</span>{" "}
+                        <a
+                          href={evento.linkOficial}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline"
+                        >
+                          Abrir portal oficial
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                      </div>
+                    )}
                   </div>
 
                   {evento.fonte === "DATAJUD" && (
                     <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 px-3 py-2 text-xs text-blue-200">
                       Evento publico sincronizado do Datajud. Serve para acompanhamento e triagem, sem
                       automatizar ciencia ou abertura de comunicacao.
+                    </div>
+                  )}
+
+                  {evento.fonte === "DJEN" && (
+                    <div className="rounded-xl border border-purple-500/20 bg-purple-500/10 px-3 py-2 text-xs text-purple-200">
+                      Publicacao registrada para triagem interna. O sistema nao substitui a leitura e a validacao humana no portal oficial.
                     </div>
                   )}
 
@@ -771,6 +1041,14 @@ export const InboxJuridicaView = () => {
                     <CalendarClock className="h-4 w-4" />
                     Criar prazo
                   </Button>
+                  {evento.linkOficial && (
+                    <Button asChild type="button" variant="outline" className="gap-2">
+                      <a href={evento.linkOficial} target="_blank" rel="noreferrer">
+                        <ExternalLink className="h-4 w-4" />
+                        Abrir oficial
+                      </a>
+                    </Button>
+                  )}
                   <Button
                     type="button"
                     variant="outline"
@@ -814,6 +1092,17 @@ export const InboxJuridicaView = () => {
           onClose={() => setEventoPrazo(null)}
           onSaved={async () => {
             setEventoPrazo(null);
+            await carregarEventos();
+          }}
+        />
+      )}
+
+      {registrandoPublicacao && (
+        <RegistrarPublicacaoDjenModal
+          usuariosResponsaveis={usuariosResponsaveis}
+          onClose={() => setRegistrandoPublicacao(false)}
+          onSaved={async () => {
+            setRegistrandoPublicacao(false);
             await carregarEventos();
           }}
         />

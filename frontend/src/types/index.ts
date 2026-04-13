@@ -157,6 +157,7 @@ export interface EventoJuridico {
   descricao: string;
   orgaoJulgador?: string;
   referenciaExterna?: string;
+  linkOficial?: string;
   destinatario?: string;
   parteRelacionada?: string;
   dataEvento?: string;

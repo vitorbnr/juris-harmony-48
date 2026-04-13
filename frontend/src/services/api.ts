@@ -44,6 +44,7 @@ export interface EventoJuridicoResponse {
   descricao: string;
   orgaoJulgador?: string | null;
   referenciaExterna?: string | null;
+  linkOficial?: string | null;
   destinatario?: string | null;
   parteRelacionada?: string | null;
   dataEvento?: string | null;
@@ -135,6 +136,20 @@ export interface SincronizacaoDomicilioResponse {
   dataInicio: string;
   dataFim: string;
   readOnly: boolean;
+}
+
+export interface CriarPublicacaoDjenRequest {
+  processoId: string;
+  responsavelId?: string | null;
+  titulo: string;
+  descricao: string;
+  orgaoJulgador?: string | null;
+  referenciaExterna?: string | null;
+  linkOficial?: string | null;
+  destinatario?: string | null;
+  parteRelacionada?: string | null;
+  dataEvento?: string | null;
+  horaEvento?: string | null;
 }
 
 export interface DashboardResponse {
@@ -381,6 +396,9 @@ export const eventosJuridicosApi = {
   sincronizarDomicilio: (params?: { dataInicio?: string; dataFim?: string; numeroProcesso?: string }) =>
     api.post("/eventos-juridicos/sincronizar-domicilio", null, { params: cleanParams(params) })
       .then(r => r.data as SincronizacaoDomicilioResponse),
+
+  registrarPublicacaoDjen: (data: CriarPublicacaoDjenRequest) =>
+    api.post("/eventos-juridicos/publicacoes/djen", data).then(r => r.data as EventoJuridicoResponse),
 };
 
 export const integracoesApi = {

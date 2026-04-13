@@ -1,6 +1,7 @@
 package com.viana.controller;
 
 import com.viana.dto.request.AtribuirResponsavelEventoRequest;
+import com.viana.dto.request.CriarPublicacaoDjenRequest;
 import com.viana.dto.request.CriarPrazoEventoRequest;
 import com.viana.dto.request.VincularEventoProcessoRequest;
 import com.viana.dto.response.EventoJuridicoResponse;
@@ -21,6 +22,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -87,7 +89,17 @@ public class EventoJuridicoController {
         return ResponseEntity.ok(eventoJuridicoService.atribuirResponsavel(id, request.getResponsavelId()));
     }
 
-    @org.springframework.web.bind.annotation.PostMapping("/{id}/criar-prazo")
+    @PostMapping("/publicacoes/djen")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO', 'SECRETARIA')")
+    public ResponseEntity<EventoJuridicoResponse> registrarPublicacaoDjen(
+            @RequestBody CriarPublicacaoDjenRequest request,
+            Authentication authentication
+    ) {
+        Usuario usuario = getUsuario(authentication);
+        return ResponseEntity.ok(eventoJuridicoService.registrarPublicacaoDjen(request, usuario.getId()));
+    }
+
+    @PostMapping("/{id}/criar-prazo")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO', 'SECRETARIA')")
     public ResponseEntity<PrazoResponse> criarPrazo(
             @PathVariable UUID id,
@@ -98,7 +110,7 @@ public class EventoJuridicoController {
         return ResponseEntity.ok(prazoService.criarAPartirDoEvento(id, request, usuario.getId()));
     }
 
-    @org.springframework.web.bind.annotation.PostMapping("/sincronizar-domicilio")
+    @PostMapping("/sincronizar-domicilio")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO')")
     public ResponseEntity<Map<String, Object>> sincronizarDomicilio(
             @RequestParam(required = false) LocalDate dataInicio,

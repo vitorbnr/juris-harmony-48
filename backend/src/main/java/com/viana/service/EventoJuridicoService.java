@@ -1,5 +1,6 @@
 package com.viana.service;
 
+import com.viana.dto.request.CriarPublicacaoDjenRequest;
 import com.viana.dto.response.EventoJuridicoResponse;
 import com.viana.dto.response.DomicilioComunicacaoResponse;
 import com.viana.exception.BusinessException;
@@ -13,6 +14,7 @@ import com.viana.model.Usuario;
 import com.viana.model.enums.FonteIntegracao;
 import com.viana.model.enums.StatusEventoJuridico;
 import com.viana.model.enums.TipoEventoJuridico;
+import com.viana.model.enums.TipoNotificacao;
 import com.viana.repository.EventoJuridicoRepository;
 import com.viana.repository.ProcessoRepository;
 import com.viana.repository.UsuarioRepository;
@@ -41,6 +43,7 @@ public class EventoJuridicoService {
     private final ProcessoRepository processoRepository;
     private final UsuarioRepository usuarioRepository;
     private final PrazoService prazoService;
+    private final NotificacaoService notificacaoService;
 
     @Transactional(readOnly = true)
     public Page<EventoJuridicoResponse> listar(String status, String fonte, UUID processoId, UUID responsavelId, Pageable pageable) {
@@ -111,6 +114,58 @@ public class EventoJuridicoService {
     }
 
     @Transactional
+    public EventoJuridicoResponse registrarPublicacaoDjen(CriarPublicacaoDjenRequest request, UUID usuarioLogadoId) {
+        if (request.getProcessoId() == null) {
+            throw new BusinessException("Processo e obrigatorio para registrar a publicacao.");
+        }
+        if (request.getTitulo() == null || request.getTitulo().isBlank()) {
+            throw new BusinessException("Titulo da publicacao e obrigatorio.");
+        }
+        if (request.getDescricao() == null || request.getDescricao().isBlank()) {
+            throw new BusinessException("Descricao da publicacao e obrigatoria.");
+        }
+
+        Processo processo = processoRepository.findById(request.getProcessoId())
+                .orElseThrow(() -> new ResourceNotFoundException("Processo nao encontrado"));
+
+        Usuario responsavel = resolveResponsavelManual(request, processo, usuarioLogadoId);
+        DistribuicaoAutomatica distribuicao = resolveDistribuicaoAutomatica(processo, request.getDestinatario());
+        if (responsavel == null && distribuicao != null) {
+            responsavel = distribuicao.responsavel();
+        }
+        if (responsavel == null) {
+            responsavel = resolveResponsavelPadrao(processo);
+        }
+
+        String hash = buildDjenHash(request, processo);
+        if (eventoJuridicoRepository.existsByHashDeduplicacao(hash)) {
+            throw new BusinessException("Ja existe uma publicacao registrada com esses dados.");
+        }
+
+        EventoJuridico evento = EventoJuridico.builder()
+                .processo(processo)
+                .responsavel(responsavel)
+                .fonte(FonteIntegracao.DJEN)
+                .tipo(TipoEventoJuridico.PUBLICACAO)
+                .status(StatusEventoJuridico.NOVO)
+                .titulo(request.getTitulo().trim())
+                .descricao(request.getDescricao().trim())
+                .orgaoJulgador(trimToNull(request.getOrgaoJulgador()))
+                .referenciaExterna(trimToNull(request.getReferenciaExterna()))
+                .linkOficial(trimToNull(request.getLinkOficial()))
+                .destinatario(trimToNull(request.getDestinatario()))
+                .parteRelacionada(resolveParteRelacionada(request, distribuicao))
+                .hashDeduplicacao(hash)
+                .dataEvento(resolveDataEventoManual(request))
+                .build();
+
+        EventoJuridico salvo = eventoJuridicoRepository.save(evento);
+        prazoService.gerarTarefaTriagemAutomatica(salvo);
+        notificarResponsaveisNovoEvento(salvo, "Nova publicacao registrada", "Uma nova publicacao do DJEN foi registrada na Inbox Juridica.");
+        return toResponse(salvo);
+    }
+
+    @Transactional
     public void registrarMovimentacoesDatajud(Processo processo, List<Movimentacao> movimentacoes) {
         if (movimentacoes == null || movimentacoes.isEmpty()) {
             return;
@@ -169,6 +224,7 @@ public class EventoJuridicoService {
                     .responsavel(distribuicao != null ? distribuicao.responsavel() : resolveResponsavelPadrao(processo))
                     .orgaoJulgador(comunicacao.getOrgaoOrigem())
                     .referenciaExterna(comunicacao.getIdExterno())
+                    .linkOficial(trimToNull(comunicacao.getLinkConsultaOficial()))
                     .destinatario(comunicacao.getDestinatario())
                     .parteRelacionada(distribuicao != null ? distribuicao.parteRelacionada() : null)
                     .hashDeduplicacao(hash)
@@ -210,6 +266,7 @@ public class EventoJuridicoService {
                 .descricao(evento.getDescricao())
                 .orgaoJulgador(evento.getOrgaoJulgador())
                 .referenciaExterna(evento.getReferenciaExterna())
+                .linkOficial(evento.getLinkOficial())
                 .destinatario(evento.getDestinatario())
                 .parteRelacionada(evento.getParteRelacionada())
                 .dataEvento(evento.getDataEvento() != null ? evento.getDataEvento().toString() : null)
@@ -317,6 +374,33 @@ public class EventoJuridicoService {
         return "DOMICILIO:" + DigestUtils.md5DigestAsHex(raw.getBytes(StandardCharsets.UTF_8));
     }
 
+    private String buildDjenHash(CriarPublicacaoDjenRequest request, Processo processo) {
+        String referencia = trimToNull(request.getReferenciaExterna());
+        if (referencia != null) {
+            return "DJEN:" + referencia;
+        }
+
+        String raw = String.join("|",
+                processo.getId().toString(),
+                sanitize(request.getTitulo()),
+                sanitize(request.getDescricao()),
+                sanitize(request.getLinkOficial()),
+                sanitize(request.getDestinatario()),
+                sanitize(resolveDataEventoManual(request) != null ? resolveDataEventoManual(request).toString() : null));
+        return "DJEN:" + DigestUtils.md5DigestAsHex(raw.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private LocalDateTime resolveDataEventoManual(CriarPublicacaoDjenRequest request) {
+        LocalDateTime fallback = LocalDateTime.now();
+        if (request.getDataEvento() == null) {
+            return fallback;
+        }
+        if (request.getHoraEvento() != null) {
+            return LocalDateTime.of(request.getDataEvento(), request.getHoraEvento());
+        }
+        return request.getDataEvento().atStartOfDay();
+    }
+
     private LocalDateTime parseDateTime(String... values) {
         for (String value : values) {
             if (value == null || value.isBlank()) {
@@ -333,6 +417,64 @@ public class EventoJuridicoService {
 
     private String sanitize(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isBlank() ? null : trimmed;
+    }
+
+    private String resolveParteRelacionada(CriarPublicacaoDjenRequest request, DistribuicaoAutomatica distribuicao) {
+        String parteRelacionada = trimToNull(request.getParteRelacionada());
+        if (parteRelacionada != null) {
+            return parteRelacionada;
+        }
+        return distribuicao != null ? distribuicao.parteRelacionada() : null;
+    }
+
+    private Usuario resolveResponsavelManual(CriarPublicacaoDjenRequest request, Processo processo, UUID usuarioLogadoId) {
+        if (request.getResponsavelId() != null) {
+            Usuario usuario = usuarioRepository.findById(request.getResponsavelId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Usuario responsavel nao encontrado"));
+            validarResponsavelAtivo(usuario);
+            validarResponsavelCompativelComProcesso(processo, usuario);
+            return usuario;
+        }
+
+        return usuarioRepository.findById(usuarioLogadoId)
+                .filter(usuario -> Boolean.TRUE.equals(usuario.getAtivo()))
+                .orElse(null);
+    }
+
+    private void notificarResponsaveisNovoEvento(EventoJuridico evento, String titulo, String descricaoBase) {
+        if (evento.getResponsavel() != null) {
+            notificacaoService.criarNotificacao(
+                    evento.getResponsavel().getId(),
+                    titulo,
+                    descricaoBase + " Processo: " + (evento.getProcesso() != null ? evento.getProcesso().getNumero() : "nao vinculado") + ".",
+                    TipoNotificacao.SISTEMA,
+                    "inbox"
+            );
+            return;
+        }
+
+        Processo processo = evento.getProcesso();
+        if (processo == null || processo.getAdvogados() == null) {
+            return;
+        }
+
+        for (Usuario advogado : processo.getAdvogados()) {
+            notificacaoService.criarNotificacao(
+                    advogado.getId(),
+                    titulo,
+                    descricaoBase + " Processo: " + processo.getNumero() + ".",
+                    TipoNotificacao.SISTEMA,
+                    "inbox"
+            );
+        }
     }
 
     private Usuario resolveResponsavelPadrao(Processo processo) {
@@ -466,7 +608,10 @@ public class EventoJuridicoService {
     }
 
     private void validarResponsavelCompativelComProcesso(EventoJuridico evento, Usuario usuario) {
-        Processo processo = evento.getProcesso();
+        validarResponsavelCompativelComProcesso(evento != null ? evento.getProcesso() : null, usuario);
+    }
+
+    private void validarResponsavelCompativelComProcesso(Processo processo, Usuario usuario) {
         if (processo == null || processo.getUnidade() == null || usuario.getUnidade() == null) {
             return;
         }

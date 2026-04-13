@@ -70,6 +70,9 @@ public class EventoJuridico {
     @Column(length = 255)
     private String referenciaExterna;
 
+    @Column(length = 500)
+    private String linkOficial;
+
     @Column(length = 255)
     private String destinatario;
 

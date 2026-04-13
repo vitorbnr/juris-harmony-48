@@ -1,22 +1,21 @@
-package com.viana.dto.response;
+package com.viana.dto.request;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.UUID;
+
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class EventoJuridicoResponse {
-    private String id;
-    private String processoId;
-    private String processoNumero;
-    private String clienteNome;
-    private String fonte;
-    private String tipo;
-    private String status;
+public class CriarPublicacaoDjenRequest {
+    private UUID processoId;
+    private UUID responsavelId;
     private String titulo;
     private String descricao;
     private String orgaoJulgador;
@@ -24,8 +23,6 @@ public class EventoJuridicoResponse {
     private String linkOficial;
     private String destinatario;
     private String parteRelacionada;
-    private String dataEvento;
-    private String responsavelId;
-    private String responsavelNome;
-    private String criadoEm;
+    private LocalDate dataEvento;
+    private LocalTime horaEvento;
 }
