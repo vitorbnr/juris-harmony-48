@@ -818,7 +818,8 @@ export const DocumentosView = () => {
         totalClientes: clientesFiltrados.length,
       };
     })
-    .filter((cidade): cidade is AcervoCidadeDocumento => cidade !== null);
+    .filter((cidade): cidade is AcervoCidadeDocumento => cidade !== null)
+    .sort((a, b) => a.label.localeCompare(b.label, "pt-BR", { sensitivity: "base" }));
 
   const clientesDaCidade =
     selecao.type === "cidade"
