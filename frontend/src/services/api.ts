@@ -316,8 +316,8 @@ export const documentosApi = {
   listarPorPasta: (pastaId: string, params?: { page?: number; size?: number }) =>
     api.get(`/documentos/pasta/${pastaId}`, { params: cleanParams(params) }).then(r => r.data),
 
-  listarPorProcesso: (processoId: string) =>
-    api.get(`/documentos/processo/${processoId}`).then(r => r.data),
+  listarPorProcesso: (processoId: string, params?: { page?: number; size?: number }) =>
+    api.get(`/documentos/processo/${processoId}`, { params: cleanParams(params) }).then(r => r.data),
 
   upload: (formData: FormData, onProgress?: (pct: number) => void) =>
     api.post("/documentos", formData, {
@@ -330,6 +330,9 @@ export const documentosApi = {
   downloadUrl: (id: string) =>
     api.get(`/documentos/${id}/download`).then(r => ({ url: r.data.url as string, nome: r.data.nome as string })),
 
+  atualizar: (id: string, data: { nome?: string; categoria?: string }) =>
+    api.put(`/documentos/${id}`, data).then(r => r.data),
+
   listarClientesComDocumentos: () =>
     api.get("/documentos/clientes-com-documentos").then(r => r.data as { id: string; nome: string }[]),
 
@@ -337,6 +340,9 @@ export const documentosApi = {
     api.get("/documentos/acervo-clientes").then(r => r.data),
 
   excluir: (id: string) => api.delete(`/documentos/${id}`),
+
+  excluirStorageKey: (storageKey: string) =>
+    api.delete(`/documentos/storage/${storageKey.replaceAll("/", "__")}`),
 };
 
 export const pastasApi = {

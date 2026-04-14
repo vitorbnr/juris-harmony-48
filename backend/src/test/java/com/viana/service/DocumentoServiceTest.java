@@ -1,5 +1,6 @@
 package com.viana.service;
 
+import com.viana.dto.request.AtualizarDocumentoRequest;
 import com.viana.dto.response.DocumentoResponse;
 import com.viana.exception.ResourceNotFoundException;
 import com.viana.model.Cliente;
@@ -251,5 +252,35 @@ class DocumentoServiceTest {
 
         verify(storageService, times(1)).delete("unidade/proc/peticao.pdf");
         verify(documentoRepository, times(1)).delete(documento);
+    }
+
+    @Test
+    @DisplayName("Deve atualizar nome e categoria do documento autorizado")
+    void atualizarSucesso() {
+        when(documentoRepository.findById(uuid)).thenReturn(Optional.of(documento));
+        when(documentoRepository.save(documento)).thenReturn(documento);
+
+        DocumentoResponse resultado = documentoService.atualizar(
+                uuid,
+                new AtualizarDocumentoRequest("Contrato revisado.pdf", "CONTRATO"),
+                usuario.getUnidade().getId(),
+                false
+        );
+
+        assertEquals("Contrato revisado.pdf", documento.getNome());
+        assertEquals(CategoriaDocumento.CONTRATO, documento.getCategoria());
+        assertEquals("Contrato revisado.pdf", resultado.getNome());
+        assertEquals("contrato", resultado.getCategoria());
+    }
+
+    @Test
+    @DisplayName("Deve excluir arquivo local por storage key")
+    void excluirPorStorageKeySucesso() {
+        when(documentoRepository.findByStorageKey("unidade/clientes/cliente-id/arquivo.pdf")).thenReturn(Optional.empty());
+        doNothing().when(storageService).delete("unidade/clientes/cliente-id/arquivo.pdf");
+
+        documentoService.excluirPorStorageKey("unidade/clientes/cliente-id/arquivo.pdf", null, true);
+
+        verify(storageService).delete("unidade/clientes/cliente-id/arquivo.pdf");
     }
 }
