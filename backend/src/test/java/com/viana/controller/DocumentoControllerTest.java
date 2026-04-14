@@ -1,7 +1,9 @@
 package com.viana.controller;
 
 import com.viana.dto.response.DocumentoResponse;
+import com.viana.model.Documento;
 import com.viana.model.Usuario;
+import com.viana.repository.DocumentoRepository;
 import com.viana.repository.UsuarioRepository;
 import com.viana.service.DocumentoService;
 import org.junit.jupiter.api.DisplayName;
@@ -19,10 +21,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -38,21 +41,19 @@ class DocumentoControllerTest {
     @MockBean
     private UsuarioRepository usuarioRepository;
 
+    @MockBean
+    private DocumentoRepository documentoRepository;
+
     @Test
     @WithMockUser(username = "user@test.com")
     @DisplayName("Deve fazer upload de arquivo simulando multipart request")
-    void upload_Sucesso() throws Exception {
+    void uploadSucesso() throws Exception {
         MockMultipartFile file = new MockMultipartFile("file", "test.pdf", "application/pdf", "conteudo".getBytes());
         Usuario mockUser = Usuario.builder().id(UUID.randomUUID()).email("user@test.com").build();
-        
-        when(usuarioRepository.findByEmailIgnoreCase("user@test.com")).thenReturn(Optional.of(mockUser));
-        
-        DocumentoResponse resp = DocumentoResponse.builder()
-                .id(UUID.randomUUID().toString())
-                .nome("test.pdf")
-                .build();
 
-        when(documentoService.upload(any(), any(), any(), any(), any(), any(), any())).thenReturn(resp);
+        when(usuarioRepository.findByEmailIgnoreCase("user@test.com")).thenReturn(Optional.of(mockUser));
+        when(documentoService.upload(any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(DocumentoResponse.builder().id(UUID.randomUUID().toString()).nome("test.pdf").build());
 
         mockMvc.perform(multipart("/api/documentos")
                         .file(file)
@@ -64,9 +65,14 @@ class DocumentoControllerTest {
     @Test
     @WithMockUser
     @DisplayName("Deve deletar arquivo retornando 204 No Content")
-    void excluir_Sucesso() throws Exception {
+    void excluirSucesso() throws Exception {
         UUID docId = UUID.randomUUID();
-        
+        Usuario mockUser = Usuario.builder().id(UUID.randomUUID()).email("user").build();
+        Documento documento = Documento.builder().id(docId).uploadedPor(mockUser).build();
+
+        when(usuarioRepository.findByEmailIgnoreCase("user")).thenReturn(Optional.of(mockUser));
+        when(documentoRepository.findById(docId)).thenReturn(Optional.of(documento));
+
         mockMvc.perform(delete("/api/documentos/" + docId))
                 .andExpect(status().isNoContent());
     }

@@ -8,8 +8,6 @@ import com.viana.exception.ResourceNotFoundException;
 import com.viana.model.EventoJuridico;
 import com.viana.model.Movimentacao;
 import com.viana.model.Processo;
-import com.viana.model.ProcessoParte;
-import com.viana.model.ProcessoParteRepresentante;
 import com.viana.model.Usuario;
 import com.viana.model.enums.FonteIntegracao;
 import com.viana.model.enums.StatusEventoJuridico;
@@ -25,12 +23,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
-import java.text.Normalizer;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
 import java.util.UUID;
 import org.springframework.util.DigestUtils;
 import com.viana.util.CnjUtils;
@@ -44,6 +39,7 @@ public class EventoJuridicoService {
     private final UsuarioRepository usuarioRepository;
     private final PrazoService prazoService;
     private final NotificacaoService notificacaoService;
+    private final ProcessoDistribuicaoService processoDistribuicaoService;
 
     @Transactional(readOnly = true)
     public Page<EventoJuridicoResponse> listar(String status, String fonte, UUID processoId, UUID responsavelId, Pageable pageable) {
@@ -450,27 +446,17 @@ public class EventoJuridicoService {
     }
 
     private void notificarResponsaveisNovoEvento(EventoJuridico evento, String titulo, String descricaoBase) {
-        if (evento.getResponsavel() != null) {
-            notificacaoService.criarNotificacao(
-                    evento.getResponsavel().getId(),
-                    titulo,
-                    descricaoBase + " Processo: " + (evento.getProcesso() != null ? evento.getProcesso().getNumero() : "nao vinculado") + ".",
-                    TipoNotificacao.SISTEMA,
-                    "inbox"
-            );
+        List<Usuario> destinatarios = processoDistribuicaoService.resolveDestinatariosNotificacao(evento);
+        if (destinatarios.isEmpty()) {
             return;
         }
 
-        Processo processo = evento.getProcesso();
-        if (processo == null || processo.getAdvogados() == null) {
-            return;
-        }
-
-        for (Usuario advogado : processo.getAdvogados()) {
+        String numeroProcesso = evento.getProcesso() != null ? evento.getProcesso().getNumero() : "nao vinculado";
+        for (Usuario advogado : destinatarios) {
             notificacaoService.criarNotificacao(
                     advogado.getId(),
                     titulo,
-                    descricaoBase + " Processo: " + processo.getNumero() + ".",
+                    descricaoBase + " Processo: " + numeroProcesso + ".",
                     TipoNotificacao.SISTEMA,
                     "inbox"
             );
@@ -478,116 +464,16 @@ public class EventoJuridicoService {
     }
 
     private Usuario resolveResponsavelPadrao(Processo processo) {
-        if (processo == null || processo.getAdvogados() == null || processo.getAdvogados().isEmpty()) {
-            return null;
-        }
-
-        return processo.getAdvogados().stream()
-                .filter(usuario -> Boolean.TRUE.equals(usuario.getAtivo()))
-                .min(Comparator.comparing(Usuario::getNome, String.CASE_INSENSITIVE_ORDER))
-                .orElse(null);
+        return processoDistribuicaoService.resolveResponsavelPadrao(processo);
     }
 
     private DistribuicaoAutomatica resolveDistribuicaoAutomatica(Processo processo, String destinatario) {
-        if (processo == null || processo.getAdvogados() == null || processo.getAdvogados().isEmpty()) {
+        ProcessoDistribuicaoService.DistribuicaoAutomatica distribuicao =
+                processoDistribuicaoService.resolveDistribuicaoAutomatica(processo, destinatario);
+        if (distribuicao == null) {
             return null;
         }
-
-        String destinatarioNormalizado = normalizeMatchKey(destinatario);
-        if (destinatarioNormalizado == null || destinatarioNormalizado.length() < 3) {
-            return null;
-        }
-
-        if (processo.getPartes() != null) {
-            for (ProcessoParte parte : processo.getPartes()) {
-                if (parte.getRepresentantes() == null) {
-                    continue;
-                }
-
-                for (ProcessoParteRepresentante representante : parte.getRepresentantes()) {
-                    Usuario usuarioInterno = representante.getUsuarioInterno();
-                    if (usuarioInterno == null || !Boolean.TRUE.equals(usuarioInterno.getAtivo())) {
-                        continue;
-                    }
-
-                    if (isMatch(destinatarioNormalizado, representante.getNome())
-                            || isMatch(destinatarioNormalizado, usuarioInterno.getNome())) {
-                        return new DistribuicaoAutomatica(usuarioInterno, parte.getNome());
-                    }
-                }
-            }
-
-            for (ProcessoParte parte : processo.getPartes()) {
-                if (!isMatch(destinatarioNormalizado, parte.getNome())) {
-                    continue;
-                }
-
-                Usuario usuarioDaParte = resolveResponsavelDaParte(parte);
-                if (usuarioDaParte != null) {
-                    return new DistribuicaoAutomatica(usuarioDaParte, parte.getNome());
-                }
-            }
-        }
-
-        for (Usuario advogado : processo.getAdvogados()) {
-            if (!Boolean.TRUE.equals(advogado.getAtivo())) {
-                continue;
-            }
-
-            if (isMatch(destinatarioNormalizado, advogado.getNome())) {
-                return new DistribuicaoAutomatica(advogado, null);
-            }
-        }
-
-        return null;
-    }
-
-    private Usuario resolveResponsavelDaParte(ProcessoParte parte) {
-        if (parte == null || parte.getRepresentantes() == null || parte.getRepresentantes().isEmpty()) {
-            return null;
-        }
-
-        return parte.getRepresentantes().stream()
-                .filter(representante -> representante.getUsuarioInterno() != null)
-                .filter(representante -> Boolean.TRUE.equals(representante.getUsuarioInterno().getAtivo()))
-                .sorted(Comparator
-                        .comparing(ProcessoParteRepresentante::getPrincipal, Comparator.nullsLast(Comparator.reverseOrder()))
-                        .thenComparing(representante -> representante.getUsuarioInterno().getNome(), String.CASE_INSENSITIVE_ORDER))
-                .map(ProcessoParteRepresentante::getUsuarioInterno)
-                .findFirst()
-                .orElse(null);
-    }
-
-    private boolean isMatch(String targetNormalized, String candidate) {
-        String candidateNormalized = normalizeMatchKey(candidate);
-        if (targetNormalized == null || candidateNormalized == null) {
-            return false;
-        }
-
-        if (targetNormalized.equals(candidateNormalized)) {
-            return true;
-        }
-
-        if (candidateNormalized.length() >= 5 && targetNormalized.contains(candidateNormalized)) {
-            return true;
-        }
-
-        return targetNormalized.length() >= 5 && candidateNormalized.contains(targetNormalized);
-    }
-
-    private String normalizeMatchKey(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-
-        String normalized = Normalizer.normalize(value, Normalizer.Form.NFD)
-                .replaceAll("\\p{M}", "")
-                .replaceAll("[^\\p{IsAlphabetic}\\p{IsDigit} ]", " ")
-                .toLowerCase(Locale.ROOT)
-                .replaceAll("\\s+", " ")
-                .trim();
-
-        return normalized.isBlank() ? null : normalized;
+        return new DistribuicaoAutomatica(distribuicao.responsavel(), distribuicao.parteRelacionada());
     }
 
     private EventoJuridicoResponse atribuirResponsavel(EventoJuridico evento, Usuario usuario) {

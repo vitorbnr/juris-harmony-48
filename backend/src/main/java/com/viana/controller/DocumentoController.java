@@ -1,5 +1,6 @@
 package com.viana.controller;
 
+import com.viana.dto.response.AcervoCidadeResponse;
 import com.viana.dto.response.DocumentoResponse;
 import com.viana.model.Documento;
 import com.viana.model.Usuario;
@@ -111,7 +112,7 @@ public class DocumentoController {
         String storageKey = encodedKey.replace("__", "/");
         Usuario usuario = getUsuario(authentication);
 
-        documentoService.findDocumentoAutorizadoPorStorageKey(
+        documentoService.validarAcessoStorageKey(
                 storageKey,
                 getUnidadeEscopo(usuario),
                 isAdmin(authentication)
@@ -129,7 +130,7 @@ public class DocumentoController {
     @GetMapping("/pasta/{pastaId}")
     public ResponseEntity<Page<DocumentoResponse>> listarPorPasta(
             @PathVariable UUID pastaId,
-            @PageableDefault(size = 20, sort = "dataUpload", direction = Sort.Direction.DESC) Pageable pageable,
+            @PageableDefault(size = 200, sort = "dataUpload", direction = Sort.Direction.DESC) Pageable pageable,
             Authentication authentication) {
         Usuario usuario = getUsuario(authentication);
         return ResponseEntity.ok(
@@ -167,11 +168,19 @@ public class DocumentoController {
         );
     }
 
+    @GetMapping("/acervo-clientes")
+    public ResponseEntity<List<AcervoCidadeResponse>> listarAcervoClientes(Authentication authentication) {
+        Usuario usuario = getUsuario(authentication);
+        return ResponseEntity.ok(
+                documentoService.listarAcervoClientes(getUnidadeEscopo(usuario), isAdmin(authentication))
+        );
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> excluir(@PathVariable UUID id, Authentication authentication) {
         UUID usuarioId = getUsuarioId(authentication);
         Documento doc = documentoRepository.findById(id)
-                .orElseThrow(() -> new com.viana.exception.ResourceNotFoundException("Documento não encontrado"));
+                .orElseThrow(() -> new com.viana.exception.ResourceNotFoundException("Documento nao encontrado"));
 
         boolean admin = isAdmin(authentication);
         boolean isUploader = doc.getUploadedPor().getId().equals(usuarioId);
@@ -191,7 +200,7 @@ public class DocumentoController {
     private Usuario getUsuario(Authentication authentication) {
         String email = authentication.getName();
         return usuarioRepository.findByEmailIgnoreCase(email)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+                .orElseThrow(() -> new RuntimeException("Usuario nao encontrado"));
     }
 
     private UUID getUnidadeEscopo(Usuario usuario) {

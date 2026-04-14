@@ -175,6 +175,8 @@ export interface CalcularPrazoResponse {
   contarDiaInicial: boolean;
   feriadosNacionaisConsiderados: string[];
   feriadosExtrasConsiderados: string[];
+  feriadosLocaisConsiderados: string[];
+  suspensoesConsideradas: string[];
   observacao: string;
 }
 
@@ -279,6 +281,8 @@ export const prazosApi = {
     quantidadeDiasUteis: number;
     contarDiaInicial?: boolean;
     feriadosExtras?: string[];
+    feriadosLocais?: string[];
+    suspensoes?: { dataInicio: string; dataFim: string }[];
   }) => api.post("/prazos/calcular-data", data).then(r => r.data as CalcularPrazoResponse),
 
   criar: (data: Record<string, unknown>) =>
@@ -306,8 +310,11 @@ export const documentosApi = {
     size?: number;
   }) => api.get("/documentos", { params: cleanParams(params) }).then(r => r.data),
 
-  listarPorCliente: (clienteId: string) =>
-    api.get(`/documentos/cliente/${clienteId}`).then(r => r.data),
+  listarPorCliente: (clienteId: string, params?: { page?: number; size?: number }) =>
+    api.get(`/documentos/cliente/${clienteId}`, { params: cleanParams(params) }).then(r => r.data),
+
+  listarPorPasta: (pastaId: string, params?: { page?: number; size?: number }) =>
+    api.get(`/documentos/pasta/${pastaId}`, { params: cleanParams(params) }).then(r => r.data),
 
   listarPorProcesso: (processoId: string) =>
     api.get(`/documentos/processo/${processoId}`).then(r => r.data),
@@ -326,7 +333,17 @@ export const documentosApi = {
   listarClientesComDocumentos: () =>
     api.get("/documentos/clientes-com-documentos").then(r => r.data as { id: string; nome: string }[]),
 
+  listarAcervoClientes: () =>
+    api.get("/documentos/acervo-clientes").then(r => r.data),
+
   excluir: (id: string) => api.delete(`/documentos/${id}`),
+};
+
+export const pastasApi = {
+  listarInternas: () => api.get("/pastas/internas").then(r => r.data),
+
+  criarInterna: (data: { nome: string; parentId?: string | null }) =>
+    api.post("/pastas/internas", data).then(r => r.data),
 };
 
 // ─── Usuários ─────────────────────────────────────────────────────────────────

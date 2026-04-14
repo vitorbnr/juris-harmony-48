@@ -17,19 +17,31 @@ import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.FileTime;
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class StorageService {
+
+    public record LocalStoredFile(
+            String storageKey,
+            String originalFilename,
+            long size,
+            LocalDateTime lastModifiedAt
+    ) {}
 
     private final S3Client s3Client;
     private final S3Presigner s3Presigner;
@@ -72,7 +84,7 @@ public class StorageService {
      * Em DEV (localMode=true), salva em pasta local.
      * Em PROD, usa Cloudflare R2.
      */
-    public String upload(MultipartFile file, UUID unidadeId, UUID clienteId, UUID processoId) throws IOException {
+    public String upload(MultipartFile file, UUID unidadeId, UUID clienteId, UUID processoId, UUID pastaId) throws IOException {
         // 1. Validar MIME type real (não confia na extensão)
         String mimeType = tika.detect(file.getInputStream());
         if (!ALLOWED_MIME_TYPES.contains(mimeType)) {
@@ -80,7 +92,7 @@ public class StorageService {
         }
 
         // 2. Gerar chave única
-        String key = buildKey(unidadeId, clienteId, processoId, file.getOriginalFilename());
+        String key = buildKey(unidadeId, clienteId, processoId, pastaId, file.getOriginalFilename());
 
         if (localMode) {
             // Salvar localmente
@@ -103,6 +115,32 @@ public class StorageService {
         }
 
         return key;
+    }
+
+    public boolean isLocalMode() {
+        return localMode;
+    }
+
+    public List<LocalStoredFile> listLocalFiles() {
+        if (!localMode) {
+            return List.of();
+        }
+
+        Path baseDir = Paths.get(localPath).toAbsolutePath().normalize();
+        if (!Files.exists(baseDir)) {
+            return List.of();
+        }
+
+        try (Stream<Path> files = Files.walk(baseDir)) {
+            return files
+                    .filter(Files::isRegularFile)
+                    .map(path -> toLocalStoredFile(baseDir, path))
+                    .sorted(Comparator.comparing(LocalStoredFile::lastModifiedAt).reversed())
+                    .toList();
+        } catch (IOException e) {
+            log.warn("[DEV] Falha ao listar arquivos locais: {}", e.getMessage());
+            return List.of();
+        }
     }
 
     /**
@@ -154,8 +192,19 @@ public class StorageService {
      * Retorna o nome original do arquivo a partir da chave de storage.
      */
     public String getOriginalFilename(String storageKey) {
-        // Formato da chave: {uuid}-{filename}
         String lastSegment = Paths.get(storageKey).getFileName().toString();
+
+        if (lastSegment.length() > 37) {
+            String maybeUuid = lastSegment.substring(0, 36);
+            if (lastSegment.charAt(36) == '-') {
+                try {
+                    UUID.fromString(maybeUuid);
+                    return lastSegment.substring(37);
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+        }
+
         int idx = lastSegment.indexOf('-');
         return idx >= 0 ? lastSegment.substring(idx + 1) : lastSegment;
     }
@@ -179,11 +228,33 @@ public class StorageService {
         }
     }
 
-    private String buildKey(UUID unidadeId, UUID clienteId, UUID processoId, String filename) {
+    private LocalStoredFile toLocalStoredFile(Path baseDir, Path filePath) {
+        try {
+            String storageKey = baseDir.relativize(filePath).toString().replace('\\', '/');
+            long size = Files.size(filePath);
+            FileTime lastModified = Files.getLastModifiedTime(filePath);
+
+            return new LocalStoredFile(
+                    storageKey,
+                    getOriginalFilename(storageKey),
+                    size,
+                    LocalDateTime.ofInstant(lastModified.toInstant(), ZoneId.systemDefault())
+            );
+        } catch (IOException e) {
+            throw new IllegalStateException("Falha ao ler metadata do arquivo local: " + filePath, e);
+        }
+    }
+
+    private String buildKey(UUID unidadeId, UUID clienteId, UUID processoId, UUID pastaId, String filename) {
         StringBuilder sb = new StringBuilder();
         if (unidadeId != null) sb.append(unidadeId).append("/");
-        if (clienteId != null) sb.append(clienteId).append("/");
-        if (processoId != null) sb.append(processoId).append("/");
+        if (clienteId != null) sb.append("clientes/").append(clienteId).append("/");
+        if (processoId != null) sb.append("processos/").append(processoId).append("/");
+        if (pastaId != null) {
+            String segmento = clienteId == null && processoId == null ? "interno/" : "pastas/";
+            sb.append(segmento).append(pastaId).append("/");
+        }
+        if (clienteId == null && processoId == null && pastaId == null) sb.append("geral/");
         sb.append(UUID.randomUUID()).append("-").append(sanitizeFilename(filename));
         return sb.toString();
     }

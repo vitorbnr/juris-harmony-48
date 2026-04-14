@@ -72,6 +72,7 @@ public class ProcessoService {
     private final FonteSyncRepository fonteSyncRepository;
     private final NotificacaoService notificacaoService;
     private final EventoJuridicoService eventoJuridicoService;
+    private final ProcessoDistribuicaoService processoDistribuicaoService;
 
     @Value("${app.sync.datajud.stale-hours:4}")
     private long datajudStaleHours;
@@ -386,7 +387,8 @@ public class ProcessoService {
     }
 
     private void notificarResponsaveisSobreSyncDatajud(Processo processo, int novasMovimentacoes) {
-        if (processo.getAdvogados() == null || processo.getAdvogados().isEmpty()) {
+        List<Usuario> destinatarios = processoDistribuicaoService.resolveDestinatariosProcesso(processo);
+        if (destinatarios.isEmpty()) {
             return;
         }
 
@@ -396,7 +398,7 @@ public class ProcessoService {
                 novasMovimentacoes
         );
 
-        for (Usuario advogado : processo.getAdvogados()) {
+        for (Usuario advogado : destinatarios) {
             notificacaoService.criarNotificacao(
                     advogado.getId(),
                     "Novas movimentacoes sincronizadas",

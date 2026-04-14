@@ -23,4 +23,8 @@ public class CalcularPrazoRequest {
     private Boolean contarDiaInicial;
 
     private List<LocalDate> feriadosExtras;
+
+    private List<LocalDate> feriadosLocais;
+
+    private List<PeriodoSuspensaoRequest> suspensoes;
 }

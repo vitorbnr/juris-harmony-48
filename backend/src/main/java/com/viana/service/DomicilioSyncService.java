@@ -2,7 +2,6 @@ package com.viana.service;
 
 import com.viana.dto.response.DomicilioComunicacaoResponse;
 import com.viana.model.EventoJuridico;
-import com.viana.model.Processo;
 import com.viana.model.Usuario;
 import com.viana.model.enums.TipoNotificacao;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +24,7 @@ public class DomicilioSyncService {
     private final EventoJuridicoService eventoJuridicoService;
     private final FonteSyncService fonteSyncService;
     private final NotificacaoService notificacaoService;
+    private final ProcessoDistribuicaoService processoDistribuicaoService;
 
     @Transactional
     public int sincronizar(LocalDate dataInicio, LocalDate dataFim, String numeroProcesso, boolean notificarResponsaveis) {
@@ -59,17 +59,7 @@ public class DomicilioSyncService {
         Map<UUID, Integer> resumoPorUsuario = new HashMap<>();
 
         for (EventoJuridico evento : eventos) {
-            if (evento.getResponsavel() != null) {
-                resumoPorUsuario.merge(evento.getResponsavel().getId(), 1, Integer::sum);
-                continue;
-            }
-
-            Processo processo = evento.getProcesso();
-            if (processo == null || processo.getAdvogados() == null) {
-                continue;
-            }
-
-            for (Usuario advogado : processo.getAdvogados()) {
+            for (Usuario advogado : processoDistribuicaoService.resolveDestinatariosNotificacao(evento)) {
                 resumoPorUsuario.merge(advogado.getId(), 1, Integer::sum);
             }
         }

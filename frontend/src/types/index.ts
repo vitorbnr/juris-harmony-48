@@ -201,13 +201,14 @@ export interface Documento {
   tipo: TipoDocumento;
   categoria: CategoriaDocumento;
   tamanho: string;
+  tamanhoBytes?: number;
   clienteId?: string;
   clienteNome?: string;
   processoId?: string;
   processoNumero?: string;
-  pastaId: string;
+  pastaId?: string;
   dataUpload: string;
-  uploadadoPor: string;
+  uploadedPor?: string;
 }
 
 export interface Pasta {
@@ -217,6 +218,28 @@ export interface Pasta {
   processoId?: string;
   parentId?: string;
   documentos: number;
+}
+
+export interface AcervoClienteDocumento {
+  id: string;
+  nome: string;
+  initials: string;
+}
+
+export interface AcervoCidadeDocumento {
+  chave: string;
+  cidade: string;
+  estado: string;
+  label: string;
+  totalClientes: number;
+  clientes: AcervoClienteDocumento[];
+}
+
+export interface PastaInternaNode {
+  id: string;
+  nome: string;
+  parentId?: string | null;
+  children: PastaInternaNode[];
 }
 
 // ─── Financeiro ──────────────────────────────────────────────────────────────

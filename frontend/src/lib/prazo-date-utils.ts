@@ -35,3 +35,36 @@ export function parseExtraHolidayInput(value: string): { dates: string[]; invali
 
   return { dates, invalid };
 }
+
+export function parseSuspensionPeriodsInput(
+  value: string,
+): { periods: { dataInicio: string; dataFim: string }[]; invalid: string[] } {
+  const parts = value
+    .split(/[\n;]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const periods: { dataInicio: string; dataFim: string }[] = [];
+  const invalid: string[] = [];
+
+  for (const part of parts) {
+    const match = part.match(/^(.+?)\s+(?:a|ate)\s+(.+)$/i) ?? part.match(/^(.+?)\s*-\s*(.+)$/);
+    if (!match) {
+      invalid.push(part);
+      continue;
+    }
+
+    const dataInicio = normalizeDateInputToIso(match[1]);
+    const dataFim = normalizeDateInputToIso(match[2]);
+    if (!dataInicio || !dataFim || dataInicio > dataFim) {
+      invalid.push(part);
+      continue;
+    }
+
+    if (!periods.some((item) => item.dataInicio === dataInicio && item.dataFim === dataFim)) {
+      periods.push({ dataInicio, dataFim });
+    }
+  }
+
+  return { periods, invalid };
+}

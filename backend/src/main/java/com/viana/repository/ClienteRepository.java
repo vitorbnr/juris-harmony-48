@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.UUID;
 
 @Repository
@@ -37,6 +38,20 @@ public interface ClienteRepository extends JpaRepository<Cliente, UUID> {
             @Param("unidadeId") UUID unidadeId,
             @Param("busca") String busca,
             Pageable pageable);
+
+    @Query("""
+        SELECT c FROM Cliente c
+        LEFT JOIN FETCH c.unidade
+        WHERE c.ativo = true
+        AND (:unidadeId IS NULL OR c.unidade.id = :unidadeId)
+        ORDER BY
+            CASE WHEN c.estado IS NULL OR TRIM(c.estado) = '' THEN 1 ELSE 0 END,
+            LOWER(COALESCE(c.estado, '')),
+            CASE WHEN c.cidade IS NULL OR TRIM(c.cidade) = '' THEN 1 ELSE 0 END,
+            LOWER(COALESCE(c.cidade, '')),
+            LOWER(c.nome)
+    """)
+    List<Cliente> findAtivosParaAcervo(@Param("unidadeId") UUID unidadeId);
 
 
     long countByAtivoTrue();

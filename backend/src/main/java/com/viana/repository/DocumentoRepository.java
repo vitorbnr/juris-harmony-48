@@ -32,6 +32,7 @@ public interface DocumentoRepository extends JpaRepository<Documento, UUID> {
         AND (:unidadeId IS NULL
              OR (d.processo IS NOT NULL AND d.processo.unidade.id = :unidadeId)
              OR (d.processo IS NULL AND d.cliente IS NOT NULL AND d.cliente.unidade.id = :unidadeId)
+             OR (d.processo IS NULL AND d.cliente IS NULL AND d.pasta IS NOT NULL AND d.pasta.unidade.id = :unidadeId)
              OR (d.processo IS NULL AND d.cliente IS NULL AND d.uploadedPor.unidade.id = :unidadeId))
         AND (:busca IS NULL OR :busca = ''
              OR LOWER(d.nome) LIKE LOWER(CONCAT('%', :busca, '%')))
@@ -82,6 +83,7 @@ public interface DocumentoRepository extends JpaRepository<Documento, UUID> {
         AND (:unidadeId IS NULL
              OR (p.processo IS NOT NULL AND p.processo.unidade.id = :unidadeId)
              OR (p.processo IS NULL AND p.cliente IS NOT NULL AND p.cliente.unidade.id = :unidadeId)
+             OR (p.processo IS NULL AND p.cliente IS NULL AND p.unidade.id = :unidadeId)
              OR (p.processo IS NULL AND p.cliente IS NULL AND d.uploadedPor.unidade.id = :unidadeId))
         ORDER BY d.dataUpload DESC
     """)

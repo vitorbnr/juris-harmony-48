@@ -17,5 +17,7 @@ public class CalcularPrazoResponse {
     private boolean contarDiaInicial;
     private List<String> feriadosNacionaisConsiderados;
     private List<String> feriadosExtrasConsiderados;
+    private List<String> feriadosLocaisConsiderados;
+    private List<String> suspensoesConsideradas;
     private String observacao;
 }

@@ -4,7 +4,7 @@ import { CalendarClock, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { parseExtraHolidayInput } from "@/lib/prazo-date-utils";
+import { parseExtraHolidayInput, parseSuspensionPeriodsInput } from "@/lib/prazo-date-utils";
 import { prazosApi, type CalcularPrazoResponse } from "@/services/api";
 import { toast } from "sonner";
 
@@ -24,6 +24,8 @@ export function PrazoDateCalculator({ dataInicial, onAplicarData }: Props) {
   const [diasUteis, setDiasUteis] = useState("5");
   const [contarDiaInicial, setContarDiaInicial] = useState(false);
   const [feriadosExtras, setFeriadosExtras] = useState("");
+  const [feriadosLocais, setFeriadosLocais] = useState("");
+  const [suspensoes, setSuspensoes] = useState("");
   const [calculandoData, setCalculandoData] = useState(false);
   const [resultado, setResultado] = useState<CalcularPrazoResponse | null>(null);
 
@@ -33,6 +35,7 @@ export function PrazoDateCalculator({ dataInicial, onAplicarData }: Props) {
     const itens = [
       ...resultado.feriadosNacionaisConsiderados.map((item) => formatDateBr(item)),
       ...resultado.feriadosExtrasConsiderados.map((item) => formatDateBr(item)),
+      ...resultado.feriadosLocaisConsiderados.map((item) => `${formatDateBr(item)} (local)`),
     ];
 
     if (itens.length === 0) {
@@ -52,8 +55,15 @@ export function PrazoDateCalculator({ dataInicial, onAplicarData }: Props) {
     setCalculandoData(true);
     try {
       const { dates, invalid } = parseExtraHolidayInput(feriadosExtras);
-      if (invalid.length > 0) {
-        toast.error(`Feriados extras invalidos: ${invalid.join(", ")}.`);
+      const locais = parseExtraHolidayInput(feriadosLocais);
+      const suspensoesParse = parseSuspensionPeriodsInput(suspensoes);
+      if (invalid.length > 0 || locais.invalid.length > 0 || suspensoesParse.invalid.length > 0) {
+        const erros = [
+          invalid.length > 0 ? `feriados extras: ${invalid.join(", ")}` : null,
+          locais.invalid.length > 0 ? `feriados locais: ${locais.invalid.join(", ")}` : null,
+          suspensoesParse.invalid.length > 0 ? `suspensoes: ${suspensoesParse.invalid.join(", ")}` : null,
+        ].filter(Boolean);
+        toast.error(`Campos invalidos: ${erros.join(" | ")}.`);
         return;
       }
 
@@ -62,6 +72,8 @@ export function PrazoDateCalculator({ dataInicial, onAplicarData }: Props) {
         quantidadeDiasUteis,
         contarDiaInicial,
         feriadosExtras: dates,
+        feriadosLocais: locais.dates,
+        suspensoes: suspensoesParse.periods,
       });
 
       setResultado(response);
@@ -104,6 +116,25 @@ export function PrazoDateCalculator({ dataInicial, onAplicarData }: Props) {
         </div>
       </div>
 
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label>Feriados locais</Label>
+          <Input
+            value={feriadosLocais}
+            onChange={(event) => setFeriadosLocais(event.target.value)}
+            placeholder="24/06/2026; 02/07/2026"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Suspensoes forenses</Label>
+          <Input
+            value={suspensoes}
+            onChange={(event) => setSuspensoes(event.target.value)}
+            placeholder="20/12/2026 a 20/01/2027; 07/09/2026 a 09/09/2026"
+          />
+        </div>
+      </div>
+
       <label className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
         <input
           type="checkbox"
@@ -114,7 +145,7 @@ export function PrazoDateCalculator({ dataInicial, onAplicarData }: Props) {
       </label>
 
       <p className="mt-2 text-xs text-muted-foreground">
-        Os feriados extras devem ser informados em <span className="font-medium text-foreground">dd/mm/aaaa</span>. O calculo considera sabados, domingos e feriados nacionais federais. Feriados locais, atos do tribunal e suspensoes forenses precisam de revisao humana.
+        Feriados devem ser informados em <span className="font-medium text-foreground">dd/mm/aaaa</span>. Suspensoes podem ser informadas como <span className="font-medium text-foreground">dd/mm/aaaa a dd/mm/aaaa</span>. O calculo continua assistido e exige revisao juridica final.
       </p>
 
       {resultado && (
@@ -134,6 +165,20 @@ export function PrazoDateCalculator({ dataInicial, onAplicarData }: Props) {
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Feriados considerados</p>
             <p className="text-sm text-foreground">{descricaoFeriados}</p>
           </div>
+
+          {resultado.suspensoesConsideradas.length > 0 && (
+            <div className="mt-3 space-y-1">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Suspensoes consideradas</p>
+              <p className="text-sm text-foreground">
+                {resultado.suspensoesConsideradas
+                  .map((item) => {
+                    const [inicio, fim] = item.split(" a ");
+                    return `${formatDateBr(inicio)} a ${formatDateBr(fim)}`;
+                  })
+                  .join(", ")}
+              </p>
+            </div>
+          )}
 
           <p className="mt-3 text-xs text-muted-foreground">{resultado.observacao}</p>
 

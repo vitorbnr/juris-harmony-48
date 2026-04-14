@@ -61,7 +61,7 @@ class StorageServiceTest {
         when(mockTika.detect(any(InputStream.class))).thenReturn("application/pdf");
         ReflectionTestUtils.setField(storageService, "tika", mockTika);
 
-        String key = storageService.upload(file, null, clienteId, null);
+        String key = storageService.upload(file, null, clienteId, null, null);
 
         assertNotNull(key);
         assertTrue(key.contains(clienteId.toString()));
@@ -79,7 +79,7 @@ class StorageServiceTest {
         when(mockTika.detect(any(InputStream.class))).thenReturn("application/x-msdownload");
         ReflectionTestUtils.setField(storageService, "tika", mockTika);
 
-        BusinessException exception = assertThrows(BusinessException.class, () -> storageService.upload(file, null, null, null));
+        BusinessException exception = assertThrows(BusinessException.class, () -> storageService.upload(file, null, null, null, null));
         assertTrue(exception.getMessage().contains("Tipo de arquivo não permitido"));
         
         verify(s3Client, never()).putObject(any(PutObjectRequest.class), any(RequestBody.class));
@@ -105,5 +105,15 @@ class StorageServiceTest {
         storageService.delete("chave_para_deletar.pdf");
 
         verify(s3Client, times(1)).deleteObject(any(DeleteObjectRequest.class));
+    }
+
+    @Test
+    @DisplayName("Deve extrair o nome original removendo o UUID prefixado")
+    void getOriginalFilename_RemoveUuidPrefixado() {
+        String filename = storageService.getOriginalFilename(
+                "unidade/clientes/cliente-id/9176fe42-36e1-4306-868b-842ab9af0632-Documento-aniversario-13.txt"
+        );
+
+        assertEquals("Documento-aniversario-13.txt", filename);
     }
 }
