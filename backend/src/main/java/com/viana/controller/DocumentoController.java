@@ -1,10 +1,10 @@
 package com.viana.controller;
 
+import com.viana.dto.request.AtualizarDocumentoRequest;
 import com.viana.dto.response.AcervoCidadeResponse;
 import com.viana.dto.response.DocumentoResponse;
 import com.viana.model.Documento;
 import com.viana.model.Usuario;
-import com.viana.repository.DocumentoRepository;
 import com.viana.repository.UsuarioRepository;
 import com.viana.service.DocumentoService;
 import com.viana.service.LogAuditoriaService;
@@ -20,10 +20,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -38,10 +41,10 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/documentos")
 @RequiredArgsConstructor
+@Validated
 public class DocumentoController {
 
     private final DocumentoService documentoService;
-    private final DocumentoRepository documentoRepository;
     private final UsuarioRepository usuarioRepository;
     private final LogAuditoriaService logAuditoriaService;
     private final StorageService storageService;
@@ -103,6 +106,17 @@ public class DocumentoController {
         }
 
         return ResponseEntity.ok(Map.of("url", url, "nome", doc.getNome()));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<DocumentoResponse> atualizar(
+            @PathVariable UUID id,
+            @RequestBody AtualizarDocumentoRequest request,
+            Authentication authentication) {
+        Usuario usuario = getUsuario(authentication);
+        return ResponseEntity.ok(
+                documentoService.atualizar(id, request, getUnidadeEscopo(usuario), isAdmin(authentication))
+        );
     }
 
     @GetMapping("/stream/{encodedKey}")
@@ -178,18 +192,16 @@ public class DocumentoController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> excluir(@PathVariable UUID id, Authentication authentication) {
-        UUID usuarioId = getUsuarioId(authentication);
-        Documento doc = documentoRepository.findById(id)
-                .orElseThrow(() -> new com.viana.exception.ResourceNotFoundException("Documento nao encontrado"));
+        Usuario usuario = getUsuario(authentication);
+        documentoService.excluir(id, getUnidadeEscopo(usuario), isAdmin(authentication));
+        return ResponseEntity.noContent().build();
+    }
 
-        boolean admin = isAdmin(authentication);
-        boolean isUploader = doc.getUploadedPor().getId().equals(usuarioId);
-
-        if (!admin && !isUploader) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
-
-        documentoService.excluir(id);
+    @DeleteMapping("/storage/{encodedKey}")
+    public ResponseEntity<Void> excluirStorageLocal(@PathVariable String encodedKey, Authentication authentication) {
+        Usuario usuario = getUsuario(authentication);
+        String storageKey = encodedKey.replace("__", "/");
+        documentoService.excluirPorStorageKey(storageKey, getUnidadeEscopo(usuario), isAdmin(authentication));
         return ResponseEntity.noContent().build();
     }
 

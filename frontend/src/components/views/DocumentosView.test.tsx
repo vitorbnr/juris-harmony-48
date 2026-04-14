@@ -1,16 +1,23 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import { DocumentosView } from "./DocumentosView";
-import { clientesApi, documentosApi, pastasApi } from "@/services/api";
+import { clientesApi, documentosApi, pastasApi, processosApi } from "@/services/api";
 
 vi.mock("@/services/api", () => ({
   documentosApi: {
     listar: vi.fn(),
     listarPorCliente: vi.fn(),
     listarPorPasta: vi.fn(),
+    listarPorProcesso: vi.fn(),
     listarAcervoClientes: vi.fn(),
+    atualizar: vi.fn(),
+    excluir: vi.fn(),
+    excluirStorageKey: vi.fn(),
   },
   clientesApi: {
+    listar: vi.fn(),
+  },
+  processosApi: {
     listar: vi.fn(),
   },
   pastasApi: {
@@ -46,11 +53,13 @@ describe("DocumentosView", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
     (documentosApi.listar as any).mockResolvedValue({ content: mockDocs });
     (documentosApi.listarPorCliente as any).mockResolvedValue({ content: mockDocs });
     (documentosApi.listarPorPasta as any).mockResolvedValue({ content: mockDocs });
     (documentosApi.listarAcervoClientes as any).mockResolvedValue(mockAcervo);
     (clientesApi.listar as any).mockResolvedValue({ content: [{ id: "c1", nome: "Joao Leis Junior" }] });
+    (processosApi.listar as any).mockResolvedValue({ content: [] });
     (pastasApi.listarInternas as any).mockResolvedValue([]);
   });
 
@@ -58,7 +67,7 @@ describe("DocumentosView", () => {
     render(<DocumentosView />);
 
     expect(await screen.findByText(/Contrato_Social.pdf/i)).toBeDefined();
-    expect(screen.getByText(/1.2 MB/i)).toBeDefined();
+    expect(screen.getAllByText(/1.2 MB/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/Cocos - BA/i)).toBeDefined();
   });
 
@@ -73,20 +82,20 @@ describe("DocumentosView", () => {
   it("deve filtrar documentos por busca de texto", async () => {
     render(<DocumentosView />);
 
-    fireEvent.change(screen.getByPlaceholderText(/Buscar documentos, cidades ou clientes/i), { target: { value: "Social" } });
+    fireEvent.change(screen.getByPlaceholderText(/Buscar documentos, clientes, processos ou cidades/i), { target: { value: "Social" } });
     expect(await screen.findByText(/Contrato_Social.pdf/i)).toBeDefined();
 
-    fireEvent.change(screen.getByPlaceholderText(/Buscar documentos, cidades ou clientes/i), { target: { value: "Inexistente" } });
+    fireEvent.change(screen.getByPlaceholderText(/Buscar documentos, clientes, processos ou cidades/i), { target: { value: "Inexistente" } });
     expect(screen.queryByText(/Contrato_Social.pdf/i)).toBeNull();
   });
 
   it("deve localizar documentos por nome do cliente e da cidade", async () => {
     render(<DocumentosView />);
 
-    fireEvent.change(screen.getByPlaceholderText(/Buscar documentos, cidades ou clientes/i), { target: { value: "Joao Leis" } });
+    fireEvent.change(screen.getByPlaceholderText(/Buscar documentos, clientes, processos ou cidades/i), { target: { value: "Joao Leis" } });
     expect(await screen.findByText(/Contrato_Social.pdf/i)).toBeDefined();
 
-    fireEvent.change(screen.getByPlaceholderText(/Buscar documentos, cidades ou clientes/i), { target: { value: "Cocos" } });
+    fireEvent.change(screen.getByPlaceholderText(/Buscar documentos, clientes, processos ou cidades/i), { target: { value: "Cocos" } });
     expect(await screen.findByText(/Contrato_Social.pdf/i)).toBeDefined();
   });
 
@@ -117,7 +126,35 @@ describe("DocumentosView", () => {
     render(<DocumentosView />);
 
     expect(await screen.findByText(/Documento-aniversario-13.txt/i)).toBeDefined();
-    fireEvent.change(screen.getByPlaceholderText(/Buscar documentos, cidades ou clientes/i), { target: { value: "13" } });
+    fireEvent.change(screen.getByPlaceholderText(/Buscar documentos, clientes, processos ou cidades/i), { target: { value: "13" } });
     expect(await screen.findByText(/Documento-aniversario-13.txt/i)).toBeDefined();
+  });
+
+  it("deve complementar a visao geral com os documentos demo no ambiente de teste", async () => {
+    (documentosApi.listar as any).mockResolvedValue({
+      content: [
+        {
+          id: "api-1",
+          nome: "Documento API.pdf",
+          tipo: "pdf",
+          tamanho: "80 KB",
+          categoria: "outros",
+          dataUpload: "2026-04-14T09:00:00",
+        },
+      ],
+    });
+
+    render(<DocumentosView />);
+
+    expect(await screen.findByText(/Documento API.pdf/i)).toBeDefined();
+    expect(await screen.findByText(/Planilha de Custas.xlsx/i)).toBeDefined();
+  });
+
+  it("deve abrir o modal de edicao do documento", async () => {
+    render(<DocumentosView />);
+
+    fireEvent.click((await screen.findAllByTitle(/Editar/i))[0]);
+
+    expect(await screen.findByText(/Editar documento/i)).toBeDefined();
   });
 });

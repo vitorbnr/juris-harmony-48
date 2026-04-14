@@ -1,5 +1,6 @@
 package com.viana.service;
 
+import com.viana.dto.request.AtualizarDocumentoRequest;
 import com.viana.dto.response.AcervoCidadeResponse;
 import com.viana.dto.response.AcervoClienteResponse;
 import com.viana.dto.response.DocumentoResponse;
@@ -210,11 +211,45 @@ public class DocumentoService {
     }
 
     @Transactional
+    public DocumentoResponse atualizar(UUID id, AtualizarDocumentoRequest request, UUID unidadeId, boolean isAdmin) {
+        Documento documento = findDocumentoAutorizado(id, unidadeId, isAdmin);
+
+        if (request.getNome() != null && !request.getNome().isBlank()) {
+            documento.setNome(request.getNome().trim());
+        }
+
+        if (request.getCategoria() != null && !request.getCategoria().isBlank()) {
+            try {
+                documento.setCategoria(CategoriaDocumento.valueOf(request.getCategoria().trim().toUpperCase(Locale.ROOT)));
+            } catch (IllegalArgumentException ignored) {
+                documento.setCategoria(CategoriaDocumento.OUTROS);
+            }
+        }
+
+        return toResponse(documentoRepository.save(documento));
+    }
+
+    @Transactional
     public void excluir(UUID id) {
         Documento doc = documentoRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Documento nao encontrado"));
         storageService.delete(doc.getStorageKey());
         documentoRepository.delete(doc);
+    }
+
+    @Transactional
+    public void excluir(UUID id, UUID unidadeId, boolean isAdmin) {
+        Documento documento = findDocumentoAutorizado(id, unidadeId, isAdmin);
+        storageService.delete(documento.getStorageKey());
+        documentoRepository.delete(documento);
+    }
+
+    @Transactional
+    public void excluirPorStorageKey(String storageKey, UUID unidadeId, boolean isAdmin) {
+        validarAcessoStorageKey(storageKey, unidadeId, isAdmin);
+
+        documentoRepository.findByStorageKey(storageKey).ifPresent(documentoRepository::delete);
+        storageService.delete(storageKey);
     }
 
     @Transactional(readOnly = true)

@@ -21,9 +21,12 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -68,12 +71,50 @@ class DocumentoControllerTest {
     void excluirSucesso() throws Exception {
         UUID docId = UUID.randomUUID();
         Usuario mockUser = Usuario.builder().id(UUID.randomUUID()).email("user").build();
-        Documento documento = Documento.builder().id(docId).uploadedPor(mockUser).build();
 
         when(usuarioRepository.findByEmailIgnoreCase("user")).thenReturn(Optional.of(mockUser));
-        when(documentoRepository.findById(docId)).thenReturn(Optional.of(documento));
 
         mockMvc.perform(delete("/api/documentos/" + docId))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @WithMockUser(username = "user@test.com")
+    @DisplayName("Deve atualizar documento retornando os dados alterados")
+    void atualizarSucesso() throws Exception {
+        UUID docId = UUID.randomUUID();
+        Usuario mockUser = Usuario.builder().id(UUID.randomUUID()).email("user@test.com").build();
+
+        when(usuarioRepository.findByEmailIgnoreCase("user@test.com")).thenReturn(Optional.of(mockUser));
+        when(documentoService.atualizar(eq(docId), any(), any(), anyBoolean()))
+                .thenReturn(DocumentoResponse.builder()
+                        .id(docId.toString())
+                        .nome("Contrato Atualizado.pdf")
+                        .categoria("contrato")
+                        .build());
+
+        mockMvc.perform(put("/api/documentos/" + docId)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "nome": "Contrato Atualizado.pdf",
+                                  "categoria": "CONTRATO"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nome").value("Contrato Atualizado.pdf"))
+                .andExpect(jsonPath("$.categoria").value("contrato"));
+    }
+
+    @Test
+    @WithMockUser(username = "user@test.com")
+    @DisplayName("Deve excluir documento local via storage key")
+    void excluirStorageLocalSucesso() throws Exception {
+        Usuario mockUser = Usuario.builder().id(UUID.randomUUID()).email("user@test.com").build();
+
+        when(usuarioRepository.findByEmailIgnoreCase("user@test.com")).thenReturn(Optional.of(mockUser));
+
+        mockMvc.perform(delete("/api/documentos/storage/unidade__clientes__arquivo.pdf"))
                 .andExpect(status().isNoContent());
     }
 }

@@ -249,7 +249,7 @@ public class StorageService {
         StringBuilder sb = new StringBuilder();
         if (unidadeId != null) sb.append(unidadeId).append("/");
         if (clienteId != null) sb.append("clientes/").append(clienteId).append("/");
-        if (processoId != null) sb.append("processos/").append(processoId).append("/");
+        if (clienteId == null && processoId != null) sb.append("processos/").append(processoId).append("/");
         if (pastaId != null) {
             String segmento = clienteId == null && processoId == null ? "interno/" : "pastas/";
             sb.append(segmento).append(pastaId).append("/");

@@ -6,7 +6,9 @@ import {
   CheckCircle,
   ChevronRight,
   Clock,
+  Download,
   Filter,
+  FileText,
   Loader2,
   MapPin,
   Pause,
@@ -16,9 +18,11 @@ import {
   Scale,
   Search,
   Tag,
+  Upload,
   X,
 } from "lucide-react";
 
+import { DocumentoUploadModal } from "@/components/modals/DocumentoUploadModal";
 import { EditarProcessoModal } from "@/components/modals/EditarProcessoModal";
 import { NovoProcessoModal } from "@/components/modals/NovoProcessoModal";
 import { Badge } from "@/components/ui/badge";
@@ -26,9 +30,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/AuthContext";
 import { useUnidade } from "@/context/UnidadeContext";
+import api from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { processosApi } from "@/services/api";
-import type { Processo, StatusProcesso, TipoProcesso } from "@/types";
+import { documentosApi, processosApi } from "@/services/api";
+import type { Documento, Processo, StatusProcesso, TipoProcesso } from "@/types";
 import { toast } from "sonner";
 
 const statusConfig: Record<StatusProcesso, { label: string; class: string; icon: React.ElementType }> = {
@@ -155,12 +160,47 @@ const tipoParteLabel = (tipo?: string) => {
   }
 };
 
+const categoriaDocumentoLabel: Record<string, string> = {
+  peticao: "Peticao",
+  contrato: "Contrato",
+  procuracao: "Procuracao",
+  sentenca: "Sentenca",
+  recurso: "Recurso",
+  comprovante: "Comprovante",
+  outros: "Outros",
+};
+
+const isDocumentoLocal = (doc: Documento) => doc.id.startsWith("local:");
+
+const formatarDataDocumento = (dataUpload?: string) => {
+  if (!dataUpload) return "Data nao informada";
+
+  const parsed = new Date(dataUpload);
+  if (Number.isNaN(parsed.getTime())) return dataUpload;
+
+  return parsed.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
 function ProcessoDrawer({
   processo,
+  documentos,
+  loadingDocumentos,
+  onUploadDocumento,
+  onDownloadDocumento,
   onClose,
   onEditar,
 }: {
   processo: Processo;
+  documentos: Documento[];
+  loadingDocumentos: boolean;
+  onUploadDocumento: () => void;
+  onDownloadDocumento: (doc: Documento) => void;
   onClose: () => void;
   onEditar: () => void;
 }) {
@@ -326,6 +366,60 @@ function ProcessoDrawer({
                 </div>
               </div>
             )}
+
+            <div className="rounded-lg bg-muted/40 px-3 py-3">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Documentos</p>
+                  <p className="text-sm font-semibold text-foreground">
+                    {documentos.length} {documentos.length === 1 ? "documento" : "documentos"} vinculados ao processo
+                  </p>
+                </div>
+                <Button size="sm" className="gap-2" onClick={onUploadDocumento}>
+                  <Upload className="h-3.5 w-3.5" />
+                  Upload
+                </Button>
+              </div>
+
+              {loadingDocumentos ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                </div>
+              ) : documentos.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border bg-background/60 px-4 py-6 text-center">
+                  <FileText className="mx-auto h-6 w-6 text-muted-foreground/40" />
+                  <p className="mt-2 text-sm text-muted-foreground">Nenhum documento vinculado a este processo.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {documentos.map((documento) => (
+                    <div
+                      key={documento.id}
+                      className="flex items-center gap-3 rounded-lg border border-border/60 bg-background/70 px-3 py-3"
+                    >
+                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <FileText className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-foreground">{documento.nome}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {(categoriaDocumentoLabel[documento.categoria] ?? documento.categoria)} · {documento.tamanho}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">{formatarDataDocumento(documento.dataUpload)}</p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onDownloadDocumento(documento)}
+                        className="h-8 w-8"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {processo.movimentacoes && processo.movimentacoes.length > 0 && (
@@ -380,9 +474,12 @@ export const ProcessosView = () => {
   const [processoSelecionado, setProcessoSelecionado] = useState<Processo | null>(null);
   const [editando, setEditando] = useState(false);
   const [processos, setProcessos] = useState<Processo[]>([]);
+  const [documentosProcesso, setDocumentosProcesso] = useState<Documento[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingDocumentosProcesso, setLoadingDocumentosProcesso] = useState(false);
   const [syncingDatajud, setSyncingDatajud] = useState(false);
   const [modalAberto, setModalAberto] = useState(false);
+  const [uploadDocumentoAberto, setUploadDocumentoAberto] = useState(false);
 
   const isSecretaria = user?.papel?.toUpperCase() === "SECRETARIA";
 
@@ -422,6 +519,31 @@ export const ProcessosView = () => {
     carregarProcessos();
   }, [carregarProcessos]);
 
+  const carregarDocumentosDoProcesso = useCallback(async (processoId: string) => {
+    setLoadingDocumentosProcesso(true);
+
+    try {
+      const response = await documentosApi.listarPorProcesso(processoId, { size: 1000 });
+      const items = response?.content ?? response;
+      setDocumentosProcesso(Array.isArray(items) ? items : []);
+    } catch {
+      toast.error("Erro ao carregar documentos do processo.");
+      setDocumentosProcesso([]);
+    } finally {
+      setLoadingDocumentosProcesso(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!processoSelecionado) {
+      setDocumentosProcesso([]);
+      setLoadingDocumentosProcesso(false);
+      return;
+    }
+
+    void carregarDocumentosDoProcesso(processoSelecionado.id);
+  }, [carregarDocumentosDoProcesso, processoSelecionado]);
+
   const todoStatus: Array<StatusProcesso | "Todos"> = [
     "Todos",
     "EM_ANDAMENTO",
@@ -452,6 +574,54 @@ export const ProcessosView = () => {
       setProcessoSelecionado(completo);
     } catch {
       setProcessoSelecionado(processo);
+    }
+  };
+
+  const handleDownloadDocumento = async (doc: Documento) => {
+    try {
+      if (isDocumentoLocal(doc)) {
+        const storageKey = doc.id.slice("local:".length);
+        const apiPath = `/documentos/stream/${storageKey.replaceAll("/", "__")}`;
+        const res = await api.get(apiPath, { responseType: "blob" });
+        const blobUrl = URL.createObjectURL(res.data);
+        const anchor = document.createElement("a");
+        anchor.href = blobUrl;
+        anchor.download = doc.nome;
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        URL.revokeObjectURL(blobUrl);
+        return;
+      }
+
+      const result = await documentosApi.downloadUrl(doc.id);
+      const url = typeof result === "string" ? result : result.url;
+      const nome = typeof result === "string" ? doc.nome : (result.nome || doc.nome);
+
+      if (url.startsWith("/")) {
+        const apiPath = url.startsWith("/api") ? url.slice(4) : url;
+        const res = await api.get(apiPath, { responseType: "blob" });
+        const blobUrl = URL.createObjectURL(res.data);
+        const anchor = document.createElement("a");
+        anchor.href = blobUrl;
+        anchor.download = nome;
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        URL.revokeObjectURL(blobUrl);
+        return;
+      }
+
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = nome;
+      anchor.target = "_blank";
+      anchor.rel = "noopener noreferrer";
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+    } catch {
+      toast.error("Erro ao obter link de download.");
     }
   };
 
@@ -708,8 +878,35 @@ export const ProcessosView = () => {
       {processoSelecionado && !editando && (
         <ProcessoDrawer
           processo={processoSelecionado}
-          onClose={() => setProcessoSelecionado(null)}
+          documentos={documentosProcesso}
+          loadingDocumentos={loadingDocumentosProcesso}
+          onUploadDocumento={() => setUploadDocumentoAberto(true)}
+          onDownloadDocumento={(doc) => void handleDownloadDocumento(doc)}
+          onClose={() => {
+            setProcessoSelecionado(null);
+            setUploadDocumentoAberto(false);
+          }}
           onEditar={() => setEditando(true)}
+        />
+      )}
+
+      {uploadDocumentoAberto && processoSelecionado && (
+        <DocumentoUploadModal
+          onClose={() => setUploadDocumentoAberto(false)}
+          onSaved={() => {
+            toast.success("Documento vinculado ao processo.");
+            void carregarDocumentosDoProcesso(processoSelecionado.id);
+          }}
+          clientesList={[{ id: processoSelecionado.clienteId, nome: processoSelecionado.clienteNome }]}
+          processosList={[processoSelecionado]}
+          pastasInternas={[]}
+          initialDestino="cliente"
+          initialClienteId={processoSelecionado.clienteId}
+          initialProcessoId={processoSelecionado.id}
+          allowDestinoSwitch={false}
+          lockClienteId={processoSelecionado.clienteId}
+          lockProcessoId={processoSelecionado.id}
+          title="Upload para o processo"
         />
       )}
 

@@ -116,4 +116,24 @@ class StorageServiceTest {
 
         assertEquals("Documento-aniversario-13.txt", filename);
     }
+
+    @Test
+    @DisplayName("Deve manter a estrutura fisica no cliente quando houver processo associado")
+    void upload_ComClienteEProcessoMantemEstruturaNoCliente() throws IOException {
+        MockMultipartFile file = new MockMultipartFile("file", "peticao.pdf", "application/pdf", "dummy content".getBytes());
+        UUID unidadeId = UUID.randomUUID();
+        UUID clienteId = UUID.randomUUID();
+        UUID processoId = UUID.randomUUID();
+
+        Tika mockTika = mock(Tika.class);
+        when(mockTika.detect(any(InputStream.class))).thenReturn("application/pdf");
+        ReflectionTestUtils.setField(storageService, "tika", mockTika);
+
+        String key = storageService.upload(file, unidadeId, clienteId, processoId, null);
+
+        assertTrue(key.contains(unidadeId.toString()));
+        assertTrue(key.contains("clientes/" + clienteId));
+        assertFalse(key.contains("processos/" + processoId));
+        assertTrue(key.endsWith("peticao.pdf"));
+    }
 }

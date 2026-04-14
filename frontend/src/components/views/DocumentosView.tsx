@@ -10,24 +10,34 @@ import {
   Grid3x3,
   List,
   MapPin,
+  Pencil,
   Plus,
   Search,
   Trash2,
   Upload,
   X,
 } from "lucide-react";
+import { EditarDocumentoModal } from "@/components/modals/EditarDocumentoModal";
+import { DocumentoUploadModal } from "@/components/modals/DocumentoUploadModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { clientes as clientesMock, documentos as documentosMock, processos as processosMock } from "@/data/mockData";
+import {
+  applyDocumentoVirtualState,
+  markDocumentoVirtualDeleted,
+  saveDocumentoVirtualOverride,
+} from "@/lib/documentos-virtual-state";
 import { cn } from "@/lib/utils";
 import api from "@/lib/api";
-import { clientesApi, documentosApi, pastasApi } from "@/services/api";
+import { clientesApi, documentosApi, pastasApi, processosApi } from "@/services/api";
 import { toast } from "sonner";
 import type {
   AcervoCidadeDocumento,
   AcervoClienteDocumento,
   Documento,
   PastaInternaNode,
+  Processo,
 } from "@/types";
 
 const tipoConfig: Record<string, { label: string; bg: string; text: string; char: string }> = {
@@ -98,6 +108,20 @@ interface PastaOption {
   label: string;
 }
 
+const SHOULD_MERGE_DEMO_DOCUMENTS = import.meta.env.DEV || import.meta.env.MODE === "test";
+
+const clienteMockPorId = new Map(clientesMock.map((cliente) => [cliente.id, cliente]));
+const processoMockPorId = new Map(processosMock.map((processo) => [processo.id, processo]));
+
+const documentosMockNormalizados = documentosMock.map((doc) =>
+  normalizeDocumento({
+    ...doc,
+    id: `demo:${doc.id}`,
+    clienteNome: doc.clienteNome ?? clienteMockPorId.get(doc.clienteId ?? "")?.nome,
+    processoNumero: doc.processoNumero ?? processoMockPorId.get(doc.processoId ?? "")?.numero,
+  } as Documento & { uploadadoPor?: string }),
+);
+
 function normalizeText(value?: string | null) {
   return (value ?? "")
     .normalize("NFD")
@@ -115,6 +139,40 @@ function normalizeDocumento(doc: Documento & { uploadadoPor?: string }): Documen
 
 function isDocumentoLocal(doc: Documento) {
   return doc.id.startsWith("local:");
+}
+
+function isDocumentoDemo(doc: Documento) {
+  return doc.id.startsWith("demo:");
+}
+
+function isDocumentoVirtual(doc: Documento) {
+  return isDocumentoLocal(doc) || isDocumentoDemo(doc);
+}
+
+function buildDocumentoMergeKey(doc: Documento) {
+  return [
+    normalizeText(doc.nome),
+    normalizeText(doc.clienteId),
+    normalizeText(doc.clienteNome),
+    normalizeText(doc.processoId),
+    normalizeText(doc.processoNumero),
+    normalizeText(doc.pastaId),
+    normalizeText(doc.dataUpload),
+  ].join("|");
+}
+
+function mergeDocumentos(primary: Documento[], fallback: Documento[]) {
+  const merged = new Map<string, Documento>();
+
+  fallback.forEach((doc) => {
+    merged.set(buildDocumentoMergeKey(doc), doc);
+  });
+
+  primary.forEach((doc) => {
+    merged.set(buildDocumentoMergeKey(doc), doc);
+  });
+
+  return Array.from(merged.values());
 }
 
 function formatBytes(bytes: number) {
@@ -525,9 +583,11 @@ export const DocumentosView = () => {
   const [busca, setBusca] = useState("");
   const [modo, setModo] = useState<"grid" | "lista">("lista");
   const [uploadAberto, setUploadAberto] = useState(false);
+  const [documentoEditando, setDocumentoEditando] = useState<Documento | null>(null);
   const [novaPastaAberta, setNovaPastaAberta] = useState(false);
   const [documentos, setDocumentos] = useState<Documento[]>([]);
   const [todosClientes, setTodosClientes] = useState<{ id: string; nome: string }[]>([]);
+  const [todosProcessos, setTodosProcessos] = useState<Processo[]>([]);
   const [acervoClientes, setAcervoClientes] = useState<AcervoCidadeDocumento[]>([]);
   const [pastasInternas, setPastasInternas] = useState<PastaInternaNode[]>([]);
   const [acervoAberto, setAcervoAberto] = useState(true);
@@ -538,6 +598,8 @@ export const DocumentosView = () => {
   const [loadingDocumentos, setLoadingDocumentos] = useState(true);
   const [ordenacao, setOrdenacao] = useState<OrdenacaoDocumentos>("recentes");
   const [categoriaFiltro, setCategoriaFiltro] = useState("todas");
+
+  const hidratarDocumentos = useCallback((docs: Documento[]) => applyDocumentoVirtualState(docs), []);
 
   const selecionarPasta = useCallback((pastaId: string, nodes: PastaInternaNode[]) => {
     const pasta = findPastaNode(nodes, pastaId);
@@ -565,20 +627,24 @@ export const DocumentosView = () => {
     setLoadingEstruturas(true);
 
     try {
-      const [acervo, pastas, clientes] = await Promise.all([
+      const [acervo, pastas, clientes, processos] = await Promise.all([
         documentosApi.listarAcervoClientes(),
         pastasApi.listarInternas(),
         clientesApi.listar({ size: 500 }),
+        processosApi.listar({ size: 1000 }).catch(() => ({ content: [] })),
       ]);
 
       const acervoLista = Array.isArray(acervo) ? acervo : [];
       const pastasLista = Array.isArray(pastas) ? pastas : [];
       const clientesData = clientes?.content ?? clientes;
       const clientesLista = Array.isArray(clientesData) ? clientesData : [];
+      const processosData = processos?.content ?? processos;
+      const processosLista = Array.isArray(processosData) ? processosData : [];
 
       setAcervoClientes(acervoLista);
       setPastasInternas(pastasLista);
       setTodosClientes(clientesLista);
+      setTodosProcessos(processosLista);
 
       setExpandedCities((prev) => {
         const next = { ...prev };
@@ -595,6 +661,7 @@ export const DocumentosView = () => {
       setAcervoClientes([]);
       setPastasInternas([]);
       setTodosClientes([]);
+      setTodosProcessos([]);
     } finally {
       setLoadingEstruturas(false);
     }
@@ -616,7 +683,7 @@ export const DocumentosView = () => {
         const docsApi = Array.isArray(items)
           ? items.map((doc) => normalizeDocumento(doc as Documento & { uploadadoPor?: string }))
           : [];
-        setDocumentos(docsApi);
+        setDocumentos(hidratarDocumentos(docsApi));
         return;
       }
 
@@ -626,7 +693,7 @@ export const DocumentosView = () => {
         const docsApi = Array.isArray(items)
           ? items.map((doc) => normalizeDocumento(doc as Documento & { uploadadoPor?: string }))
           : [];
-        setDocumentos(docsApi);
+        setDocumentos(hidratarDocumentos(docsApi));
         return;
       }
 
@@ -635,13 +702,18 @@ export const DocumentosView = () => {
       const docsApi = Array.isArray(items)
         ? items.map((doc) => normalizeDocumento(doc as Documento & { uploadadoPor?: string }))
         : [];
-      setDocumentos(docsApi);
+
+      setDocumentos(hidratarDocumentos(
+        SHOULD_MERGE_DEMO_DOCUMENTS ? mergeDocumentos(docsApi, documentosMockNormalizados) : docsApi,
+      ));
     } catch {
-      setDocumentos([]);
+      setDocumentos(hidratarDocumentos(
+        SHOULD_MERGE_DEMO_DOCUMENTS && selecao.type === "overview" ? documentosMockNormalizados : [],
+      ));
     } finally {
       setLoadingDocumentos(false);
     }
-  }, [selecao]);
+  }, [hidratarDocumentos, selecao]);
 
   useEffect(() => {
     void carregarEstruturas();
@@ -653,6 +725,11 @@ export const DocumentosView = () => {
 
   const handleDownload = async (doc: Documento) => {
     try {
+      if (isDocumentoDemo(doc)) {
+        toast.error("Documento disponivel apenas para visualizacao na massa de teste.");
+        return;
+      }
+
       if (isDocumentoLocal(doc)) {
         const storageKey = doc.id.slice("local:".length);
         const apiPath = `/documentos/stream/${storageKey.replaceAll("/", "__")}`;
@@ -699,20 +776,42 @@ export const DocumentosView = () => {
   };
 
   const handleExcluir = async (doc: Documento) => {
-    if (isDocumentoLocal(doc)) {
-      toast.error("Exclusao indisponivel para documentos apenas no storage local.");
-      return;
-    }
-
     if (!confirm(`Excluir "${doc.nome}"? Esta acao e irreversivel.`)) return;
 
     try {
-      await documentosApi.excluir(doc.id);
+      if (isDocumentoDemo(doc)) {
+        markDocumentoVirtualDeleted(doc.id);
+      } else if (isDocumentoLocal(doc)) {
+        await documentosApi.excluirStorageKey(doc.id.slice("local:".length));
+      } else {
+        await documentosApi.excluir(doc.id);
+      }
+
       toast.success("Documento excluido.");
       void carregarDocumentos();
     } catch {
       toast.error("Erro ao excluir documento.");
     }
+  };
+
+  const handleSalvarEdicaoDocumento = async (payload: { nome: string; categoria: string }) => {
+    if (!documentoEditando) return;
+
+    if (isDocumentoVirtual(documentoEditando)) {
+      saveDocumentoVirtualOverride(documentoEditando.id, {
+        nome: payload.nome,
+        categoria: payload.categoria.toLowerCase(),
+      });
+    } else {
+      await documentosApi.atualizar(documentoEditando.id, {
+        nome: payload.nome,
+        categoria: payload.categoria,
+      });
+    }
+
+    toast.success("Documento atualizado.");
+    setDocumentoEditando(null);
+    void carregarDocumentos();
   };
 
   const handleUploadSaved = () => {
@@ -732,6 +831,11 @@ export const DocumentosView = () => {
       cidadePorClienteId.set(cliente.id, cidade.label);
     });
   });
+  clientesMock.forEach((cliente) => {
+    if (!cidadePorClienteId.has(cliente.id)) {
+      cidadePorClienteId.set(cliente.id, `${cliente.cidade} - ${cliente.estado}`);
+    }
+  });
 
   const docsFiltrados = documentos
     .filter((doc) => {
@@ -745,6 +849,7 @@ export const DocumentosView = () => {
       const textoBase = [
         doc.nome,
         doc.clienteNome,
+        doc.processoNumero,
         categoriaLabel[doc.categoria],
         cidadeCliente,
       ]
@@ -1090,7 +1195,7 @@ export const DocumentosView = () => {
           <div className="relative flex-1 max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder=""
+              placeholder="Buscar documentos, clientes, processos ou cidades"
               className="pl-9 bg-secondary border-none h-9"
               value={busca}
               onChange={(event) => setBusca(event.target.value)}
@@ -1234,9 +1339,22 @@ export const DocumentosView = () => {
                     <p className="text-xs font-medium text-foreground truncate w-full group-hover:text-primary transition-colors">
                       {doc.nome}
                     </p>
+                    {doc.processoNumero && (
+                      <p className="text-[10px] text-muted-foreground mt-1 truncate">{doc.processoNumero}</p>
+                    )}
                     <p className="text-[10px] text-muted-foreground mt-0.5">{doc.tamanho}</p>
                   </div>
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setDocumentoEditando(doc);
+                      }}
+                      title="Editar"
+                      className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-all"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
                     <button
                       onClick={(event) => {
                         event.stopPropagation();
@@ -1247,18 +1365,16 @@ export const DocumentosView = () => {
                     >
                       <Download className="h-3.5 w-3.5" />
                     </button>
-                    {!isDocumentoLocal(doc) && (
-                      <button
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          void handleExcluir(doc);
-                        }}
-                        title="Excluir"
-                        className="p-1.5 rounded-md hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-all"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    )}
+                    <button
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handleExcluir(doc);
+                      }}
+                      title="Excluir"
+                      className="p-1.5 rounded-md hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-all"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 </div>
               ))}
@@ -1274,6 +1390,9 @@ export const DocumentosView = () => {
                     </th>
                     <th className="text-left px-4 py-3 text-muted-foreground font-medium text-xs hidden lg:table-cell">
                       Categoria
+                    </th>
+                    <th className="text-left px-4 py-3 text-muted-foreground font-medium text-xs hidden xl:table-cell">
+                      Processo
                     </th>
                     <th className="text-left px-4 py-3 text-muted-foreground font-medium text-xs">Tamanho</th>
                     <th className="px-3 py-3" />
@@ -1292,9 +1411,19 @@ export const DocumentosView = () => {
                       <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell text-xs">
                         {categoriaLabel[doc.categoria] ?? doc.categoria}
                       </td>
+                      <td className="px-4 py-3 text-muted-foreground hidden xl:table-cell text-xs">
+                        {doc.processoNumero || "-"}
+                      </td>
                       <td className="px-4 py-3 text-muted-foreground text-xs">{doc.tamanho}</td>
                       <td className="px-3 py-3 text-right">
                         <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => setDocumentoEditando(doc)}
+                            title="Editar"
+                            className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-all"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
                           <button
                             onClick={() => void handleDownload(doc)}
                             title="Baixar"
@@ -1302,15 +1431,13 @@ export const DocumentosView = () => {
                           >
                             <Download className="h-3.5 w-3.5" />
                           </button>
-                          {!isDocumentoLocal(doc) && (
-                            <button
-                              onClick={() => void handleExcluir(doc)}
-                              title="Excluir"
-                              className="p-1.5 rounded-md hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-all"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          )}
+                          <button
+                            onClick={() => void handleExcluir(doc)}
+                            title="Excluir"
+                            className="p-1.5 rounded-md hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-all"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -1323,14 +1450,23 @@ export const DocumentosView = () => {
       </div>
 
       {uploadAberto && (
-        <UploadModal
+        <DocumentoUploadModal
           onClose={() => setUploadAberto(false)}
           onSaved={handleUploadSaved}
           clientesList={todosClientes}
+          processosList={todosProcessos}
           pastasInternas={pastasInternas}
           initialDestino={initialUploadDestino}
           initialClienteId={initialClienteId}
           initialPastaId={initialPastaId}
+        />
+      )}
+
+      {documentoEditando && (
+        <EditarDocumentoModal
+          documento={documentoEditando}
+          onClose={() => setDocumentoEditando(null)}
+          onSave={handleSalvarEdicaoDocumento}
         />
       )}
 
