@@ -17,6 +17,8 @@ public interface PastaRepository extends JpaRepository<Pasta, UUID> {
 
     List<Pasta> findByParentId(UUID parentId);
 
+    boolean existsByParentId(UUID parentId);
+
     List<Pasta> findByClienteId(UUID clienteId);
 
     @Query("""

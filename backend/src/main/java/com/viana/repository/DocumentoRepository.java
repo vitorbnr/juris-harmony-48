@@ -20,6 +20,7 @@ public interface DocumentoRepository extends JpaRepository<Documento, UUID> {
     Page<Documento> findByClienteId(UUID clienteId, Pageable pageable);
     Page<Documento> findByProcessoId(UUID processoId, Pageable pageable);
     List<Documento> findByPastaIdIsNull();
+    boolean existsByPastaId(UUID pastaId);
     Optional<Documento> findByStorageKey(String storageKey);
 
     @Query("""

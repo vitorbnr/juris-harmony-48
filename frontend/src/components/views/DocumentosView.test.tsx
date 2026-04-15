@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import { DocumentosView } from "./DocumentosView";
 import { clientesApi, documentosApi, pastasApi, processosApi } from "@/services/api";
@@ -16,6 +16,7 @@ vi.mock("@/services/api", () => ({
   },
   clientesApi: {
     listar: vi.fn(),
+    desativar: vi.fn(),
   },
   processosApi: {
     listar: vi.fn(),
@@ -23,6 +24,7 @@ vi.mock("@/services/api", () => ({
   pastasApi: {
     listarInternas: vi.fn(),
     criarInterna: vi.fn(),
+    excluirInterna: vi.fn(),
   },
 }));
 
@@ -54,6 +56,7 @@ describe("DocumentosView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    vi.stubGlobal("confirm", vi.fn(() => true));
     (documentosApi.listar as any).mockResolvedValue({ content: mockDocs });
     (documentosApi.listarPorCliente as any).mockResolvedValue({ content: mockDocs });
     (documentosApi.listarPorPasta as any).mockResolvedValue({ content: mockDocs });
@@ -100,11 +103,14 @@ describe("DocumentosView", () => {
   });
 
   it("deve permitir fechar todas as cidades da sidebar", async () => {
-    render(<DocumentosView />);
+    const { getByTestId } = render(<DocumentosView />);
+    const sidebar = getByTestId("documentos-sidebar-scroll");
 
-    expect(await screen.findByRole("button", { name: /Joao Leis Junior/i })).toBeDefined();
+    expect(await within(sidebar).findByText(/Joao Leis Junior/i)).toBeDefined();
     fireEvent.click(screen.getByRole("button", { name: /Fechar todos/i }));
-    expect(screen.queryByRole("button", { name: /Joao Leis Junior/i })).toBeNull();
+    await waitFor(() => {
+      expect(within(sidebar).queryByText(/Joao Leis Junior/i)).toBeNull();
+    });
   });
 
   it("deve localizar documento por trecho numerico do nome", async () => {
@@ -157,4 +163,25 @@ describe("DocumentosView", () => {
 
     expect(await screen.findByText(/Editar documento/i)).toBeDefined();
   });
+
+  it("deve excluir uma pasta interna pela sidebar", async () => {
+    (pastasApi.listarInternas as any).mockResolvedValue([
+      {
+        id: "p1",
+        nome: "Financeiro",
+        parentId: null,
+        children: [],
+      },
+    ]);
+    (pastasApi.excluirInterna as any).mockResolvedValue(undefined);
+
+    render(<DocumentosView />);
+
+    fireEvent.click(await screen.findByLabelText(/Excluir pasta Financeiro/i));
+
+    await waitFor(() => {
+      expect(pastasApi.excluirInterna).toHaveBeenCalledWith("p1");
+    });
+  });
+
 });

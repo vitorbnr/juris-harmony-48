@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, Upload, X, FileText } from "lucide-react";
+import { CheckCircle2, FileText, Upload, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,6 +71,10 @@ function formatBytes(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function buildFileKey(file: File) {
+  return `${file.name}:${file.size}:${file.lastModified}`;
+}
+
 function FileIcon({ tipo, size = "md" }: { tipo: string; size?: "sm" | "md" | "lg" }) {
   const conf = tipoConfig[tipo?.toLowerCase()] ?? tipoConfig.outro;
   return (
@@ -113,7 +117,7 @@ export function DocumentoUploadModal({
 }: DocumentoUploadModalProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [destino, setDestino] = useState<DocumentoDestino>(initialDestino);
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [categoria, setCategoria] = useState("OUTROS");
   const [clienteId, setClienteId] = useState(initialClienteId ?? lockClienteId ?? "");
   const [processoId, setProcessoId] = useState(initialProcessoId ?? lockProcessoId ?? "");
@@ -123,6 +127,7 @@ export function DocumentoUploadModal({
   const [concluido, setConcluido] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [arquivosEnviados, setArquivosEnviados] = useState(0);
 
   const pastaOptions = flattenPastas(pastasInternas);
   const clienteSelecionadoId = lockClienteId ?? clienteId;
@@ -182,13 +187,49 @@ export function DocumentoUploadModal({
     setProcessoId("");
   }, [processoId, processosDoCliente, lockProcessoId]);
 
-  const escolherArquivo = (selectedFile: File) => {
-    if (selectedFile.size > MAX_SIZE_BYTES) {
-      setErro(`Arquivo muito grande: ${formatBytes(selectedFile.size)}. Maximo permitido: 100MB.`);
+  const adicionarArquivos = (selectedFiles: Iterable<File>) => {
+    const validos: File[] = [];
+    const invalidos: string[] = [];
+
+    for (const selectedFile of Array.from(selectedFiles)) {
+      if (selectedFile.size > MAX_SIZE_BYTES) {
+        invalidos.push(selectedFile.name);
+        continue;
+      }
+
+      validos.push(selectedFile);
+    }
+
+    if (validos.length > 0) {
+      setFiles((prev) => {
+        const existing = new Set(prev.map(buildFileKey));
+        const novos = validos.filter((file) => {
+          const key = buildFileKey(file);
+          if (existing.has(key)) return false;
+          existing.add(key);
+          return true;
+        });
+        return [...prev, ...novos];
+      });
+      setConcluido(false);
+      setArquivosEnviados(0);
+    }
+
+    if (invalidos.length > 0) {
+      const nomes = invalidos.slice(0, 2).join(", ");
+      setErro(
+        `Alguns arquivos nao foram adicionados por excederem 100MB: ${nomes}${invalidos.length > 2 ? "..." : ""}.`,
+      );
       return;
     }
 
-    setFile(selectedFile);
+    if (validos.length > 0) {
+      setErro(null);
+    }
+  };
+
+  const removerArquivo = (fileKey: string) => {
+    setFiles((prev) => prev.filter((file) => buildFileKey(file) !== fileKey));
     setErro(null);
   };
 
@@ -202,7 +243,7 @@ export function DocumentoUploadModal({
 
         const pastedFile = item.getAsFile();
         if (pastedFile) {
-          escolherArquivo(pastedFile);
+          adicionarArquivos([pastedFile]);
         }
         break;
       }
@@ -213,7 +254,7 @@ export function DocumentoUploadModal({
   }, []);
 
   const handleUpload = async () => {
-    if (!file) return;
+    if (files.length === 0) return;
 
     if (destino === "cliente" && !clienteSelecionadoId) {
       setErro("Selecione o cliente que recebera o documento.");
@@ -227,33 +268,70 @@ export function DocumentoUploadModal({
 
     setUploading(true);
     setErro(null);
+    setProgresso(0);
 
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("categoria", categoria);
+    const arquivosPendentes = [...files];
+    const falhas: Array<{ file: File; message: string }> = [];
+    let enviados = 0;
 
-    if (destino === "cliente") {
-      formData.append("clienteId", clienteSelecionadoId);
-    }
-    if (destino === "interno") {
-      formData.append("pastaId", pastaId);
-    }
-    if (processoSelecionadoId) {
-      formData.append("processoId", processoSelecionadoId);
+    for (let index = 0; index < arquivosPendentes.length; index += 1) {
+      const file = arquivosPendentes[index];
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("categoria", categoria);
+
+      if (destino === "cliente") {
+        formData.append("clienteId", clienteSelecionadoId);
+      }
+      if (destino === "interno") {
+        formData.append("pastaId", pastaId);
+      }
+      if (processoSelecionadoId) {
+        formData.append("processoId", processoSelecionadoId);
+      }
+
+      try {
+        await documentosApi.upload(formData, (pct) => {
+          const totalPct = ((index + pct / 100) / arquivosPendentes.length) * 100;
+          setProgresso(Math.round(totalPct));
+        });
+        enviados += 1;
+      } catch (err: unknown) {
+        const axiosErr = err as { response?: { data?: { mensagem?: string } } };
+        falhas.push({
+          file,
+          message: axiosErr.response?.data?.mensagem ?? `Erro ao enviar ${file.name}.`,
+        });
+      }
     }
 
-    try {
-      await documentosApi.upload(formData, (pct) => setProgresso(pct));
-      setConcluido(true);
-      setTimeout(() => {
+    setUploading(false);
+    setArquivosEnviados(enviados);
+
+    if (falhas.length > 0) {
+      setFiles(falhas.map((falha) => falha.file));
+      setConcluido(false);
+      setProgresso(0);
+
+      if (enviados > 0) {
         onSaved();
-        onClose();
-      }, 1200);
-    } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { mensagem?: string } } };
-      setErro(axiosErr.response?.data?.mensagem ?? "Erro ao enviar arquivo.");
-      setUploading(false);
+      }
+
+      const arquivosComFalha = falhas.slice(0, 2).map((falha) => falha.file.name).join(", ");
+      setErro(
+        enviados > 0
+          ? `${enviados} ${enviados === 1 ? "arquivo enviado" : "arquivos enviados"}. Falha em ${falhas.length}: ${arquivosComFalha}${falhas.length > 2 ? "..." : ""}.`
+          : falhas[0].message,
+      );
+      return;
     }
+
+    setProgresso(100);
+    setConcluido(true);
+    setTimeout(() => {
+      onSaved();
+      onClose();
+    }, 1200);
   };
 
   return (
@@ -268,58 +346,84 @@ export function DocumentoUploadModal({
         </div>
 
         <div className="p-6 space-y-4">
-          {!file ? (
-            <div
-              onDragOver={(event) => {
-                event.preventDefault();
-                setDragging(true);
-              }}
-              onDragLeave={() => setDragging(false)}
-              onDrop={(event) => {
-                event.preventDefault();
-                setDragging(false);
-                const droppedFile = event.dataTransfer.files[0];
-                if (droppedFile) escolherArquivo(droppedFile);
-              }}
-              onClick={() => fileRef.current?.click()}
-              className={cn(
-                "border-2 border-dashed rounded-xl p-10 text-center transition-all cursor-pointer",
-                dragging ? "border-primary bg-primary/5" : "border-border hover:border-primary/40",
-              )}
-            >
-              <input
-                ref={fileRef}
-                type="file"
-                className="hidden"
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.webp,.bmp,.mp4,.mpeg,.mov,.avi,.webm,.mp3,.wav,.ogg,.zip,.rar,.7z,.txt,.rtf"
-                onChange={(event) => {
-                  if (event.target.files?.[0]) escolherArquivo(event.target.files[0]);
-                }}
-              />
-              <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-3" />
-              <p className="text-sm font-medium text-foreground">Arraste, clique ou cole (Ctrl+V)</p>
-              <p className="text-xs text-muted-foreground mt-1">PDF, DOCX, XLSX, imagens e videos ate 100MB</p>
-            </div>
-          ) : concluido ? (
+          {concluido ? (
             <div className="text-center py-8 space-y-2">
               <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
                 <CheckCircle2 className="h-7 w-7 text-primary" />
               </div>
               <p className="font-medium text-foreground">Upload concluido</p>
-              <p className="text-sm text-muted-foreground">{file.name}</p>
+              <p className="text-sm text-muted-foreground">
+                {arquivosEnviados} {arquivosEnviados === 1 ? "arquivo enviado" : "arquivos enviados"}
+              </p>
             </div>
           ) : (
             <div className="space-y-3">
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-accent/50">
-                <FileIcon tipo={file.name.split(".").pop() ?? ""} size="sm" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{file.name}</p>
-                  <p className="text-xs text-muted-foreground">{formatBytes(file.size)}</p>
-                </div>
-                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => setFile(null)}>
-                  <X className="h-3.5 w-3.5" />
-                </Button>
+              <div
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  setDragging(true);
+                }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  setDragging(false);
+                  adicionarArquivos(Array.from(event.dataTransfer.files));
+                }}
+                onClick={() => fileRef.current?.click()}
+                className={cn(
+                  "border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer",
+                  dragging ? "border-primary bg-primary/5" : "border-border hover:border-primary/40",
+                )}
+              >
+                <input
+                  ref={fileRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.webp,.bmp,.mp4,.mpeg,.mov,.avi,.webm,.mp3,.wav,.ogg,.zip,.rar,.7z,.txt,.rtf"
+                  onChange={(event) => {
+                    if (event.target.files?.length) {
+                      adicionarArquivos(Array.from(event.target.files));
+                    }
+                    event.currentTarget.value = "";
+                  }}
+                />
+                <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-3" />
+                <p className="text-sm font-medium text-foreground">
+                  {files.length > 0 ? "Adicionar mais arquivos" : "Arraste, clique ou cole (Ctrl+V)"}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  PDF, DOCX, XLSX, imagens e videos ate 100MB por arquivo
+                </p>
+                {files.length > 0 && (
+                  <p className="text-xs text-primary mt-2">
+                    {files.length} {files.length === 1 ? "arquivo selecionado" : "arquivos selecionados"}
+                  </p>
+                )}
               </div>
+
+              {files.length > 0 && (
+                <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
+                  {files.map((file) => (
+                    <div key={buildFileKey(file)} className="flex items-center gap-3 p-3 rounded-lg bg-accent/50">
+                      <FileIcon tipo={file.name.split(".").pop() ?? ""} size="sm" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{file.name}</p>
+                        <p className="text-xs text-muted-foreground">{formatBytes(file.size)}</p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 shrink-0"
+                        disabled={uploading}
+                        onClick={() => removerArquivo(buildFileKey(file))}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {uploading && (
                 <div className="space-y-1">
@@ -453,7 +557,7 @@ export function DocumentoUploadModal({
                     <div className="text-xs">
                       <p className="font-medium text-foreground">Vinculo com processo ativo</p>
                       <p className="text-muted-foreground">
-                        {processoSelecionado.numero} · {processoSelecionado.clienteNome}
+                        {processoSelecionado.numero} - {processoSelecionado.clienteNome}
                       </p>
                     </div>
                   </div>
@@ -464,8 +568,12 @@ export function DocumentoUploadModal({
         </div>
 
         <div className="px-6 py-4 border-t border-border flex gap-2">
-          <Button className="flex-1" disabled={!file || uploading || concluido} onClick={handleUpload}>
-            {uploading ? `Enviando... ${progresso}%` : "Fazer upload"}
+          <Button className="flex-1" disabled={files.length === 0 || uploading || concluido} onClick={handleUpload}>
+            {uploading
+              ? `Enviando... ${progresso}%`
+              : files.length > 1
+                ? `Fazer upload (${files.length})`
+                : "Fazer upload"}
           </Button>
           <Button variant="outline" onClick={onClose}>
             Cancelar

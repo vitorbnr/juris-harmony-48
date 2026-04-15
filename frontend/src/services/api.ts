@@ -350,6 +350,8 @@ export const pastasApi = {
 
   criarInterna: (data: { nome: string; parentId?: string | null }) =>
     api.post("/pastas/internas", data).then(r => r.data),
+
+  excluirInterna: (id: string) => api.delete(`/pastas/internas/${id}`),
 };
 
 // ─── Usuários ─────────────────────────────────────────────────────────────────

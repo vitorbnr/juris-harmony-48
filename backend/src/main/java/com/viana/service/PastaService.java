@@ -6,6 +6,7 @@ import com.viana.exception.BusinessException;
 import com.viana.exception.ResourceNotFoundException;
 import com.viana.model.Pasta;
 import com.viana.model.Unidade;
+import com.viana.repository.DocumentoRepository;
 import com.viana.repository.PastaRepository;
 import com.viana.repository.UnidadeRepository;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ import java.util.UUID;
 public class PastaService {
 
     private final PastaRepository pastaRepository;
+    private final DocumentoRepository documentoRepository;
     private final UnidadeRepository unidadeRepository;
 
     @Transactional(readOnly = true)
@@ -79,6 +81,21 @@ public class PastaService {
         return toNode(pastaRepository.save(pasta));
     }
 
+    @Transactional
+    public void excluirInterna(UUID pastaId, UUID unidadeId, boolean isAdmin) {
+        Pasta pasta = buscarPastaInternaAutorizada(pastaId, unidadeId, isAdmin);
+
+        if (pastaRepository.existsByParentId(pasta.getId())) {
+            throw new BusinessException("A pasta possui subpastas internas. Exclua-as primeiro.");
+        }
+
+        if (documentoRepository.existsByPastaId(pasta.getId())) {
+            throw new BusinessException("A pasta possui documentos vinculados. Exclua ou mova os documentos primeiro.");
+        }
+
+        pastaRepository.delete(pasta);
+    }
+
     private void validarNomeDuplicado(String nome, Pasta parent, UUID unidadeId) {
         boolean duplicado = parent == null
                 ? pastaRepository.existsByParentIsNullAndClienteIsNullAndProcessoIsNullAndUnidadeIdAndNomeIgnoreCase(unidadeId, nome)
@@ -93,6 +110,17 @@ public class PastaService {
         if (pasta.getCliente() != null || pasta.getProcesso() != null) {
             throw new BusinessException("Apenas pastas internas podem receber subpastas internas.");
         }
+    }
+
+    private Pasta buscarPastaInternaAutorizada(UUID pastaId, UUID unidadeId, boolean isAdmin) {
+        Pasta pasta = isAdmin
+                ? pastaRepository.findById(pastaId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Pasta interna nao encontrada"))
+                : pastaRepository.findByIdAndUnidadeId(pastaId, unidadeId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Pasta interna nao encontrada"));
+
+        validarPastaInterna(pasta);
+        return pasta;
     }
 
     private PastaInternaResponse toNode(Pasta pasta) {

@@ -12,10 +12,18 @@ type AdvogadoInternoOption = {
   nome: string;
 };
 
+type ClienteSugestao = {
+  id: string;
+  nome: string;
+  cpfCnpj: string;
+  tipo: string; // "pessoa_fisica" | "pessoa_juridica"
+};
+
 type Props = {
   value: ProcessoParteFormValue[];
   onChange: (value: ProcessoParteFormValue[]) => void;
   advogadosInternos: AdvogadoInternoOption[];
+  clientesSugestoes?: ClienteSugestao[];
 };
 
 const tiposParte = [
@@ -125,7 +133,7 @@ export function sanitizeProcessoPartesForApi(partes: ProcessoParteFormValue[]) {
     .filter((parte) => parte.nome);
 }
 
-export function PartesProcessoEditor({ value, onChange, advogadosInternos }: Props) {
+export function PartesProcessoEditor({ value, onChange, advogadosInternos, clientesSugestoes = [] }: Props) {
   useEffect(() => {
     if (!value.length) {
       return;
@@ -232,10 +240,40 @@ export function PartesProcessoEditor({ value, onChange, advogadosInternos }: Pro
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <div className="space-y-1.5 md:col-span-2">
               <Label>Nome da parte *</Label>
+              {clientesSugestoes.length > 0 && (
+                <datalist id={`datalist-partes-clientes-${parteIndex}`}>
+                  {clientesSugestoes.map((cliente) => (
+                    <option key={cliente.id} value={cliente.nome} />
+                  ))}
+                </datalist>
+              )}
               <Input
                 value={parte.nome}
-                onChange={(event) => updateParte(parteIndex, { nome: event.target.value })}
-                placeholder="Ex: Joao da Silva ou Empresa XYZ Ltda"
+                list={clientesSugestoes.length > 0 ? `datalist-partes-clientes-${parteIndex}` : undefined}
+                onChange={(event) => {
+                  const nomeDigitado = event.target.value;
+                  updateParte(parteIndex, { nome: nomeDigitado });
+
+                  // Ao corresponder exatamente a um cliente, preenche documento e tipo
+                  const clienteEncontrado = clientesSugestoes.find(
+                    (c) => c.nome.toLowerCase() === nomeDigitado.toLowerCase(),
+                  );
+                  if (clienteEncontrado) {
+                    const tipoMapeado =
+                      clienteEncontrado.tipo === "pessoa_juridica" ? "PESSOA_JURIDICA" : "PESSOA_FISICA";
+                    const docFormatado = clienteEncontrado.cpfCnpj
+                      ? tipoMapeado === "PESSOA_JURIDICA"
+                        ? maskCNPJ(clienteEncontrado.cpfCnpj)
+                        : maskCPF(clienteEncontrado.cpfCnpj)
+                      : "";
+                    updateParte(parteIndex, {
+                      nome: clienteEncontrado.nome,
+                      tipo: tipoMapeado,
+                      documento: docFormatado,
+                    });
+                  }
+                }}
+                placeholder="Digite ou selecione um cliente cadastrado"
               />
             </div>
 

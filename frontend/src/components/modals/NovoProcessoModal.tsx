@@ -36,6 +36,8 @@ type ProcessoFormValues = {
 type ClienteOption = {
   id: string;
   nome: string;
+  cpfCnpj: string;
+  tipo: string;
 };
 
 type UnidadeOption = {
@@ -304,7 +306,7 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
                     <FormControl>
                       <Input
                         className="flex-1"
-                        placeholder="Ex: 0000000-00.0000.0.00.0000"
+                        placeholder=""
                         value={field.value}
                         onChange={event => field.onChange(maskProcesso(event.target.value))}
                       />
@@ -528,6 +530,7 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
               value={partes}
               onChange={setPartes}
               advogadosInternos={advogadosSelecionados}
+              clientesSugestoes={clientes.map(c => ({ id: c.id, nome: c.nome, cpfCnpj: c.cpfCnpj ?? "", tipo: c.tipo ?? "pessoa_fisica" }))}
             />
 
             <FormField

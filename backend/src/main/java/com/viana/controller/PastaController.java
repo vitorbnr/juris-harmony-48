@@ -10,7 +10,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -42,6 +44,13 @@ public class PastaController {
         Usuario usuario = getUsuario(authentication);
         PastaInternaResponse response = pastaService.criarInterna(request, getUnidadeEscopo(usuario));
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @DeleteMapping("/internas/{id}")
+    public ResponseEntity<Void> excluirInterna(@PathVariable UUID id, Authentication authentication) {
+        Usuario usuario = getUsuario(authentication);
+        pastaService.excluirInterna(id, getUnidadeEscopo(usuario), isAdmin(authentication));
+        return ResponseEntity.noContent().build();
     }
 
     private Usuario getUsuario(Authentication authentication) {

@@ -548,13 +548,13 @@ function NovaPastaModal({ onClose, onSaved, pastasInternas, initialParentId }: N
           </div>
 
           <div className="space-y-1.5">
-            <Label>Pasta pai</Label>
+            <Label>Criar em:</Label>
             <select
               value={parentId}
               onChange={(event) => setParentId(event.target.value)}
               className="w-full h-10 px-3 rounded-md bg-secondary text-foreground text-sm border-none outline-none"
             >
-              <option value="">Criar na raiz</option>
+              <option value="">Pastas internas</option>
               {pastaOptions.map((pasta) => (
                 <option key={pasta.id} value={pasta.id}>
                   {pasta.label}
@@ -775,18 +775,25 @@ export const DocumentosView = () => {
     }
   };
 
+  const excluirDocumentoPersistido = useCallback(async (doc: Documento) => {
+    if (isDocumentoDemo(doc)) {
+      markDocumentoVirtualDeleted(doc.id);
+      return;
+    }
+
+    if (isDocumentoLocal(doc)) {
+      await documentosApi.excluirStorageKey(doc.id.slice("local:".length));
+      return;
+    }
+
+    await documentosApi.excluir(doc.id);
+  }, []);
+
   const handleExcluir = async (doc: Documento) => {
     if (!confirm(`Excluir "${doc.nome}"? Esta acao e irreversivel.`)) return;
 
     try {
-      if (isDocumentoDemo(doc)) {
-        markDocumentoVirtualDeleted(doc.id);
-      } else if (isDocumentoLocal(doc)) {
-        await documentosApi.excluirStorageKey(doc.id.slice("local:".length));
-      } else {
-        await documentosApi.excluir(doc.id);
-      }
-
+      await excluirDocumentoPersistido(doc);
       toast.success("Documento excluido.");
       void carregarDocumentos();
     } catch {
@@ -821,6 +828,24 @@ export const DocumentosView = () => {
   const handlePastaCriada = (pasta: PastaInternaNode) => {
     void carregarEstruturas(pasta.id);
     toast.success("Pasta criada.");
+  };
+
+  const handleExcluirPasta = async (pasta: PastaInternaNode) => {
+    if (!confirm(`Excluir a pasta "${pasta.nome}"?`)) return;
+
+    try {
+      await pastasApi.excluirInterna(pasta.id);
+
+      if (selecao.type === "interna" && selecao.pastaId === pasta.id) {
+        setSelecao({ type: "overview" });
+      }
+
+      toast.success("Pasta excluida.");
+      void carregarEstruturas();
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { mensagem?: string } } };
+      toast.error(axiosErr.response?.data?.mensagem ?? "Erro ao excluir pasta.");
+    }
   };
 
   const buscaNormalizada = normalizeText(busca);
@@ -976,7 +1001,7 @@ export const DocumentosView = () => {
 
       const row = (
         <div key={node.id}>
-          <div className="flex items-center">
+          <div className="group flex items-center">
             <div className="w-6 flex justify-center">
               {hasChildren ? (
                 <button
@@ -1014,6 +1039,18 @@ export const DocumentosView = () => {
               )}
               <span className="truncate text-xs">{node.nome}</span>
             </button>
+            <button
+              type="button"
+              aria-label={`Excluir pasta ${node.nome}`}
+              title="Excluir pasta"
+              onClick={(event) => {
+                event.stopPropagation();
+                void handleExcluirPasta(node);
+              }}
+              className="mr-2 rounded-md p-1.5 text-muted-foreground transition-all hover:bg-accent hover:text-destructive"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
           </div>
 
           {hasChildren && expanded ? renderPastaNodes(node.children, depth + 1) : null}
@@ -1030,7 +1067,7 @@ export const DocumentosView = () => {
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Documentos</p>
         </div>
 
-        <nav className="flex-1 overflow-y-auto py-2">
+        <nav className="flex-1 overflow-y-auto py-2" data-testid="documentos-sidebar-scroll">
           <button
             onClick={() => setSelecao({ type: "overview" })}
             className={cn(
@@ -1052,7 +1089,7 @@ export const DocumentosView = () => {
             >
               <ChevronRight className={cn("h-3.5 w-3.5 transition-transform", acervoVisivel && "rotate-90")} />
               <MapPin className="h-3.5 w-3.5" />
-              <span>Escritório Viana</span>
+              <span>Escritorio Viana</span>
             </button>
             {acervoVisivel && !loadingEstruturas && acervoClientes.length > 0 && (
               <div className="flex items-center gap-2 text-[10px]">
@@ -1175,19 +1212,21 @@ export const DocumentosView = () => {
             </button>
           </div>
 
-          {loadingEstruturas ? (
-            <p className="px-4 py-3 text-[11px] text-muted-foreground/60 italic">Carregando pastas...</p>
-          ) : pastasInternas.length === 0 ? (
-            <div className="px-4 py-3 space-y-2">
-              <p className="text-[11px] text-muted-foreground/60 italic">Nenhuma pasta criada.</p>
-              <Button variant="outline" size="sm" className="w-full gap-2" onClick={() => setNovaPastaAberta(true)}>
-                <Plus className="h-3.5 w-3.5" />
-                Nova pasta
-              </Button>
-            </div>
-          ) : (
-            renderPastaNodes(pastasInternas)
-          )}
+          <div className="max-h-60 overflow-y-auto pr-1" data-testid="pastas-internas-scroll">
+            {loadingEstruturas ? (
+              <p className="px-4 py-3 text-[11px] text-muted-foreground/60 italic">Carregando pastas...</p>
+            ) : pastasInternas.length === 0 ? (
+              <div className="px-4 py-3 space-y-2">
+                <p className="text-[11px] text-muted-foreground/60 italic">Nenhuma pasta criada.</p>
+                <Button variant="outline" size="sm" className="w-full gap-2" onClick={() => setNovaPastaAberta(true)}>
+                  <Plus className="h-3.5 w-3.5" />
+                  Nova pasta
+                </Button>
+              </div>
+            ) : (
+              renderPastaNodes(pastasInternas)
+            )}
+          </div>
         </nav>
       </aside>
       <div className="flex-1 min-w-0 flex flex-col">
@@ -1195,7 +1234,7 @@ export const DocumentosView = () => {
           <div className="relative flex-1 max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar documentos, clientes, processos ou cidades"
+              placeholder=""
               className="pl-9 bg-secondary border-none h-9"
               value={busca}
               onChange={(event) => setBusca(event.target.value)}
