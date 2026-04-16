@@ -37,6 +37,12 @@ public interface ProcessoRepository extends JpaRepository<Processo, UUID> {
         SELECT p.* FROM processos p
         JOIN clientes c ON p.cliente_id = c.id
         WHERE (:unidadeId IS NULL OR p.unidade_id = CAST(:unidadeId AS uuid))
+        AND (:clienteId IS NULL OR p.cliente_id = CAST(:clienteId AS uuid))
+        AND NOT (
+            UPPER(p.numero) LIKE 'ATD-%'
+            AND p.status = 'AGUARDANDO'
+            AND p.data_distribuicao IS NULL
+        )
         AND (:status IS NULL OR p.status = :status)
         AND (:tipo IS NULL OR p.tipo = :tipo)
         AND (:etiqueta IS NULL OR EXISTS (
@@ -56,6 +62,12 @@ public interface ProcessoRepository extends JpaRepository<Processo, UUID> {
         SELECT COUNT(DISTINCT p.id) FROM processos p
         JOIN clientes c ON p.cliente_id = c.id
         WHERE (:unidadeId IS NULL OR p.unidade_id = CAST(:unidadeId AS uuid))
+        AND (:clienteId IS NULL OR p.cliente_id = CAST(:clienteId AS uuid))
+        AND NOT (
+            UPPER(p.numero) LIKE 'ATD-%'
+            AND p.status = 'AGUARDANDO'
+            AND p.data_distribuicao IS NULL
+        )
         AND (:status IS NULL OR p.status = :status)
         AND (:tipo IS NULL OR p.tipo = :tipo)
         AND (:etiqueta IS NULL OR EXISTS (
@@ -73,12 +85,24 @@ public interface ProcessoRepository extends JpaRepository<Processo, UUID> {
         """, nativeQuery = true)
     Page<Processo> findAllWithFilters(
             @Param("unidadeId") UUID unidadeId,
+            @Param("clienteId") UUID clienteId,
             @Param("status") String status,
             @Param("tipo") String tipo,
             @Param("etiqueta") String etiqueta,
             @Param("busca") String busca,
             @Param("buscaNumero") String buscaNumero,
             Pageable pageable);
+
+    @Query("""
+        SELECT count(p) FROM Processo p
+        WHERE p.status IN :statuses
+          AND NOT (
+              UPPER(p.numero) LIKE 'ATD-%'
+              AND p.status = com.viana.model.enums.StatusProcesso.AGUARDANDO
+              AND p.dataDistribuicao IS NULL
+          )
+    """)
+    long countByStatusInExcluindoAtendimentoSintetico(@Param("statuses") List<StatusProcesso> statuses);
 
 
     /**
@@ -98,7 +122,24 @@ public interface ProcessoRepository extends JpaRepository<Processo, UUID> {
     """)
     List<Processo> findTop5ByOrderByCriadoEmDesc(Pageable pageable);
 
+    @Query("""
+        SELECT DISTINCT p FROM Processo p
+        LEFT JOIN FETCH p.cliente
+        LEFT JOIN FETCH p.unidade
+        WHERE NOT (
+            UPPER(p.numero) LIKE 'ATD-%'
+            AND p.status = com.viana.model.enums.StatusProcesso.AGUARDANDO
+            AND p.dataDistribuicao IS NULL
+        )
+        ORDER BY p.criadoEm DESC
+    """)
+    List<Processo> findRecentesDashboard(Pageable pageable);
+
     default List<Processo> findTop5ByOrderByCriadoEmDesc() {
         return findTop5ByOrderByCriadoEmDesc(org.springframework.data.domain.PageRequest.of(0, 5));
+    }
+
+    default List<Processo> findRecentesDashboard() {
+        return findRecentesDashboard(org.springframework.data.domain.PageRequest.of(0, 5));
     }
 }

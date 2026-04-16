@@ -18,6 +18,10 @@ const getSectionTitles = (userName: string): Record<string, { title: string; sub
     title: "Inbox Juridica",
     subtitle: "Central de eventos juridicos novos para triagem e acompanhamento.",
   },
+  atendimentos: {
+    title: "Atendimentos",
+    subtitle: "Triagem comercial com vinculo opcional a processo apenas como contexto do atendimento.",
+  },
   processos: {
     title: "Processos",
     subtitle: "Gerencie todos os processos do escritorio.",

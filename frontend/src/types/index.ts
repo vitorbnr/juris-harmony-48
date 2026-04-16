@@ -46,6 +46,28 @@ export interface Cliente {
   unidadeId: string;
 }
 
+export type StatusAtendimento = "ABERTO" | "EM_ANALISE" | "CONVERTIDO" | "ARQUIVADO";
+
+export interface Atendimento {
+  id: string;
+  clienteId: string;
+  clienteNome: string;
+  usuarioId: string;
+  usuarioNome: string;
+  unidadeId?: string | null;
+  unidadeNome?: string | null;
+  processoId?: string | null;
+  processoNumero?: string | null;
+  vinculoTipo?: "PROCESSO" | "CASO" | "ATENDIMENTO" | null;
+  vinculoReferenciaId?: string | null;
+  assunto: string;
+  descricao?: string | null;
+  status: StatusAtendimento;
+  etiquetas: string[];
+  dataCriacao: string;
+  dataAtualizacao: string;
+}
+
 // ─── Processos ───────────────────────────────────────────────────────────────
 
 export type StatusProcesso =
@@ -315,7 +337,7 @@ export interface Notificacao {
 // ─── Logs de Auditoria ───────────────────────────────────────────────────────
 
 export type TipoAcao = "acessou" | "criou" | "editou" | "excluiu" | "visualizou" | "fez_upload" | "baixou";
-export type ModuloLog = "processos" | "clientes" | "prazos" | "documentos" | "usuarios" | "sistema" | "financeiro";
+export type ModuloLog = "atendimentos" | "processos" | "clientes" | "prazos" | "documentos" | "usuarios" | "sistema" | "financeiro";
 
 export interface LogAuditoria {
   id: string;

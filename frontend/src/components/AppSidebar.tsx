@@ -3,6 +3,7 @@ import {
   LayoutDashboard,
   Users,
   Scale,
+  ClipboardList,
   CalendarClock,
   FileText,
   Settings2,
@@ -16,6 +17,7 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard",     id: "dashboard" },
   { icon: Inbox,           label: "Inbox Juridica", id: "inbox" },
+  { icon: ClipboardList,   label: "Atendimentos", id: "atendimentos" },
   { icon: Scale,           label: "Processos",     id: "processos" },
   { icon: Users,           label: "Clientes",      id: "clientes" },
   { icon: CalendarClock,   label: "Prazos & Tarefas", id: "prazos" },

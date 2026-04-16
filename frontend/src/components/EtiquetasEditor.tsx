@@ -10,6 +10,7 @@ interface EtiquetasEditorProps {
   onChange: (value: string[]) => void;
   label?: string;
   disabled?: boolean;
+  helperText?: string;
 }
 
 const LIMITE_ETIQUETAS = 10;
@@ -28,6 +29,7 @@ export function EtiquetasEditor({
   onChange,
   label = "Etiquetas",
   disabled = false,
+  helperText = `Ate ${LIMITE_ETIQUETAS} etiquetas por registo. Pressione Enter para adicionar.`,
 }: EtiquetasEditorProps) {
   const [entrada, setEntrada] = useState("");
 
@@ -111,7 +113,7 @@ export function EtiquetasEditor({
       )}
 
       <p className="text-xs text-muted-foreground">
-        Ate {LIMITE_ETIQUETAS} etiquetas por processo. Pressione `Enter` para adicionar.
+        {helperText}
       </p>
     </div>
   );

@@ -7,6 +7,7 @@ import { RecentProcesses } from "@/components/RecentProcesses";
 import { UpcomingDeadlines } from "@/components/UpcomingDeadlines";
 import { UrgencyPanel } from "@/components/UrgencyPanel";
 import { QuickActions } from "@/components/QuickActions";
+import { AtendimentosView } from "@/components/views/AtendimentosView";
 import { ProcessosView } from "@/components/views/ProcessosView";
 import { InboxJuridicaView } from "@/components/views/InboxJuridicaView";
 import { ClientesView } from "@/components/views/ClientesView";
@@ -64,6 +65,8 @@ const renderContent = (activeItem: string, onNavigate: (id: string) => void) => 
   switch (activeItem) {
     case "inbox":
       return <InboxJuridicaView />;
+    case "atendimentos":
+      return <AtendimentosView />;
     case "processos":
       return <ProcessosView />;
     case "clientes":

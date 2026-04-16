@@ -41,7 +41,7 @@ public class DashboardController {
 
     
         long totalClientes = clienteRepository.countByAtivoTrue();
-        long processosAtivos = processoRepository.countByStatusIn(
+        long processosAtivos = processoRepository.countByStatusInExcluindoAtendimentoSintetico(
                 List.of(StatusProcesso.EM_ANDAMENTO, StatusProcesso.URGENTE, StatusProcesso.AGUARDANDO));
         
         long prazosSemana = prazoRepository.countByAdvogadoIdAndConcluidoFalseAndDataBetween(usuarioId, inicioSemana, fimSemana);

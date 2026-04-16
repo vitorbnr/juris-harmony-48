@@ -1,5 +1,5 @@
 import api from "@/lib/api";
-import type { Processo } from "@/types";
+import type { Atendimento, Processo } from "@/types";
 
 type ApiParams = Record<string, unknown>;
 
@@ -180,6 +180,18 @@ export interface CalcularPrazoResponse {
   observacao: string;
 }
 
+export interface AtendimentoPayload {
+  clienteId: string;
+  usuarioId: string;
+  unidadeId?: string | null;
+  processoId?: string | null;
+  tipoVinculo?: "PROCESSO" | "CASO" | "ATENDIMENTO" | null;
+  vinculoReferenciaId?: string | null;
+  assunto: string;
+  descricao?: string | null;
+  etiquetas?: string[];
+}
+
 function cleanParams<T extends ApiParams | undefined>(params: T): T {
   if (!params) return params;
   const out: ApiParams = {};
@@ -205,6 +217,7 @@ export const dashboardApi = {
 export const processosApi = {
   listar: (params?: {
     unidadeId?: string;
+    clienteId?: string;
     status?: string;
     tipo?: string;
     etiqueta?: string;
@@ -239,6 +252,36 @@ export const processosApi = {
 };
 
 // ─── Clientes ────────────────────────────────────────────────────────────────
+export const atendimentosApi = {
+  listar: (params?: {
+    unidadeId?: string;
+    clienteId?: string;
+    status?: string;
+    busca?: string;
+    page?: number;
+    size?: number;
+    sort?: string;
+  }) => api.get("/atendimentos", { params: cleanParams(params) }).then(r => r.data),
+
+  buscar: (id: string) =>
+    api.get(`/atendimentos/${id}`).then(r => r.data as Atendimento),
+
+  criar: (data: AtendimentoPayload) =>
+    api.post("/atendimentos", data).then(r => r.data as Atendimento),
+
+  atualizar: (id: string, data: AtendimentoPayload) =>
+    api.put(`/atendimentos/${id}`, data).then(r => r.data as Atendimento),
+
+  excluir: (id: string) =>
+    api.delete(`/atendimentos/${id}`),
+
+  fechar: (id: string) =>
+    api.patch(`/atendimentos/${id}/fechar`).then(r => r.data as Atendimento),
+
+  reabrir: (id: string) =>
+    api.patch(`/atendimentos/${id}/reabrir`).then(r => r.data as Atendimento),
+};
+
 export const clientesApi = {
   listar: (params?: {
     unidadeId?: string;

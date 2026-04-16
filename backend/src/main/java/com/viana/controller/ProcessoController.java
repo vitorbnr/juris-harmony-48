@@ -33,12 +33,13 @@ public class ProcessoController {
     @GetMapping
     public ResponseEntity<Page<ProcessoResponse>> listar(
             @RequestParam(required = false) UUID unidadeId,
+            @RequestParam(required = false) UUID clienteId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String tipo,
             @RequestParam(required = false) String busca,
             @RequestParam(required = false) String etiqueta,
             @PageableDefault(size = 20, sort = "criado_em", direction = Sort.Direction.DESC) Pageable pageable) {
-        return ResponseEntity.ok(processoService.listar(unidadeId, status, tipo, busca, etiqueta, pageable));
+        return ResponseEntity.ok(processoService.listar(unidadeId, clienteId, status, tipo, busca, etiqueta, pageable));
     }
 
     @GetMapping("/{id}")

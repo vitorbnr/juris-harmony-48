@@ -25,7 +25,11 @@ export const RecentProcesses = ({ onNavigate }: Props) => {
     dashboardApi.get()
       .then((data) => {
         const items = data.processosRecentes ?? [];
-        setProcessos(Array.isArray(items) ? items : []);
+        setProcessos(
+          Array.isArray(items)
+            ? items.filter((processo) => !processo.numero?.toUpperCase().startsWith("ATD-"))
+            : [],
+        );
       })
       .catch(() => setProcessos([]))
       .finally(() => setLoading(false));

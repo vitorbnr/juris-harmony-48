@@ -78,7 +78,7 @@ public class ProcessoService {
     private long datajudStaleHours;
 
     @Transactional(readOnly = true)
-    public Page<ProcessoResponse> listar(UUID unidadeId, String status, String tipo, String busca, String etiqueta, Pageable pageable) {
+    public Page<ProcessoResponse> listar(UUID unidadeId, UUID clienteId, String status, String tipo, String busca, String etiqueta, Pageable pageable) {
         StatusProcesso statusEnum = parseEnum(StatusProcesso.class, status);
         TipoProcesso tipoEnum = parseEnum(TipoProcesso.class, tipo);
         String buscaNorm = (busca != null && !busca.isBlank()) ? busca : "";
@@ -89,6 +89,7 @@ public class ProcessoService {
 
         return processoRepository.findAllWithFilters(
                         unidadeId,
+                        clienteId,
                         statusEnum != null ? statusEnum.name() : null,
                         tipoEnum != null ? tipoEnum.name() : null,
                         etiquetaNorm,
@@ -101,7 +102,7 @@ public class ProcessoService {
 
     @Transactional(readOnly = true)
     public List<ProcessoResponse> listarRecentes(int limite) {
-        return processoRepository.findTop5ByOrderByCriadoEmDesc().stream()
+        return processoRepository.findRecentesDashboard().stream()
                 .limit(limite)
                 .map(this::toResponse)
                 .toList();
