@@ -1,5 +1,6 @@
 package com.viana.controller;
 
+import com.viana.dto.request.AtualizarEtapaKanbanRequest;
 import com.viana.dto.request.AtualizarPrazoRequest;
 import com.viana.dto.request.CalcularPrazoRequest;
 import com.viana.dto.request.CriarPrazoRequest;
@@ -46,9 +47,7 @@ public class PrazoController {
             Authentication authentication) {
 
         Usuario usuario = getUsuario(authentication);
-        UUID idParaListar = usuario.getId();
-
-        return ResponseEntity.ok(prazoService.listar(unidadeId, tipo, concluido, idParaListar, pageable));
+        return ResponseEntity.ok(prazoService.listar(unidadeId, tipo, concluido, usuario.getId(), advogadoId, pageable));
     }
 
     @GetMapping("/calendario")
@@ -60,7 +59,7 @@ public class PrazoController {
             Authentication authentication) {
 
         Usuario usuario = getUsuario(authentication);
-        return ResponseEntity.ok(prazoService.getCalendario(usuario.getId(), unidadeId, inicio, fim));
+        return ResponseEntity.ok(prazoService.getCalendario(usuario.getId(), unidadeId, inicio, fim, advogadoId));
     }
 
     @PostMapping("/calcular-data")
@@ -98,6 +97,17 @@ public class PrazoController {
     ) {
         Usuario usuario = getUsuario(authentication);
         return ResponseEntity.ok(prazoService.atualizarEtapa(id, body.get("etapa"), usuario.getId()));
+    }
+
+    @PatchMapping("/{id}/etapa-kanban")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO', 'SECRETARIA')")
+    public ResponseEntity<PrazoResponse> atualizarEtapaKanban(
+            @PathVariable UUID id,
+            @Valid @RequestBody AtualizarEtapaKanbanRequest request,
+            Authentication authentication
+    ) {
+        Usuario usuario = getUsuario(authentication);
+        return ResponseEntity.ok(prazoService.atualizarEtapaKanban(id, request.getEtapa(), usuario.getId()));
     }
 
     @DeleteMapping("/{id}")

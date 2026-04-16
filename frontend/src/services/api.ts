@@ -1,5 +1,5 @@
 import api from "@/lib/api";
-import type { Atendimento, Processo } from "@/types";
+import type { Atendimento, NotaPessoal, Prazo, Processo } from "@/types";
 
 type ApiParams = Record<string, unknown>;
 
@@ -192,6 +192,32 @@ export interface AtendimentoPayload {
   etiquetas?: string[];
 }
 
+export interface PrazoPayload {
+  titulo: string;
+  data: string;
+  hora?: string | null;
+  dataFim?: string | null;
+  horaFim?: string | null;
+  diaInteiro?: boolean;
+  tipo: string;
+  prioridade: string;
+  etapa?: string | null;
+  processoId?: string | null;
+  advogadoId?: string | null;
+  participantesIds?: string[];
+  etiqueta?: string | null;
+  descricao?: string | null;
+  local?: string | null;
+  modalidade?: string | null;
+  sala?: string | null;
+  alertaValor?: number | null;
+  alertaUnidade?: string | null;
+  vinculoTipo?: string | null;
+  vinculoReferenciaId?: string | null;
+  quadroKanban?: string | null;
+  unidadeId?: string | null;
+}
+
 function cleanParams<T extends ApiParams | undefined>(params: T): T {
   if (!params) return params;
   const out: ApiParams = {};
@@ -328,19 +354,30 @@ export const prazosApi = {
     suspensoes?: { dataInicio: string; dataFim: string }[];
   }) => api.post("/prazos/calcular-data", data).then(r => r.data as CalcularPrazoResponse),
 
-  criar: (data: Record<string, unknown>) =>
-    api.post("/prazos", data).then(r => r.data),
+  criar: (data: PrazoPayload) =>
+    api.post("/prazos", data).then(r => r.data as Prazo),
 
-  atualizar: (id: string, data: Record<string, unknown>) =>
-    api.put(`/prazos/${id}`, data).then(r => r.data),
+  atualizar: (id: string, data: PrazoPayload) =>
+    api.put(`/prazos/${id}`, data).then(r => r.data as Prazo),
 
   atualizarEtapa: (id: string, etapa: string) =>
     api.patch(`/prazos/${id}/etapa`, { etapa }).then(r => r.data),
+
+  atualizarEtapaKanban: (id: string, etapa: string) =>
+    api.patch(`/prazos/${id}/etapa-kanban`, { etapa }).then(r => r.data),
 
   concluir: (id: string) =>
     api.patch(`/prazos/${id}/concluir`).then(r => r.data),
 
   excluir: (id: string) => api.delete(`/prazos/${id}`),
+};
+
+export const notasPessoaisApi = {
+  buscarMinhaNota: () =>
+    api.get("/notas-pessoais/minha-nota").then(r => r.data as NotaPessoal),
+
+  salvarMinhaNota: (conteudo: string) =>
+    api.put("/notas-pessoais/minha-nota", { conteudo }).then(r => r.data as NotaPessoal),
 };
 
 // ─── Documentos ──────────────────────────────────────────────────────────────

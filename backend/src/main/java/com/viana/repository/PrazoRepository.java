@@ -17,29 +17,36 @@ import java.util.UUID;
 public interface PrazoRepository extends JpaRepository<Prazo, UUID> {
 
     @Query("""
-        SELECT p FROM Prazo p
-        WHERE p.advogado.id = :advogadoId
+        SELECT DISTINCT p FROM Prazo p
+        LEFT JOIN p.participantes participante
+        WHERE (p.advogado.id = :usuarioEscopoId OR participante.id = :usuarioEscopoId)
         AND p.data BETWEEN :inicio AND :fim
         AND (:unidadeId IS NULL OR p.unidade.id = :unidadeId)
+        AND (:responsavelId IS NULL OR p.advogado.id = :responsavelId)
         ORDER BY p.data ASC, p.hora ASC
     """)
     List<Prazo> findCalendario(
             @Param("inicio") LocalDate inicio,
             @Param("fim") LocalDate fim,
-            @Param("advogadoId") UUID advogadoId,
-            @Param("unidadeId") UUID unidadeId);
+            @Param("usuarioEscopoId") UUID usuarioEscopoId,
+            @Param("unidadeId") UUID unidadeId,
+            @Param("responsavelId") UUID responsavelId);
 
     @Query(value = """
-        SELECT p FROM Prazo p
-        WHERE p.advogado.id = :advogadoId
+        SELECT DISTINCT p FROM Prazo p
+        LEFT JOIN p.participantes participante
+        WHERE (p.advogado.id = :usuarioEscopoId OR participante.id = :usuarioEscopoId)
         AND (:unidadeId IS NULL OR p.unidade.id = :unidadeId)
+        AND (:responsavelId IS NULL OR p.advogado.id = :responsavelId)
         AND (:tipo IS NULL OR p.tipo = :tipo)
         AND (:concluido IS NULL OR p.concluido = :concluido)
         ORDER BY p.data ASC
     """, countQuery = """
-        SELECT count(p) FROM Prazo p
-        WHERE p.advogado.id = :advogadoId
+        SELECT count(DISTINCT p) FROM Prazo p
+        LEFT JOIN p.participantes participante
+        WHERE (p.advogado.id = :usuarioEscopoId OR participante.id = :usuarioEscopoId)
         AND (:unidadeId IS NULL OR p.unidade.id = :unidadeId)
+        AND (:responsavelId IS NULL OR p.advogado.id = :responsavelId)
         AND (:tipo IS NULL OR p.tipo = :tipo)
         AND (:concluido IS NULL OR p.concluido = :concluido)
     """)
@@ -47,7 +54,8 @@ public interface PrazoRepository extends JpaRepository<Prazo, UUID> {
             @Param("unidadeId") UUID unidadeId,
             @Param("tipo") com.viana.model.enums.TipoPrazo tipo,
             @Param("concluido") Boolean concluido,
-            @Param("advogadoId") UUID advogadoId,
+            @Param("usuarioEscopoId") UUID usuarioEscopoId,
+            @Param("responsavelId") UUID responsavelId,
             Pageable pageable);
 
     List<Prazo> findTop5ByAdvogadoIdAndConcluidoFalseAndDataGreaterThanEqualOrderByDataAsc(UUID advogadoId, LocalDate data);
@@ -64,5 +72,12 @@ public interface PrazoRepository extends JpaRepository<Prazo, UUID> {
 
     boolean existsByEventoJuridicoIdAndTipo(UUID eventoJuridicoId, com.viana.model.enums.TipoPrazo tipo);
 
-    List<Prazo> findByConcluidoFalseAndAdvogadoIsNotNullAndDataLessThanEqual(LocalDate data);
+    @Query("""
+        SELECT DISTINCT p FROM Prazo p
+        LEFT JOIN FETCH p.participantes
+        WHERE p.concluido = false
+          AND p.advogado IS NOT NULL
+          AND p.data <= :data
+    """)
+    List<Prazo> findAlertaveis(@Param("data") LocalDate data);
 }

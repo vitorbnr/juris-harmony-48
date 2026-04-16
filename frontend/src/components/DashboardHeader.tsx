@@ -34,6 +34,14 @@ const getSectionTitles = (userName: string): Record<string, { title: string; sub
     title: "Prazos e Tarefas",
     subtitle: "Acompanhe prazos processuais, audiencias e tarefas.",
   },
+  "gestao-kanban": {
+    title: "Gestao Kanban",
+    subtitle: "Mova prazos entre etapas com drag-and-drop e acompanhe o fluxo em tempo real.",
+  },
+  "agenda-notas": {
+    title: "Agenda & Notas",
+    subtitle: "Calendario operacional e bloco de notas pessoal com gravacao automatica.",
+  },
   documentos: {
     title: "Documentos",
     subtitle: "Repositorio central de arquivos e documentos.",

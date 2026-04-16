@@ -193,6 +193,14 @@ export interface EventoJuridico {
 export type TipoPrazo = "prazo_processual" | "audiencia" | "tarefa_interna" | "reuniao";
 export type PrioridadePrazo = "alta" | "media" | "baixa";
 export type EtapaPrazo = "a_fazer" | "em_andamento" | "concluido";
+export type ModalidadeAtividade = "presencial" | "online" | "hibrido";
+export type TipoUnidadeAlertaPrazo = "horas" | "dias";
+export type TipoVinculoPrazo = "processo" | "caso" | "atendimento";
+
+export interface ParticipantePrazo {
+  id: string;
+  nome: string;
+}
 
 export interface Prazo {
   id: string;
@@ -203,13 +211,33 @@ export interface Prazo {
   clienteNome?: string;
   data: string;
   hora?: string;
+  dataFim?: string | null;
+  horaFim?: string | null;
+  diaInteiro?: boolean;
   tipo: TipoPrazo;
   prioridade: PrioridadePrazo;
   etapa?: EtapaPrazo;
   concluido: boolean;
   advogadoId?: string;
+  advogadoNome?: string;
+  participantes?: ParticipantePrazo[];
+  etiqueta?: string | null;
   descricao?: string;
+  local?: string | null;
+  modalidade?: ModalidadeAtividade | null;
+  sala?: string | null;
+  alertaValor?: number | null;
+  alertaUnidade?: TipoUnidadeAlertaPrazo | null;
+  vinculoTipo?: TipoVinculoPrazo | null;
+  vinculoReferenciaId?: string | null;
+  quadroKanban?: string | null;
   unidadeId?: string;
+}
+
+export interface NotaPessoal {
+  id?: string | null;
+  conteudo: string;
+  dataAtualizacao?: string | null;
 }
 
 // ─── Documentos ──────────────────────────────────────────────────────────────

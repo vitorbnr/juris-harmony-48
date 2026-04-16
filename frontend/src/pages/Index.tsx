@@ -8,10 +8,12 @@ import { UpcomingDeadlines } from "@/components/UpcomingDeadlines";
 import { UrgencyPanel } from "@/components/UrgencyPanel";
 import { QuickActions } from "@/components/QuickActions";
 import { AtendimentosView } from "@/components/views/AtendimentosView";
+import { GestaoKanbanView } from "@/components/views/GestaoKanbanView";
 import { ProcessosView } from "@/components/views/ProcessosView";
 import { InboxJuridicaView } from "@/components/views/InboxJuridicaView";
 import { ClientesView } from "@/components/views/ClientesView";
 import { PrazosView } from "@/components/views/PrazosView";
+import { AgendaNotasView } from "@/components/views/AgendaNotasView";
 import { DocumentosView } from "@/components/views/DocumentosView";
 import { ConfiguracoesView } from "@/components/views/ConfiguracoesView";
 import { UnidadeProvider } from "@/context/UnidadeContext";
@@ -73,6 +75,10 @@ const renderContent = (activeItem: string, onNavigate: (id: string) => void) => 
       return <ClientesView />;
     case "prazos":
       return <PrazosView />;
+    case "gestao-kanban":
+      return <GestaoKanbanView />;
+    case "agenda-notas":
+      return <AgendaNotasView />;
     case "documentos":
       return <DocumentosView />;
     case "configuracoes":

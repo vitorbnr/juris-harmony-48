@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -25,6 +26,12 @@ public class CriarPrazoRequest {
 
     private LocalTime hora;
 
+    private LocalDate dataFim;
+
+    private LocalTime horaFim;
+
+    private Boolean diaInteiro;
+
     @NotBlank(message = "Tipo e obrigatorio")
     private String tipo;
 
@@ -33,6 +40,16 @@ public class CriarPrazoRequest {
 
     private String etapa;
     private UUID advogadoId;
+    private List<UUID> participantesIds;
+    private String etiqueta;
     private String descricao;
+    private String local;
+    private String modalidade;
+    private String sala;
+    private Integer alertaValor;
+    private String alertaUnidade;
+    private String vinculoTipo;
+    private UUID vinculoReferenciaId;
+    private String quadroKanban;
     private UUID unidadeId;
 }

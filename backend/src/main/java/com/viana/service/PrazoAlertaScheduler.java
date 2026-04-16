@@ -3,6 +3,7 @@ package com.viana.service;
 import com.viana.model.Prazo;
 import com.viana.model.enums.TipoNotificacao;
 import com.viana.model.enums.TipoPrazo;
+import com.viana.model.enums.TipoUnidadeAlertaPrazo;
 import com.viana.repository.PrazoRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,6 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
@@ -29,14 +32,15 @@ public class PrazoAlertaScheduler {
     @Scheduled(cron = "${app.alertas.prazos.cron:0 0 8,13 * * *}")
     @Transactional
     public void gerarAlertas() {
-        LocalDate hoje = LocalDate.now();
+        LocalDateTime agora = LocalDateTime.now();
+        LocalDate hoje = agora.toLocalDate();
         LocalDate limite = hoje.plusDays(Math.max(lookaheadDays, 0));
 
-        List<Prazo> prazos = prazoRepository.findByConcluidoFalseAndAdvogadoIsNotNullAndDataLessThanEqual(limite);
+        List<Prazo> prazos = prazoRepository.findAlertaveis(limite);
         int alertasCriados = 0;
 
         for (Prazo prazo : prazos) {
-            AlertaPrazo alerta = resolverAlerta(prazo, hoje);
+            AlertaPrazo alerta = resolverAlerta(prazo, agora);
             if (alerta == null) {
                 continue;
             }
@@ -46,12 +50,26 @@ public class PrazoAlertaScheduler {
                     alerta.titulo(),
                     alerta.descricao(),
                     TipoNotificacao.PRAZO,
-                    "prazos",
-                    alerta.chaveExterna(),
+                    "agenda-notas",
+                    alerta.chaveExterna() + ":" + prazo.getAdvogado().getId(),
                     "PRAZO",
                     prazo.getId()
             );
             alertasCriados++;
+
+            for (var participante : prazo.getParticipantes()) {
+                notificacaoService.criarNotificacao(
+                        participante.getId(),
+                        alerta.titulo(),
+                        alerta.descricao(),
+                        TipoNotificacao.PRAZO,
+                        "agenda-notas",
+                        alerta.chaveExterna() + ":" + participante.getId(),
+                        "PRAZO",
+                        prazo.getId()
+                );
+                alertasCriados++;
+            }
         }
 
         if (alertasCriados > 0) {
@@ -59,9 +77,20 @@ public class PrazoAlertaScheduler {
         }
     }
 
-    private AlertaPrazo resolverAlerta(Prazo prazo, LocalDate hoje) {
+    private AlertaPrazo resolverAlerta(Prazo prazo, LocalDateTime agora) {
+        LocalDate hoje = agora.toLocalDate();
         long diferencaDias = ChronoUnit.DAYS.between(hoje, prazo.getData());
-        String itemLabel = prazo.getTipo() == TipoPrazo.TAREFA_INTERNA ? "Tarefa" : "Prazo";
+        String itemLabel = switch (prazo.getTipo()) {
+            case TAREFA_INTERNA -> "Tarefa";
+            case AUDIENCIA -> "Audiencia";
+            case REUNIAO -> "Evento";
+            default -> "Prazo";
+        };
+
+        AlertaPrazo alertaCustomizado = resolverAlertaCustomizado(prazo, agora, itemLabel);
+        if (alertaCustomizado != null) {
+            return alertaCustomizado;
+        }
 
         if (diferencaDias < 0) {
             return new AlertaPrazo(
@@ -93,6 +122,39 @@ public class PrazoAlertaScheduler {
                     itemLabel + " se aproxima",
                     itemLabel + " \"" + prazo.getTitulo() + "\" vence em 3 dias.",
                     "prazo-alerta:3dias:" + prazo.getId() + ":" + prazo.getData()
+            );
+        }
+
+        return null;
+    }
+
+    private AlertaPrazo resolverAlertaCustomizado(Prazo prazo, LocalDateTime agora, String itemLabel) {
+        if (prazo.getAlertaValor() == null || prazo.getAlertaUnidade() == null) {
+            return null;
+        }
+
+        if (prazo.getAlertaUnidade() == TipoUnidadeAlertaPrazo.DIAS) {
+            long diferencaDias = ChronoUnit.DAYS.between(agora.toLocalDate(), prazo.getData());
+            if (diferencaDias == prazo.getAlertaValor()) {
+                return new AlertaPrazo(
+                        itemLabel + " se aproxima",
+                        itemLabel + " \"" + prazo.getTitulo() + "\" acontece em " + prazo.getAlertaValor() + " dia(s).",
+                        "prazo-alerta:custom-dias:" + prazo.getId() + ":" + prazo.getData() + ":" + prazo.getAlertaValor()
+                );
+            }
+            return null;
+        }
+
+        LocalDateTime inicioAtividade = LocalDateTime.of(
+                prazo.getData(),
+                prazo.getHora() != null ? prazo.getHora() : LocalTime.of(9, 0)
+        );
+        long diferencaHoras = ChronoUnit.HOURS.between(agora.truncatedTo(ChronoUnit.HOURS), inicioAtividade.truncatedTo(ChronoUnit.HOURS));
+        if (diferencaHoras == prazo.getAlertaValor()) {
+            return new AlertaPrazo(
+                    itemLabel + " se aproxima",
+                    itemLabel + " \"" + prazo.getTitulo() + "\" acontece em " + prazo.getAlertaValor() + " hora(s).",
+                    "prazo-alerta:custom-horas:" + prazo.getId() + ":" + inicioAtividade + ":" + prazo.getAlertaValor()
             );
         }
 

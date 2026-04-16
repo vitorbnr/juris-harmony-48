@@ -16,16 +16,13 @@ import {
 } from "lucide-react";
 
 import { CalendarioPrazos } from "@/components/prazos/CalendarioPrazos";
-import { PrazoDateCalculator } from "@/components/prazos/PrazoDateCalculator";
 import { EditarPrazoModal } from "@/components/modals/EditarPrazoModal";
+import { AtividadeModal } from "@/components/produtividade/AtividadeModal";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
-import { prazosApi, processosApi } from "@/services/api";
+import { prazosApi } from "@/services/api";
 import { toast } from "sonner";
-import type { EtapaPrazo, Prazo, PrioridadePrazo, TipoPrazo } from "@/types";
+import type { EtapaPrazo, Prazo } from "@/types";
 
 function AdicionarPrazoModal({
   dataInicial,
@@ -36,179 +33,16 @@ function AdicionarPrazoModal({
   onClose: () => void;
   onSaved?: () => void;
 }) {
-  const { user } = useAuth();
-  const [titulo, setTitulo] = useState("");
-  const [data, setData] = useState(dataInicial ?? "");
-  const [hora, setHora] = useState("");
-  const [tipo, setTipo] = useState<TipoPrazo>("prazo_processual");
-  const [prioridade, setPrioridade] = useState<PrioridadePrazo>("media");
-  const [processoId, setProcessoId] = useState("");
-  const [descricao, setDescricao] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [processosLista, setProcessosLista] = useState<{ id: string; numero: string; clienteNome: string }[]>([]);
-
-  useEffect(() => {
-    processosApi
-      .listar({ size: 1000 })
-      .then((res) => {
-        const items = res.content ?? res;
-        setProcessosLista(Array.isArray(items) ? items : []);
-      })
-      .catch(() => {});
-  }, []);
-
-  const handleSalvar = async () => {
-    if (!titulo.trim() || !data) {
-      toast.error("Titulo e data sao obrigatorios.");
-      return;
-    }
-
-    setSaving(true);
-    try {
-      await prazosApi.criar({
-        titulo: titulo.trim(),
-        data,
-        hora: hora || null,
-        tipo,
-        prioridade,
-        processoId: processoId || null,
-        descricao: descricao || null,
-        advogadoId: user?.id,
-        unidadeId: user?.unidadeId,
-        etapa: tipo === "tarefa_interna" ? "A_FAZER" : null,
-      });
-      toast.success("Prazo cadastrado com sucesso.");
-      onSaved?.();
-      onClose();
-    } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { mensagem?: string } } };
-      toast.error(axiosErr.response?.data?.mensagem || "Erro ao cadastrar prazo.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const tipoLabels: Record<TipoPrazo, string> = {
-    prazo_processual: "Prazo processual",
-    audiencia: "Audiencia",
-    tarefa_interna: "Tarefa interna",
-    reuniao: "Reuniao",
-  };
-
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="flex min-h-full items-start justify-center py-4 md:items-center">
-        <div className="relative flex w-full max-w-md max-h-[calc(100vh-2rem)] flex-col rounded-2xl border border-border bg-card shadow-2xl">
-          <div className="flex items-center justify-between border-b border-border px-6 py-5">
-            <h2 className="text-lg font-semibold text-foreground">Novo prazo / tarefa</h2>
-            <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-
-          <div className="space-y-4 overflow-y-auto p-6">
-            <div className="space-y-1.5">
-              <Label>Titulo *</Label>
-              <Input value={titulo} onChange={(e) => setTitulo(e.target.value)} />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Data *</Label>
-                <Input type="date" value={data} onChange={(e) => setData(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Hora</Label>
-                <Input type="time" value={hora} onChange={(e) => setHora(e.target.value)} />
-              </div>
-            </div>
-
-            <PrazoDateCalculator dataInicial={data} onAplicarData={setData} />
-
-            <div className="space-y-1.5">
-              <Label>Tipo</Label>
-              <div className="grid grid-cols-2 gap-2">
-                {(Object.keys(tipoLabels) as TipoPrazo[]).map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    onClick={() => setTipo(item)}
-                    className={cn(
-                      "rounded-lg border px-3 py-2 text-left text-sm transition-all",
-                      tipo === item
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border text-muted-foreground hover:border-primary/40",
-                    )}
-                  >
-                    {tipoLabels[item]}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>Prioridade</Label>
-              <div className="flex gap-2">
-                {(["alta", "media", "baixa"] as const).map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    onClick={() => setPrioridade(item)}
-                    className={cn(
-                      "flex-1 rounded-lg border px-3 py-2 text-sm transition-all",
-                      prioridade === item
-                        ? item === "alta"
-                          ? "border-red-500/50 bg-red-500/10 text-red-400"
-                          : item === "media"
-                          ? "border-yellow-500/50 bg-yellow-500/10 text-yellow-400"
-                          : "border-primary/50 bg-primary/10 text-primary"
-                        : "border-border text-muted-foreground hover:border-primary/40",
-                    )}
-                  >
-                    {item === "alta" ? "Alta" : item === "media" ? "Media" : "Baixa"}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>Processo vinculado</Label>
-              <select
-                value={processoId}
-                onChange={(e) => setProcessoId(e.target.value)}
-                className="h-10 w-full rounded-md bg-secondary px-3 text-sm text-foreground outline-none"
-              >
-                <option value="">Nenhum processo</option>
-                {processosLista.map((processo) => (
-                  <option key={processo.id} value={processo.id}>
-                    {processo.numero} - {processo.clienteNome}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>Descricao</Label>
-              <textarea
-                className="min-h-[120px] w-full rounded-md bg-secondary px-3 py-2 text-sm text-foreground outline-none"
-                value={descricao}
-                onChange={(e) => setDescricao(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="flex shrink-0 gap-2 border-t border-border px-6 py-4">
-            <Button className="flex-1" onClick={handleSalvar} disabled={saving}>
-              {saving ? "Salvando..." : "Salvar"}
-            </Button>
-            <Button variant="outline" onClick={onClose}>
-              Cancelar
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <AtividadeModal
+      open
+      initialTipo="tarefa_interna"
+      dataInicial={dataInicial}
+      onClose={onClose}
+      onSaved={() => {
+        onSaved?.();
+      }}
+    />
   );
 }
 
@@ -384,7 +218,7 @@ function TarefaKanbanCard({ prazo, onAtualizar }: { prazo: Prazo; onAtualizar: (
   const mover = async (etapa: EtapaPrazo) => {
     setLoading(true);
     try {
-      await prazosApi.atualizarEtapa(prazo.id, etapa.toUpperCase());
+      await prazosApi.atualizarEtapaKanban(prazo.id, etapa.toUpperCase());
       onAtualizar();
     } catch {
       toast.error("Nao foi possivel mover a tarefa.");

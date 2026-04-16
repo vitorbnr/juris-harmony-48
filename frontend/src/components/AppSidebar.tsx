@@ -9,6 +9,8 @@ import {
   Settings2,
   ChevronLeft,
   ChevronRight,
+  NotebookPen,
+  SquareKanban,
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { useState } from "react";
@@ -21,6 +23,8 @@ const navItems = [
   { icon: Scale,           label: "Processos",     id: "processos" },
   { icon: Users,           label: "Clientes",      id: "clientes" },
   { icon: CalendarClock,   label: "Prazos & Tarefas", id: "prazos" },
+  { icon: SquareKanban,    label: "Gestao Kanban", id: "gestao-kanban" },
+  { icon: NotebookPen,     label: "Agenda & Notas", id: "agenda-notas" },
   { icon: FileText,        label: "Documentos",    id: "documentos" },
 ];
 
