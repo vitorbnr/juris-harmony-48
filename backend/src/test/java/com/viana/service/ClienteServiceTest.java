@@ -21,13 +21,17 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ClienteServiceTest {
@@ -68,7 +72,7 @@ class ClienteServiceTest {
         requestValida.setCpfCnpj("12.345.678/0001-90");
         requestValida.setEmail("contato@abc.com");
         requestValida.setTelefone("11999999999");
-        requestValida.setCidade("São Paulo");
+        requestValida.setCidade("Sao Paulo");
         requestValida.setEstado("SP");
         requestValida.setUnidadeId(unidadeDefault.getId());
         requestValida.setAdvogadoId(advogadoDefault.getId());
@@ -80,7 +84,7 @@ class ClienteServiceTest {
                 .cpfCnpj("12.345.678/0001-90")
                 .email("contato@abc.com")
                 .telefone("11999999999")
-                .cidade("São Paulo")
+                .cidade("Sao Paulo")
                 .estado("SP")
                 .advogadoResponsavel(advogadoDefault)
                 .unidade(unidadeDefault)
@@ -91,12 +95,12 @@ class ClienteServiceTest {
 
     @Test
     @DisplayName("Deve criar um cliente com sucesso")
-    void criarCliente_ComSucesso() {
+    void criarClienteComSucesso() {
         when(clienteRepository.existsByCpfCnpj(requestValida.getCpfCnpj())).thenReturn(false);
         when(unidadeRepository.findById(requestValida.getUnidadeId())).thenReturn(Optional.of(unidadeDefault));
         when(usuarioRepository.findById(requestValida.getAdvogadoId())).thenReturn(Optional.of(advogadoDefault));
         when(clienteRepository.save(any(Cliente.class))).thenReturn(clienteSalvo);
-        // when(processoRepository.countByClienteId(clienteId)).thenReturn(0L); // Removido do service temporariamente
+        when(processoRepository.countByClienteId(clienteId)).thenReturn(0L);
 
         ClienteResponse response = clienteService.criar(requestValida, advogadoDefault.getId());
 
@@ -107,44 +111,59 @@ class ClienteServiceTest {
     }
 
     @Test
-    @DisplayName("Deve lançar exceção se o CPF/CNPJ já existir")
-    void criarCliente_CpfCnpjDuplicado() {
+    @DisplayName("Deve permitir criar cliente sem CPF/CNPJ")
+    void criarClienteSemDocumento() {
+        requestValida.setCpfCnpj(null);
+
+        when(unidadeRepository.findById(requestValida.getUnidadeId())).thenReturn(Optional.of(unidadeDefault));
+        when(usuarioRepository.findById(requestValida.getAdvogadoId())).thenReturn(Optional.of(advogadoDefault));
+        when(clienteRepository.save(any(Cliente.class))).thenReturn(clienteSalvo);
+        when(processoRepository.countByClienteId(clienteId)).thenReturn(0L);
+
+        ClienteResponse response = clienteService.criar(requestValida, advogadoDefault.getId());
+
+        assertNotNull(response);
+        verify(clienteRepository, never()).existsByCpfCnpj(any());
+    }
+
+    @Test
+    @DisplayName("Deve lancar excecao se o CPF/CNPJ ja existir")
+    void criarClienteCpfCnpjDuplicado() {
         when(clienteRepository.existsByCpfCnpj(requestValida.getCpfCnpj())).thenReturn(true);
+        when(unidadeRepository.findById(requestValida.getUnidadeId())).thenReturn(Optional.of(unidadeDefault));
+        when(usuarioRepository.findById(requestValida.getAdvogadoId())).thenReturn(Optional.of(advogadoDefault));
 
         BusinessException exception = assertThrows(BusinessException.class, () -> clienteService.criar(requestValida, null));
-        assertTrue(exception.getMessage().contains("Já existe um cliente com este CPF/CNPJ"));
+        assertTrue(exception.getMessage().contains("Ja existe um cliente com este CPF/CNPJ"));
         verify(clienteRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("Deve lançar exceção para tipo de cliente inválido")
-    void criarCliente_TipoInvalido() {
-        when(clienteRepository.existsByCpfCnpj(requestValida.getCpfCnpj())).thenReturn(false);
-        when(unidadeRepository.findById(requestValida.getUnidadeId())).thenReturn(Optional.of(unidadeDefault));
-        
+    @DisplayName("Deve lancar excecao para tipo de cliente invalido")
+    void criarClienteTipoInvalido() {
         requestValida.setTipo("PESSOA_MARCIANA");
 
         BusinessException exception = assertThrows(BusinessException.class, () -> clienteService.criar(requestValida, null));
-        assertTrue(exception.getMessage().contains("Tipo inválido. Use: PESSOA_FISICA ou PESSOA_JURIDICA"));
+        assertTrue(exception.getMessage().contains("Tipo invalido"));
     }
 
     @Test
-    @DisplayName("Deve buscar cliente por ID e montar Response completo")
-    void buscarPorId_ComSucesso() {
+    @DisplayName("Deve buscar cliente por ID")
+    void buscarPorIdComSucesso() {
         when(clienteRepository.findById(clienteId)).thenReturn(Optional.of(clienteSalvo));
-        // when(processoRepository.countByClienteId(clienteId)).thenReturn(3L); // Removido do service temporariamente
+        when(processoRepository.countByClienteId(clienteId)).thenReturn(3L);
 
         ClienteResponse response = clienteService.buscarPorId(clienteId);
 
         assertNotNull(response);
         assertEquals("Empresa ABC", response.getNome());
-        assertEquals(0L, response.getProcessos()); // Temporariamente 0L
+        assertEquals(3L, response.getProcessos());
         assertEquals("Dr. Pedro", response.getAdvogadoResponsavel());
     }
 
     @Test
-    @DisplayName("Deve lançar ResourceNotFoundException ao buscar ID que não existe")
-    void buscarPorId_NaoEncontrado() {
+    @DisplayName("Deve lancar ResourceNotFoundException ao buscar ID inexistente")
+    void buscarPorIdNaoEncontrado() {
         when(clienteRepository.findById(clienteId)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> clienteService.buscarPorId(clienteId));

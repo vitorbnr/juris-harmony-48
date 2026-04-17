@@ -762,7 +762,7 @@ export const AgendaNotasView = () => {
   );
 
   return (
-    <div className="space-y-6 p-6 md:p-8">
+    <div className="flex min-h-full flex-col gap-6 p-6 md:p-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-lg font-semibold text-foreground">Agenda & Notas</h3>
@@ -804,7 +804,7 @@ export const AgendaNotasView = () => {
           <div className="overflow-hidden rounded-2xl border border-border bg-card">{notesContent}</div>
         </div>
       ) : (
-        <div className="h-[760px] overflow-hidden rounded-2xl border border-border bg-card">
+        <div className="min-h-[760px] flex-1 overflow-hidden rounded-2xl border border-border bg-card shadow-[0_30px_80px_-45px_rgba(0,0,0,0.65)]">
           <ResizablePanelGroup direction="horizontal">
             <ResizablePanel defaultSize={68} minSize={50}>
               {agendaContent}

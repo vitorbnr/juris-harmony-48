@@ -211,11 +211,11 @@ export const lancamentos: LancamentoFinanceiro[] = [
 // ─── Notificações ─────────────────────────────────────────────────────────────
 
 export const notificacoes: Notificacao[] = [
-  { id: "n1", titulo: "Prazo urgente amanhã", descricao: "Contestação de Maria Oliveira vence em 22/03", tipo: "prazo", lida: false, data: "2024-03-21", hora: "08:00", link: "prazos" },
-  { id: "n2", titulo: "Honorário em atraso", descricao: "Pedro Lima — honorário venceu em 15/03 (R$ 3.500)", tipo: "financeiro", lida: false, data: "2024-03-21", hora: "07:30", link: "financeiro" },
+  { id: "n1", titulo: "Prazo urgente amanhã", descricao: "Contestação de Maria Oliveira vence em 22/03", tipo: "prazo", lida: false, data: "2024-03-21", hora: "08:00", link: "gestao-kanban" },
+  { id: "n2", titulo: "Honorário em atraso", descricao: "Pedro Lima — honorário venceu em 15/03 (R$ 3.500)", tipo: "financeiro", lida: false, data: "2024-03-21", hora: "07:30", link: "dashboard" },
   { id: "n3", titulo: "Novo documento disponível", descricao: "Tutela antecipada juntada no processo da Construtora Alfa", tipo: "documento", lida: false, data: "2024-03-20", hora: "16:45", link: "documentos" },
-  { id: "n4", titulo: "Audiência amanhã — João Santos", descricao: "Audiência de conciliação às 14h no TJ-BA", tipo: "prazo", lida: true, data: "2024-03-20", hora: "09:00", link: "prazos" },
-  { id: "n5", titulo: "Prazo crítico em 3 dias", descricao: "Contestação da Construtora Alfa vence em 24/03", tipo: "prazo", lida: true, data: "2024-03-19", hora: "10:00", link: "prazos" },
+  { id: "n4", titulo: "Audiência amanhã — João Santos", descricao: "Audiência de conciliação às 14h no TJ-BA", tipo: "prazo", lida: true, data: "2024-03-20", hora: "09:00", link: "gestao-kanban" },
+  { id: "n5", titulo: "Prazo crítico em 3 dias", descricao: "Contestação da Construtora Alfa vence em 24/03", tipo: "prazo", lida: true, data: "2024-03-19", hora: "10:00", link: "gestao-kanban" },
 ];
 
 // ─── Logs de Auditoria ───────────────────────────────────────────────────────

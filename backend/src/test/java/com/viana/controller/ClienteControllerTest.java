@@ -23,8 +23,10 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -41,16 +43,16 @@ class ClienteControllerTest {
     private ClienteService clienteService;
 
     @Test
-    @DisplayName("Acesso Negado 401 para buscar clientes sem Token JWT")
-    void buscar_NaoAutenticado() throws Exception {
+    @DisplayName("Acesso negado para buscar clientes sem autenticacao")
+    void buscarNaoAutenticado() throws Exception {
         mockMvc.perform(get("/api/clientes"))
                 .andExpect(status().isForbidden());
     }
 
     @Test
     @WithMockUser
-    @DisplayName("Deve buscar e paginar clientes retornando 200 OK")
-    void listar_Autenticado() throws Exception {
+    @DisplayName("Deve listar clientes com autenticacao")
+    void listarAutenticado() throws Exception {
         ClienteResponse resp = ClienteResponse.builder()
                 .id(UUID.randomUUID().toString())
                 .nome("Empresa Ficticia")
@@ -71,18 +73,20 @@ class ClienteControllerTest {
 
     @Test
     @WithMockUser
-    @DisplayName("Deve criar cliente com 201 Created")
-    void criar_Sucesso() throws Exception {
+    @DisplayName("Deve criar cliente com 201")
+    void criarSucesso() throws Exception {
         CriarClienteRequest req = new CriarClienteRequest();
-        req.setNome("João Doe");
+        req.setNome("Joao Doe");
         req.setTipo("PESSOA_FISICA");
         req.setCpfCnpj("123.456.789-00");
+        req.setCidade("Sao Paulo");
+        req.setEstado("SP");
         req.setUnidadeId(UUID.randomUUID());
         req.setAdvogadoId(UUID.randomUUID());
 
         ClienteResponse resp = ClienteResponse.builder()
                 .id(UUID.randomUUID().toString())
-                .nome("João Doe")
+                .nome("Joao Doe")
                 .tipo("PESSOA_FISICA")
                 .build();
 
@@ -92,14 +96,14 @@ class ClienteControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.nome").value("João Doe"));
+                .andExpect(jsonPath("$.nome").value("Joao Doe"));
     }
 
     @Test
     @WithMockUser
-    @DisplayName("Deve retornar 400 Bad Request se payload de criacao de cliente for nulo ou faltar campos obrigatorios")
-    void criar_BadRequest() throws Exception {
-        CriarClienteRequest req = new CriarClienteRequest(); // Campos vazios -> falha no @Valid
+    @DisplayName("Deve retornar 400 quando faltarem campos obrigatorios")
+    void criarBadRequest() throws Exception {
+        CriarClienteRequest req = new CriarClienteRequest();
 
         mockMvc.perform(post("/api/clientes")
                         .contentType(MediaType.APPLICATION_JSON)

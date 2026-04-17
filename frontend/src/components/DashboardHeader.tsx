@@ -5,52 +5,10 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 import { useUnidade } from "@/context/UnidadeContext";
+import { getSectionMeta } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 import { notificacoesApi, unidadesApi } from "@/services/api";
 import type { Notificacao, Unidade } from "@/types";
-
-const getSectionTitles = (userName: string): Record<string, { title: string; subtitle: string }> => ({
-  dashboard: {
-    title: `Ola, ${userName}`,
-    subtitle: "Aqui esta o resumo do escritorio hoje.",
-  },
-  inbox: {
-    title: "Inbox Juridica",
-    subtitle: "Central de eventos juridicos novos para triagem e acompanhamento.",
-  },
-  atendimentos: {
-    title: "Atendimentos",
-    subtitle: "Triagem comercial com vinculo opcional a processo apenas como contexto do atendimento.",
-  },
-  processos: {
-    title: "Processos",
-    subtitle: "Gerencie todos os processos do escritorio.",
-  },
-  clientes: {
-    title: "Clientes",
-    subtitle: "Carteira de clientes do escritorio.",
-  },
-  prazos: {
-    title: "Prazos e Tarefas",
-    subtitle: "Acompanhe prazos processuais, audiencias e tarefas.",
-  },
-  "gestao-kanban": {
-    title: "Gestao Kanban",
-    subtitle: "Mova prazos entre etapas com drag-and-drop e acompanhe o fluxo em tempo real.",
-  },
-  "agenda-notas": {
-    title: "Agenda & Notas",
-    subtitle: "Calendario operacional e bloco de notas pessoal com gravacao automatica.",
-  },
-  documentos: {
-    title: "Documentos",
-    subtitle: "Repositorio central de arquivos e documentos.",
-  },
-  configuracoes: {
-    title: "Configuracoes",
-    subtitle: "Gerencie perfil, equipe e preferencias do sistema.",
-  },
-});
 
 const tipoCor: Record<string, string> = {
   prazo: "bg-red-500/15 text-red-400",
@@ -74,8 +32,7 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [unidades, setUnidades] = useState<Unidade[]>([]);
 
-  const sectionTitles = getSectionTitles(user?.nome?.split(" ").slice(0, 2).join(" ") ?? "");
-  const section = sectionTitles[activeItem] ?? sectionTitles.dashboard;
+  const section = getSectionMeta(activeItem, user?.nome?.split(" ").slice(0, 2).join(" ") ?? "");
 
   useEffect(() => {
     unidadesApi

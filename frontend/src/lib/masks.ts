@@ -22,6 +22,50 @@ export const maskPhone = (value: string) => {
     .replace(/(\d{4,5})(\d{4})$/, "$1-$2");
 };
 
+const digitsOnly = (value: string, max: number) => value.replace(/\D/g, "").substring(0, max);
+
+export const maskRG = (value: string) => {
+  const v = digitsOnly(value, 9);
+  return v
+    .replace(/(\d{2})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)$/, "$1-$2");
+};
+
+export const maskCTPS = (value: string) => {
+  const v = digitsOnly(value, 13);
+  return v
+    .replace(/(\d{7})(\d)/, "$1 $2")
+    .replace(/(\d{7}) (\d{4})(\d)/, "$1 $2 $3");
+};
+
+export const maskPIS = (value: string) => {
+  const v = digitsOnly(value, 11);
+  return v
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{5})(\d)/, "$1.$2")
+    .replace(/(\d{2})(\d)$/, "$1-$2");
+};
+
+export const maskTituloEleitorNumero = (value: string) => {
+  const v = digitsOnly(value, 12);
+  return v
+    .replace(/(\d{4})(\d)/, "$1 $2")
+    .replace(/(\d{4}) (\d{4})(\d)/, "$1 $2 $3");
+};
+
+export const maskTituloEleitorZona = (value: string) => digitsOnly(value, 3);
+
+export const maskTituloEleitorSessao = (value: string) => digitsOnly(value, 4);
+
+export const maskCnhNumero = (value: string) => digitsOnly(value, 11);
+
+export const maskPassaporte = (value: string) =>
+  value.toUpperCase().replace(/[^A-Z0-9]/g, "").substring(0, 20);
+
+export const maskReservista = (value: string) => digitsOnly(value, 20);
+
 export const maskProcesso = (value: string) => {
   // Padrão CNJ: 0000000-00.0000.8.00.0000 (20 dígitos)
   let v = value.replace(/\D/g, "").substring(0, 20);

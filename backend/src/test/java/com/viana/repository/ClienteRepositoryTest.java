@@ -28,16 +28,14 @@ class ClienteRepositoryTest {
 
     private Unidade unidadeSede;
     private Unidade unidadeFilial;
-    private Cliente clienteA;
-    private Cliente clienteB;
 
     @BeforeEach
     void setUp() {
-        unidadeSede = Unidade.builder().nome("Sede").cidade("Cidades").estado("EX").build();
-        unidadeFilial = Unidade.builder().nome("Filial").cidade("Cidades 2").estado("EX").build();
+        unidadeSede = Unidade.builder().nome("Sede").cidade("Cidade A").estado("EX").build();
+        unidadeFilial = Unidade.builder().nome("Filial").cidade("Cidade B").estado("EX").build();
         unidadeRepository.saveAll(List.of(unidadeSede, unidadeFilial));
 
-        clienteA = Cliente.builder()
+        Cliente clienteA = Cliente.builder()
                 .nome("Maria Oliveira")
                 .email("maria@teste.com")
                 .cpfCnpj("111.999.888-77")
@@ -46,12 +44,12 @@ class ClienteRepositoryTest {
                 .unidade(unidadeSede)
                 .build();
 
-        clienteB = Cliente.builder()
+        Cliente clienteB = Cliente.builder()
                 .nome("Empresa X")
                 .email("contato@empresax.com")
                 .cpfCnpj("00.111.222/0001-33")
                 .tipo(TipoCliente.PESSOA_JURIDICA)
-                .ativo(false) // Este será ignorado pela query findAllWithFilters
+                .ativo(false)
                 .unidade(unidadeSede)
                 .build();
 
@@ -68,37 +66,30 @@ class ClienteRepositoryTest {
     }
 
     @Test
-    @DisplayName("Garante que findAllWithFilters ignora inativos e aplica filtros opcionais")
+    @DisplayName("Deve ignorar inativos e aplicar filtros opcionais")
     void findAllWithFilters() {
-        // Busca todos os ativos da base inteira
-        Page<Cliente> todosAtivos = clienteRepository.findAllWithFilters(null, null, PageRequest.of(0, 10));
-        assertThat(todosAtivos.getContent()).hasSize(2); // A e C
-        
-        // Busca pela Unidade Sede (apenas o ativo da sede)
-        Page<Cliente> somenteSede = clienteRepository.findAllWithFilters(unidadeSede.getId(), null, PageRequest.of(0, 10));
+        Page<Cliente> todosAtivos = clienteRepository.findAllWithFilters(null, "", PageRequest.of(0, 10));
+        assertThat(todosAtivos.getContent()).hasSize(2);
+
+        Page<Cliente> somenteSede = clienteRepository.findAllWithFilters(unidadeSede.getId(), "", PageRequest.of(0, 10));
         assertThat(somenteSede.getContent()).hasSize(1);
         assertThat(somenteSede.getContent().get(0).getNome()).isEqualTo("Maria Oliveira");
 
-        // Busca textual (insensitive) sobre a filial
         Page<Cliente> buscaNome = clienteRepository.findAllWithFilters(null, "CARLOS", PageRequest.of(0, 10));
         assertThat(buscaNome.getContent()).hasSize(1);
         assertThat(buscaNome.getContent().get(0).getEmail()).isEqualTo("carlos@teste.com");
     }
 
     @Test
-    @DisplayName("Verifica existencia por CPF/CNPJ corretamente")
+    @DisplayName("Deve verificar existencia por CPF/CNPJ")
     void existsByCpfCnpj() {
-        boolean existe = clienteRepository.existsByCpfCnpj("111.999.888-77");
-        boolean naoExiste = clienteRepository.existsByCpfCnpj("000.000.000-00");
-        
-        assertThat(existe).isTrue();
-        assertThat(naoExiste).isFalse();
+        assertThat(clienteRepository.existsByCpfCnpj("111.999.888-77")).isTrue();
+        assertThat(clienteRepository.existsByCpfCnpj("000.000.000-00")).isFalse();
     }
 
     @Test
-    @DisplayName("Conta apenas a quantidade de clientes ativos")
+    @DisplayName("Deve contar apenas clientes ativos")
     void countByAtivoTrue() {
-        long contagem = clienteRepository.countByAtivoTrue();
-        assertThat(contagem).isEqualTo(2L);
+        assertThat(clienteRepository.countByAtivoTrue()).isEqualTo(2L);
     }
 }

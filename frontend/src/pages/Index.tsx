@@ -12,11 +12,13 @@ import { GestaoKanbanView } from "@/components/views/GestaoKanbanView";
 import { ProcessosView } from "@/components/views/ProcessosView";
 import { InboxJuridicaView } from "@/components/views/InboxJuridicaView";
 import { ClientesView } from "@/components/views/ClientesView";
-import { PrazosView } from "@/components/views/PrazosView";
 import { AgendaNotasView } from "@/components/views/AgendaNotasView";
 import { DocumentosView } from "@/components/views/DocumentosView";
+import { PublicacoesView } from "@/components/views/PublicacoesView";
+import { IndicadoresView } from "@/components/views/IndicadoresView";
 import { ConfiguracoesView } from "@/components/views/ConfiguracoesView";
 import { UnidadeProvider } from "@/context/UnidadeContext";
+import { normalizeSectionId, type AppSectionId } from "@/lib/navigation";
 import api from "@/lib/api";
 
 interface DashboardStats {
@@ -63,24 +65,26 @@ const DashboardContent = ({ onNavigate }: { onNavigate: (id: string) => void }) 
   );
 };
 
-const renderContent = (activeItem: string, onNavigate: (id: string) => void) => {
+const renderContent = (activeItem: AppSectionId, onNavigate: (id: string) => void) => {
   switch (activeItem) {
     case "inbox":
       return <InboxJuridicaView />;
-    case "atendimentos":
-      return <AtendimentosView />;
-    case "processos":
-      return <ProcessosView />;
-    case "clientes":
-      return <ClientesView />;
-    case "prazos":
-      return <PrazosView />;
     case "gestao-kanban":
       return <GestaoKanbanView />;
     case "agenda-notas":
       return <AgendaNotasView />;
+    case "clientes":
+      return <ClientesView />;
+    case "atendimentos":
+      return <AtendimentosView />;
+    case "processos":
+      return <ProcessosView />;
+    case "publicacoes":
+      return <PublicacoesView />;
     case "documentos":
       return <DocumentosView />;
+    case "indicadores":
+      return <IndicadoresView />;
     case "configuracoes":
       return <ConfiguracoesView />;
     default:
@@ -89,16 +93,20 @@ const renderContent = (activeItem: string, onNavigate: (id: string) => void) => 
 };
 
 const Index = () => {
-  const [activeItem, setActiveItem] = useState("dashboard");
+  const [activeItem, setActiveItem] = useState<AppSectionId>("dashboard");
+
+  const handleNavigate = (sectionId: string) => {
+    setActiveItem(normalizeSectionId(sectionId));
+  };
 
   return (
     <UnidadeProvider>
       <div className="flex min-h-screen bg-background">
-        <AppSidebar activeItem={activeItem} onNavigate={setActiveItem} />
+        <AppSidebar activeItem={activeItem} onNavigate={handleNavigate} />
         <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
-          <DashboardHeader activeItem={activeItem} onNavigate={setActiveItem} />
+          <DashboardHeader activeItem={activeItem} onNavigate={handleNavigate} />
           <div className="flex-1 min-h-0 overflow-auto">
-            {renderContent(activeItem, setActiveItem)}
+            {renderContent(activeItem, handleNavigate)}
           </div>
         </main>
       </div>

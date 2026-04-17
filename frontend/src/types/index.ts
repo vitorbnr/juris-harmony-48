@@ -28,7 +28,13 @@ export interface Usuario {
 
 // ─── Clientes ────────────────────────────────────────────────────────────────
 
-export type TipoCliente = "pessoa_fisica" | "pessoa_juridica";
+export type TipoCliente =
+  | "pessoa_fisica"
+  | "pessoa_juridica"
+  | "PESSOA_FISICA"
+  | "PESSOA_JURIDICA";
+
+export type TipoContaBancaria = "CORRENTE" | "POUPANCA";
 
 export interface Cliente {
   id: string;
@@ -41,9 +47,40 @@ export interface Cliente {
   estado: string;
   dataCadastro: string;
   processos: number;
+  advogadoId?: string | null;
   advogadoResponsavel: string;
   initials: string;
   unidadeId: string;
+  unidadeNome?: string | null;
+  ativo?: boolean;
+  rg?: string;
+  ctps?: string;
+  pis?: string;
+  tituloEleitorNumero?: string;
+  tituloEleitorZona?: string;
+  tituloEleitorSessao?: string;
+  cnhNumero?: string;
+  cnhCategoria?: string;
+  cnhVencimento?: string;
+  passaporteNumero?: string;
+  certidaoReservistaNumero?: string;
+  dataNascimento?: string;
+  nomePai?: string;
+  nomeMae?: string;
+  naturalidade?: string;
+  nacionalidade?: string;
+  estadoCivil?: string;
+  profissao?: string;
+  empresa?: string;
+  atividadeEconomica?: string;
+  comentarios?: string;
+  bancoNome?: string;
+  bancoAgencia?: string;
+  bancoConta?: string;
+  bancoTipo?: TipoContaBancaria | "";
+  chavePix?: string;
+  isFalecido?: boolean;
+  detalhesObito?: string;
 }
 
 export type StatusAtendimento = "ABERTO" | "EM_ANALISE" | "CONVERTIDO" | "ARQUIVADO";

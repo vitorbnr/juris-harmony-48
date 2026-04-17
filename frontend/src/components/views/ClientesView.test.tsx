@@ -1,10 +1,9 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { ClientesView } from "./ClientesView";
 import { useUnidade } from "@/context/UnidadeContext";
 import { clientesApi } from "@/services/api";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 
-// Mocks
 vi.mock("@/context/UnidadeContext", () => ({
   useUnidade: vi.fn(),
 }));
@@ -40,6 +39,11 @@ describe("ClientesView", () => {
       estado: "BA",
       dataCadastro: "2024-01-01",
       unidadeId: "u1",
+      unidadeNome: "Carinhanha",
+      advogadoResponsavel: "Dr. Rafael",
+      ativo: true,
+      isFalecido: true,
+      processos: 2,
     },
   ];
 
@@ -49,20 +53,22 @@ describe("ClientesView", () => {
     (clientesApi.listar as any).mockResolvedValue({ content: mockClientes });
   });
 
-  it("deve carregar e exibir a lista de clientes em modo Grid por padrão", async () => {
+  it("deve carregar e exibir a lista de clientes em modo grid por padrao", async () => {
     render(<ClientesView />);
     expect(await screen.findByText(/Empresa Alfa/i)).toBeDefined();
   });
 
-  it("deve alternar para o modo lista ao clicar no botão correspondente", async () => {
+  it("deve exibir indicador visual para cliente falecido", async () => {
     render(<ClientesView />);
-    
-    // Seleciona os botões de troca de modo (grid/lista)
-    const buttons = screen.getAllByRole("button").filter(b => b.className.includes("p-1.5"));
+    expect(await screen.findByText("Falecido")).toBeDefined();
+  });
+
+  it("deve alternar para o modo lista ao clicar no botao correspondente", async () => {
+    render(<ClientesView />);
+    const buttons = screen.getAllByRole("button").filter((button) => button.className.includes("p-1.5"));
     if (buttons.length >= 2) {
-      fireEvent.click(buttons[1]); // Botão de lista
+      fireEvent.click(buttons[1]);
     }
-    
     expect(await screen.findByText("CPF / CNPJ")).toBeDefined();
   });
 
@@ -72,11 +78,9 @@ describe("ClientesView", () => {
     expect(screen.getByTestId("novo-cliente-modal")).toBeDefined();
   });
 
-  it("deve reagir ao evento customizado 'open_novo_processo'", async () => {
+  it("deve reagir ao evento customizado open_novo_processo", async () => {
     render(<ClientesView />);
-    
     fireEvent(window, new CustomEvent("open_novo_processo", { detail: "c1" }));
-    
     expect(screen.getByTestId("novo-processo-modal")).toBeDefined();
   });
 });

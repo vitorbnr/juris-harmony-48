@@ -70,12 +70,14 @@ class PrazoServiceTest {
                 .id(UUID.randomUUID())
                 .nome("Dr. João")
                 .papel(UserRole.ADVOGADO)
+                .ativo(true)
                 .build();
 
         secretaria = Usuario.builder()
                 .id(UUID.randomUUID())
                 .nome("Maria Sec")
                 .papel(UserRole.SECRETARIA)
+                .ativo(true)
                 .build();
 
         prazoMock = Prazo.builder()
@@ -92,28 +94,28 @@ class PrazoServiceTest {
     @Test
     @DisplayName("getCalendario: Advogado deve ver os prazos pelo calendário")
     void getCalendario_ParaAdvogado() {
-        when(prazoRepository.findCalendario(any(), any(), eq(advogado.getId()), any()))
+        when(prazoRepository.findCalendario(any(), any(), eq(advogado.getId()), any(), any()))
                 .thenReturn(List.of(prazoMock));
 
         List<PrazoResponse> result = prazoService.getCalendario(
-                advogado.getId(), null, LocalDate.now().minusDays(1), LocalDate.now().plusDays(1));
+                advogado.getId(), null, LocalDate.now().minusDays(1), LocalDate.now().plusDays(1), null);
 
         assertEquals(1, result.size());
         assertEquals(prazoId.toString(), result.get(0).getId());
-        verify(prazoRepository, times(1)).findCalendario(any(), any(), eq(advogado.getId()), any());
+        verify(prazoRepository, times(1)).findCalendario(any(), any(), eq(advogado.getId()), any(), any());
     }
 
     @Test
     @DisplayName("getCalendario: Secretaria/Admin deve ver TODOS os prazos com base no filtro")
     void getCalendario_ParaSecretariaOuAdmin() {
-        when(prazoRepository.findCalendario(any(), any(), any(), any()))
+        when(prazoRepository.findCalendario(any(), any(), eq(secretaria.getId()), any(), any()))
                 .thenReturn(List.of(prazoMock));
 
         List<PrazoResponse> result = prazoService.getCalendario(
-                secretaria.getId(), null, LocalDate.now().minusDays(1), LocalDate.now().plusDays(1));
+                secretaria.getId(), null, LocalDate.now().minusDays(1), LocalDate.now().plusDays(1), null);
 
         assertEquals(1, result.size());
-        verify(prazoRepository, times(1)).findCalendario(any(), any(), any(), any());
+        verify(prazoRepository, times(1)).findCalendario(any(), any(), eq(secretaria.getId()), any(), any());
     }
 
     @Test
@@ -139,6 +141,7 @@ class PrazoServiceTest {
     @DisplayName("marcarConcluido: Deve inverter o status de conclusão do prazo (para o dono)")
     void marcarConcluido_Success() {
         when(prazoRepository.findById(prazoId)).thenReturn(Optional.of(prazoMock));
+        when(usuarioRepository.findById(advogado.getId())).thenReturn(Optional.of(advogado));
         when(prazoRepository.save(any(Prazo.class))).thenReturn(prazoMock);
 
         boolean initialStatus = prazoMock.getConcluido();

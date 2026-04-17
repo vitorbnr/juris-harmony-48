@@ -67,7 +67,7 @@ class ProcessoControllerTest {
 
         Page<ProcessoResponse> pageResponse = new PageImpl<>(List.of(resp), PageRequest.of(0, 10), 1);
 
-        when(processoService.listar(any(), any(), any(), any(), any(), any())).thenReturn(pageResponse);
+        when(processoService.listar(any(), any(), any(), any(), any(), any(), any())).thenReturn(pageResponse);
 
         mockMvc.perform(get("/api/processos?page=0&size=10"))
                 .andExpect(status().isOk())
@@ -120,6 +120,6 @@ class ProcessoControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.erros.advogadoIds").value("Pelo menos um advogado responsÃ¡vel Ã© obrigatÃ³rio"));
+                .andExpect(jsonPath("$.erros.advogadoIds").value("Pelo menos um advogado responsavel e obrigatorio"));
     }
 }

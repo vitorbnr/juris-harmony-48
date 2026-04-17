@@ -1,32 +1,10 @@
-import {
-  Inbox,
-  LayoutDashboard,
-  Users,
-  Scale,
-  ClipboardList,
-  CalendarClock,
-  FileText,
-  Settings2,
-  ChevronLeft,
-  ChevronRight,
-  NotebookPen,
-  SquareKanban,
-} from "lucide-react";
-import { ThemeToggle } from "./ThemeToggle";
+import { ChevronLeft, ChevronRight, Scale } from "lucide-react";
 import { useState } from "react";
+
+import { appSections, configuracoesSection } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 
-const navItems = [
-  { icon: LayoutDashboard, label: "Dashboard",     id: "dashboard" },
-  { icon: Inbox,           label: "Inbox Juridica", id: "inbox" },
-  { icon: ClipboardList,   label: "Atendimentos", id: "atendimentos" },
-  { icon: Scale,           label: "Processos",     id: "processos" },
-  { icon: Users,           label: "Clientes",      id: "clientes" },
-  { icon: CalendarClock,   label: "Prazos & Tarefas", id: "prazos" },
-  { icon: SquareKanban,    label: "Gestao Kanban", id: "gestao-kanban" },
-  { icon: NotebookPen,     label: "Agenda & Notas", id: "agenda-notas" },
-  { icon: FileText,        label: "Documentos",    id: "documentos" },
-];
+import { ThemeToggle } from "./ThemeToggle";
 
 interface AppSidebarProps {
   activeItem: string;
@@ -39,22 +17,22 @@ export const AppSidebar = ({ activeItem, onNavigate }: AppSidebarProps) => {
   return (
     <aside
       className={cn(
-        "sidebar-gradient flex flex-col border-r border-sidebar-border transition-all duration-300 h-screen sticky top-0",
-        collapsed ? "w-[72px]" : "w-64"
+        "sidebar-gradient sticky top-0 flex h-screen flex-col border-r border-sidebar-border transition-all duration-300",
+        collapsed ? "w-[72px]" : "w-64",
       )}
     >
-      {/* Logo */}
-      <div className={cn(
-        "flex items-center border-b border-sidebar-border transition-all duration-300",
-        collapsed ? "justify-center px-0 py-4" : "px-4 py-4"
-      )}>
+      <div
+        className={cn(
+          "flex items-center border-b border-sidebar-border transition-all duration-300",
+          collapsed ? "justify-center px-0 py-4" : "px-4 py-4",
+        )}
+      >
         {collapsed ? (
-          <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center shrink-0">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary">
             <Scale className="h-5 w-5 text-primary-foreground" />
           </div>
         ) : (
-          /* Logo real — invert+screen: branco vira preto (transparente no screen), cores aparecem */
-          <div className="w-full flex items-center justify-center px-3 py-2">
+          <div className="flex w-full items-center justify-center px-3 py-2">
             <img
               src="/logo.png"
               alt="Viana Advocacia"
@@ -70,19 +48,18 @@ export const AppSidebar = ({ activeItem, onNavigate }: AppSidebarProps) => {
         )}
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-        {navItems.map((item) => (
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+        {appSections.map((item) => (
           <button
             key={item.id}
             onClick={() => onNavigate(item.id)}
             title={collapsed ? item.label : undefined}
             className={cn(
-              "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all",
+              "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
               collapsed && "justify-center",
               activeItem === item.id
                 ? "bg-sidebar-accent text-sidebar-primary"
-                : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground",
             )}
           >
             <item.icon className="h-[18px] w-[18px] shrink-0" />
@@ -91,35 +68,30 @@ export const AppSidebar = ({ activeItem, onNavigate }: AppSidebarProps) => {
         ))}
       </nav>
 
-      {/* Footer */}
-      <div className="border-t border-sidebar-border px-3 py-4 space-y-1">
+      <div className="space-y-1 border-t border-sidebar-border px-3 py-4">
         <button
-          onClick={() => onNavigate("configuracoes")}
-          title={collapsed ? "Configurações" : undefined}
+          onClick={() => onNavigate(configuracoesSection.id)}
+          title={collapsed ? configuracoesSection.label : undefined}
           className={cn(
-            "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-sidebar-foreground hover:bg-sidebar-accent/50 transition-all",
+            "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
             collapsed && "justify-center",
-            activeItem === "configuracoes" && "bg-sidebar-accent text-sidebar-primary"
+            activeItem === configuracoesSection.id
+              ? "bg-sidebar-accent text-sidebar-primary"
+              : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground",
           )}
         >
-          <Settings2 className="h-[18px] w-[18px] shrink-0" />
-          {!collapsed && <span>Configurações</span>}
+          <configuracoesSection.icon className="h-[18px] w-[18px] shrink-0" />
+          {!collapsed && <span>{configuracoesSection.label}</span>}
         </button>
 
-        <div className={cn(
-          "flex items-center px-1 mt-2",
-          collapsed ? "flex-col gap-2" : "justify-between"
-        )}>
+        <div className={cn("mt-2 flex items-center px-1", collapsed ? "flex-col gap-2" : "justify-between")}>
           <ThemeToggle />
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="text-sidebar-muted hover:text-sidebar-foreground transition-colors p-2 rounded-lg hover:bg-sidebar-accent/40"
+            className="rounded-lg p-2 text-sidebar-muted transition-colors hover:bg-sidebar-accent/40 hover:text-sidebar-foreground"
             title={collapsed ? "Expandir menu" : "Recolher menu"}
           >
-            {collapsed
-              ? <ChevronRight className="h-4 w-4" />
-              : <ChevronLeft className="h-4 w-4" />
-            }
+            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </button>
         </div>
       </div>

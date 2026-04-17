@@ -1234,7 +1234,7 @@ export const DocumentosView = () => {
           <div className="relative flex-1 max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder=""
+              placeholder="Buscar documentos, clientes, processos ou cidades"
               className="pl-9 bg-secondary border-none h-9"
               value={busca}
               onChange={(event) => setBusca(event.target.value)}

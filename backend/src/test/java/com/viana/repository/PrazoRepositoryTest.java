@@ -89,10 +89,24 @@ class PrazoRepositoryTest {
     @Test
     @DisplayName("Recupera calendário do administrador/secretária")
     void findCalendario() {
-        List<Prazo> todos = prazoRepository.findCalendario(hoje, hoje.plusDays(4), null, null);
-        assertThat(todos).hasSize(3);
+        List<Prazo> prazosDoAdvogado1 = prazoRepository.findCalendario(
+                hoje,
+                hoje.plusDays(4),
+                advogado1.getId(),
+                null,
+                null
+        );
+        assertThat(prazosDoAdvogado1).hasSize(2);
+        assertThat(prazosDoAdvogado1).extracting(Prazo::getTitulo)
+                .containsExactly("Audiencia Incial", "Despacho");
 
-        List<Prazo> apenasAdv1 = prazoRepository.findCalendario(hoje, hoje.plusDays(4), advogado1.getId(), null);
+        List<Prazo> apenasAdv1 = prazoRepository.findCalendario(
+                hoje,
+                hoje.plusDays(4),
+                advogado1.getId(),
+                unidade.getId(),
+                advogado1.getId()
+        );
         assertThat(apenasAdv1).hasSize(2);
         assertThat(apenasAdv1.get(0).getTitulo()).isEqualTo("Audiencia Incial");
     }
@@ -100,11 +114,25 @@ class PrazoRepositoryTest {
     @Test
     @DisplayName("Aplica filtros múltiplos na listagem paginada de prazos")
     void findAllWithFilters() {
-        Page<Prazo> concluidos = prazoRepository.findAllWithFilters(null, null, true, null, PageRequest.of(0, 10));
+        Page<Prazo> concluidos = prazoRepository.findAllWithFilters(
+                unidade.getId(),
+                null,
+                true,
+                advogado2.getId(),
+                null,
+                PageRequest.of(0, 10)
+        );
         assertThat(concluidos.getContent()).hasSize(1);
         assertThat(concluidos.getContent().get(0).getTitulo()).isEqualTo("Contestacao");
 
-        Page<Prazo> audiencias = prazoRepository.findAllWithFilters(null, TipoPrazo.AUDIENCIA, null, null, PageRequest.of(0, 10));
+        Page<Prazo> audiencias = prazoRepository.findAllWithFilters(
+                unidade.getId(),
+                TipoPrazo.AUDIENCIA,
+                null,
+                advogado1.getId(),
+                null,
+                PageRequest.of(0, 10)
+        );
         assertThat(audiencias.getContent()).hasSize(1);
         assertThat(audiencias.getContent().get(0).getTitulo()).isEqualTo("Audiencia Incial");
     }
