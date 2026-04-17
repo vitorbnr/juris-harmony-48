@@ -408,7 +408,7 @@ export function NovoAtendimentoModal({
               <Textarea
                 value={form.descricao}
                 onChange={(event) => setField("descricao", event.target.value)}
-                placeholder="Descreva o relato inicial do cliente, contexto, urgencia e encaminhamento..."
+                placeholder="Descreva o relato inicial do cliente, contexto, urgência e encaminhamento..."
                 className="min-h-[220px]"
               />
             </div>
