@@ -34,6 +34,11 @@ public class LogAuditoria {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String descricao;
 
+    @Column(length = 40)
+    private String referenciaTipo;
+
+    private UUID referenciaId;
+
     @Column(nullable = false, updatable = false)
     @Builder.Default
     private LocalDateTime dataHora = LocalDateTime.now();

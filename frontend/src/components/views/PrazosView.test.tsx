@@ -6,7 +6,7 @@ import { vi, describe, it, expect, beforeEach } from "vitest";
 
 // Mocks
 vi.mock("@/context/AuthContext", () => ({
-  useAuth: () => ({ user: { id: "u1", unidadeId: "un1" } }),
+  useAuth: () => ({ user: { id: "u1", unidadeId: "un1", papel: "advogado" } }),
 }));
 
 vi.mock("@/services/api", () => ({
@@ -37,12 +37,13 @@ describe("PrazosView", () => {
       tipo: "prazo_processual",
       prioridade: "alta",
       concluido: false,
+      advogadoId: "u1",
     },
   ];
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (prazosApi.listar as any).mockResolvedValue({ content: mockPrazos });
+    vi.mocked(prazosApi.listar).mockResolvedValue({ content: mockPrazos });
   });
 
   it("deve carregar e exibir a lista de prazos", async () => {

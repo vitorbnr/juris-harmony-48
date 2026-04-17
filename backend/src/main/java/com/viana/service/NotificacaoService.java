@@ -93,6 +93,8 @@ public class NotificacaoService {
                 .lida(Boolean.TRUE.equals(notificacao.getLida()))
                 .criadaEm(notificacao.getCriadaEm().toString())
                 .link(notificacao.getLink())
+                .referenciaTipo(notificacao.getReferenciaTipo())
+                .referenciaId(notificacao.getReferenciaId() != null ? notificacao.getReferenciaId().toString() : null)
                 .build();
     }
 }

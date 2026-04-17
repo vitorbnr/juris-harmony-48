@@ -234,6 +234,59 @@ export interface Prazo {
   unidadeId?: string;
 }
 
+export interface PrazoDetalheProcesso {
+  id: string;
+  numero?: string | null;
+  clienteNome?: string | null;
+  tribunal?: string | null;
+  vara?: string | null;
+}
+
+export interface PrazoDetalheEventoJuridico {
+  id: string;
+  fonte?: string | null;
+  tipo?: string | null;
+  status?: string | null;
+  titulo?: string | null;
+  descricao?: string | null;
+  orgaoJulgador?: string | null;
+  referenciaExterna?: string | null;
+  linkOficial?: string | null;
+  destinatario?: string | null;
+  parteRelacionada?: string | null;
+  dataEvento?: string | null;
+  responsavelId?: string | null;
+  responsavelNome?: string | null;
+  criadoEm?: string | null;
+}
+
+export interface PrazoComentario {
+  id: string;
+  conteudo: string;
+  criadoEm?: string | null;
+  autorId?: string | null;
+  autorNome?: string | null;
+}
+
+export interface PrazoHistorico {
+  id: string;
+  descricao: string;
+  acao?: string | null;
+  usuarioNome?: string | null;
+  dataHora?: string | null;
+}
+
+export interface PrazoDetalhe {
+  prazo: Prazo;
+  criadoEm?: string | null;
+  criadoPorNome?: string | null;
+  unidadeNome?: string | null;
+  processo?: PrazoDetalheProcesso | null;
+  eventoJuridico?: PrazoDetalheEventoJuridico | null;
+  comentarios: PrazoComentario[];
+  historico: PrazoHistorico[];
+}
+
 export interface NotaPessoal {
   id?: string | null;
   conteudo: string;

@@ -3,8 +3,10 @@ package com.viana.controller;
 import com.viana.dto.request.AtualizarEtapaKanbanRequest;
 import com.viana.dto.request.AtualizarPrazoRequest;
 import com.viana.dto.request.CalcularPrazoRequest;
+import com.viana.dto.request.CriarPrazoComentarioRequest;
 import com.viana.dto.request.CriarPrazoRequest;
 import com.viana.dto.response.CalcularPrazoResponse;
+import com.viana.dto.response.PrazoDetalheResponse;
 import com.viana.dto.response.PrazoResponse;
 import com.viana.model.Usuario;
 import com.viana.model.enums.UserRole;
@@ -62,6 +64,30 @@ public class PrazoController {
         return ResponseEntity.ok(prazoService.getCalendario(usuario.getId(), unidadeId, inicio, fim, advogadoId));
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<PrazoResponse> buscar(@PathVariable UUID id, Authentication authentication) {
+        Usuario usuario = getUsuario(authentication);
+        return ResponseEntity.ok(prazoService.buscarPorId(id, usuario.getId()));
+    }
+
+    @GetMapping("/{id}/detalhes")
+    public ResponseEntity<PrazoDetalheResponse> buscarDetalhes(@PathVariable UUID id, Authentication authentication) {
+        Usuario usuario = getUsuario(authentication);
+        return ResponseEntity.ok(prazoService.buscarDetalhePorId(id, usuario.getId()));
+    }
+
+    @PostMapping("/{id}/comentarios")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO', 'SECRETARIA')")
+    public ResponseEntity<PrazoDetalheResponse.ComentarioInfo> adicionarComentario(
+            @PathVariable UUID id,
+            @Valid @RequestBody CriarPrazoComentarioRequest request,
+            Authentication authentication
+    ) {
+        Usuario usuario = getUsuario(authentication);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(prazoService.adicionarComentario(id, request.getConteudo(), usuario.getId()));
+    }
+
     @PostMapping("/calcular-data")
     public ResponseEntity<CalcularPrazoResponse> calcularData(@Valid @RequestBody CalcularPrazoRequest request) {
         return ResponseEntity.ok(prazoCalculadoraService.calcularDataLimite(request));
@@ -112,8 +138,9 @@ public class PrazoController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO')")
-    public ResponseEntity<Void> excluir(@PathVariable UUID id) {
-        prazoService.excluir(id);
+    public ResponseEntity<Void> excluir(@PathVariable UUID id, Authentication authentication) {
+        Usuario usuario = getUsuario(authentication);
+        prazoService.excluir(id, usuario.getId());
         return ResponseEntity.noContent().build();
     }
 

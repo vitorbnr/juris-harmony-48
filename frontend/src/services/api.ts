@@ -1,5 +1,5 @@
 import api from "@/lib/api";
-import type { Atendimento, NotaPessoal, Prazo, Processo } from "@/types";
+import type { Atendimento, NotaPessoal, Prazo, PrazoComentario, PrazoDetalhe, Processo } from "@/types";
 
 type ApiParams = Record<string, unknown>;
 
@@ -338,6 +338,12 @@ export const prazosApi = {
     size?: number;
   }) => api.get("/prazos", { params: cleanParams(params) }).then(r => r.data),
 
+  buscar: (id: string) =>
+    api.get(`/prazos/${id}`).then(r => r.data as Prazo),
+
+  buscarDetalhe: (id: string) =>
+    api.get(`/prazos/${id}/detalhes`).then(r => r.data as PrazoDetalhe),
+
   calendario: (params: {
     inicio: string;
     fim: string;
@@ -361,13 +367,16 @@ export const prazosApi = {
     api.put(`/prazos/${id}`, data).then(r => r.data as Prazo),
 
   atualizarEtapa: (id: string, etapa: string) =>
-    api.patch(`/prazos/${id}/etapa`, { etapa }).then(r => r.data),
+    api.patch(`/prazos/${id}/etapa`, { etapa }).then(r => r.data as Prazo),
 
   atualizarEtapaKanban: (id: string, etapa: string) =>
-    api.patch(`/prazos/${id}/etapa-kanban`, { etapa }).then(r => r.data),
+    api.patch(`/prazos/${id}/etapa-kanban`, { etapa }).then(r => r.data as Prazo),
 
   concluir: (id: string) =>
-    api.patch(`/prazos/${id}/concluir`).then(r => r.data),
+    api.patch(`/prazos/${id}/concluir`).then(r => r.data as Prazo),
+
+  adicionarComentario: (id: string, conteudo: string) =>
+    api.post(`/prazos/${id}/comentarios`, { conteudo }).then(r => r.data as PrazoComentario),
 
   excluir: (id: string) => api.delete(`/prazos/${id}`),
 };

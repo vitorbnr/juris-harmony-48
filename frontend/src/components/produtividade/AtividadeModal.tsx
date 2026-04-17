@@ -44,6 +44,7 @@ type AtividadeDraft = {
   processoId: string;
   vinculoTipo: TipoVinculoPrazo | "";
   vinculoReferenciaId: string;
+  vinculoBusca: string;
   responsavelId: string;
   participantesIds: string[];
   participantesBusca: string;
@@ -71,6 +72,17 @@ type ProcessOption = {
 };
 
 type AtendimentoOption = Pick<Atendimento, "id" | "assunto" | "clienteNome" | "processoId" | "processoNumero">;
+
+type AuthUserOption = {
+  id: string;
+  nome: string;
+  email: string;
+  papel: string;
+  cargo: string;
+  initials: string;
+  unidadeId: string;
+  unidadeNome: string;
+};
 
 const PRIORIDADE_DEFAULT: Record<TipoPrazo, PrioridadePrazo> = {
   tarefa_interna: "media",
@@ -114,6 +126,44 @@ function extractItems<T>(response: T[] | { content?: T[] } | undefined): T[] {
   return [];
 }
 
+function normalizeUserRole(papel?: string): Usuario["papel"] {
+  const normalized = papel?.toLowerCase();
+  if (normalized === "administrador" || normalized === "advogado" || normalized === "secretaria") {
+    return normalized;
+  }
+  return "advogado";
+}
+
+function buildCurrentUserOption(user: AuthUserOption | null): Usuario | null {
+  if (!user) return null;
+
+  return {
+    id: user.id,
+    nome: user.nome,
+    email: user.email,
+    cargo: user.cargo,
+    papel: normalizeUserRole(user.papel),
+    ativo: true,
+    initials: user.initials,
+    unidadeId: user.unidadeId,
+    unidadeNome: user.unidadeNome,
+  };
+}
+
+function mergeUsuarios(apiUsers: Usuario[], currentUser: Usuario | null): Usuario[] {
+  const deduped = new Map<string, Usuario>();
+
+  for (const usuario of [...apiUsers, ...(currentUser ? [currentUser] : [])]) {
+    deduped.set(usuario.id, { ...usuario, ativo: usuario.ativo ?? true });
+  }
+
+  return Array.from(deduped.values()).sort((left, right) => left.nome.localeCompare(right.nome));
+}
+
+function sanitizeIntegerInput(value: string) {
+  return value.replace(/\D+/g, "");
+}
+
 function buildInitialDraft(initialData?: Prazo | null, initialTipo?: TipoPrazo, dataInicial?: string): AtividadeDraft {
   const tipo = initialData?.tipo ?? initialTipo ?? "tarefa_interna";
   const vinculoTipo = initialData?.vinculoTipo ?? (initialData?.processoId ? "processo" : "");
@@ -133,6 +183,7 @@ function buildInitialDraft(initialData?: Prazo | null, initialTipo?: TipoPrazo, 
     processoId: initialData?.processoId ?? "",
     vinculoTipo,
     vinculoReferenciaId,
+    vinculoBusca: "",
     responsavelId: initialData?.advogadoId ?? "",
     participantesIds: initialData?.participantes?.map((participante) => participante.id) ?? [],
     participantesBusca: "",
@@ -158,6 +209,8 @@ export function AtividadeModal({
   onSaved,
 }: AtividadeModalProps) {
   const { user } = useAuth();
+  const currentUserOption = useMemo(() => buildCurrentUserOption(user), [user]);
+  const isAdmin = user?.papel?.toLowerCase() === "administrador";
   const [form, setForm] = useState<AtividadeDraft>(() => buildInitialDraft(initialData, initialTipo, dataInicial));
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [processos, setProcessos] = useState<ProcessOption[]>([]);
@@ -176,30 +229,46 @@ export function AtividadeModal({
     let active = true;
     setLoadingOptions(true);
 
-    Promise.all([
+    Promise.allSettled([
       usuariosApi.listar(),
       processosApi.listar({ size: 1000 }),
       atendimentosApi.listar({ size: 1000 }),
     ])
-      .then(([usuariosResponse, processosResponse, atendimentosResponse]) => {
+      .then(([usuariosResult, processosResult, atendimentosResult]) => {
         if (!active) return;
 
-        const users = extractItems<Usuario>(usuariosResponse).filter((item) => item.ativo);
-        const processItems = extractItems<ProcessOption>(processosResponse);
-        const atendimentoItems = extractItems<AtendimentoOption>(atendimentosResponse);
+        const usersFromApi =
+          usuariosResult.status === "fulfilled"
+            ? extractItems<Usuario>(usuariosResult.value).filter((item) => item.ativo)
+            : [];
+        const mergedUsers = mergeUsuarios(usersFromApi, currentUserOption);
+        const processItems =
+          processosResult.status === "fulfilled"
+            ? extractItems<ProcessOption>(processosResult.value)
+            : [];
+        const atendimentoItems =
+          atendimentosResult.status === "fulfilled"
+            ? extractItems<AtendimentoOption>(atendimentosResult.value)
+            : [];
 
-        setUsuarios(users);
+        setUsuarios(mergedUsers);
         setProcessos(processItems);
         setAtendimentos(atendimentoItems);
 
         setForm((current) => ({
           ...current,
-          responsavelId: current.responsavelId || user?.id || users[0]?.id || "",
+          responsavelId: isAdmin
+            ? current.responsavelId || currentUserOption?.id || mergedUsers[0]?.id || ""
+            : currentUserOption?.id || current.responsavelId || mergedUsers[0]?.id || "",
         }));
-      })
-      .catch(() => {
-        if (!active) return;
-        toast.error("Nao foi possivel carregar as opcoes do formulario de atividade.");
+
+        if (
+          usuariosResult.status === "rejected" &&
+          processosResult.status === "rejected" &&
+          atendimentosResult.status === "rejected"
+        ) {
+          toast.error("Nao foi possivel carregar as opcoes do formulario de atividade.");
+        }
       })
       .finally(() => {
         if (active) setLoadingOptions(false);
@@ -208,7 +277,17 @@ export function AtividadeModal({
     return () => {
       active = false;
     };
-  }, [open, user?.id]);
+  }, [currentUserOption, isAdmin, open]);
+
+  useEffect(() => {
+    if (!open || isAdmin || !currentUserOption?.id) return;
+
+    setForm((current) => ({
+      ...current,
+      responsavelId: currentUserOption.id,
+      participantesIds: current.participantesIds.filter((id) => id !== currentUserOption.id),
+    }));
+  }, [currentUserOption?.id, isAdmin, open]);
 
   const isEdicao = Boolean(initialData?.id);
   const meta = TIPO_META[form.tipo];
@@ -216,6 +295,14 @@ export function AtividadeModal({
   const isPrazo = form.tipo === "prazo_processual";
   const isEvento = form.tipo === "reuniao";
   const isAudiencia = form.tipo === "audiencia";
+  const processoSelecionado = useMemo(
+    () => processos.find((processo) => processo.id === form.processoId) ?? null,
+    [form.processoId, processos],
+  );
+  const atendimentoSelecionado = useMemo(
+    () => atendimentos.find((atendimento) => atendimento.id === form.vinculoReferenciaId) ?? null,
+    [atendimentos, form.vinculoReferenciaId],
+  );
   const participantsDisponiveis = useMemo(
     () =>
       usuarios.filter((usuario) => {
@@ -230,8 +317,31 @@ export function AtividadeModal({
       }),
     [form.participantesBusca, form.responsavelId, usuarios],
   );
+  const vinculoBusca = form.vinculoBusca.toLowerCase().trim();
+  const processosFiltrados = useMemo(
+    () =>
+      processos.filter((processo) =>
+        [processo.numero, processo.clienteNome].filter(Boolean).join(" ").toLowerCase().includes(vinculoBusca),
+      ),
+    [processos, vinculoBusca],
+  );
+  const atendimentosFiltrados = useMemo(
+    () =>
+      atendimentos.filter((atendimento) =>
+        [atendimento.assunto, atendimento.clienteNome, atendimento.processoNumero]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(vinculoBusca),
+      ),
+    [atendimentos, vinculoBusca],
+  );
+  const canClearVinculo = !isPrazo && !isAudiencia;
   const showProcessoVinculo = form.vinculoTipo === "processo";
   const showAtendimentoVinculo = form.vinculoTipo === "atendimento";
+  const responsavelSelecionado =
+    usuarios.find((usuario) => usuario.id === form.responsavelId) ??
+    (currentUserOption?.id === form.responsavelId ? currentUserOption : null);
 
   const updateField = <K extends keyof AtividadeDraft>(field: K, value: AtividadeDraft[K]) => {
     setForm((current) => {
@@ -241,9 +351,12 @@ export function AtividadeModal({
         next.prioridade = PRIORIDADE_DEFAULT[value as TipoPrazo];
         next.etapa = "a_fazer";
 
-        if (value === "audiencia") {
-          next.vinculoTipo = "processo";
-        } else if (current.vinculoTipo === "") {
+        if (value === "audiencia" || value === "prazo_processual") {
+          if (current.vinculoTipo !== "processo") {
+            next.processoId = "";
+            next.vinculoReferenciaId = "";
+            next.vinculoBusca = "";
+          }
           next.vinculoTipo = "processo";
         }
 
@@ -265,6 +378,7 @@ export function AtividadeModal({
       if (field === "vinculoTipo") {
         next.vinculoReferenciaId = "";
         next.processoId = "";
+        next.vinculoBusca = "";
       }
 
       if (field === "vinculoReferenciaId" && next.vinculoTipo === "processo") {
@@ -277,6 +391,15 @@ export function AtividadeModal({
 
       return next;
     });
+  };
+
+  const handleSelecionarVinculo = (tipo: Exclude<TipoVinculoPrazo, "caso">) => {
+    updateField("vinculoTipo", form.vinculoTipo === tipo && canClearVinculo ? "" : tipo);
+  };
+
+  const handleLimparVinculo = () => {
+    if (!canClearVinculo) return;
+    updateField("vinculoTipo", "");
   };
 
   const toggleParticipante = (usuarioId: string, checked: boolean) => {
@@ -353,7 +476,7 @@ export function AtividadeModal({
       prioridade: form.prioridade,
       etapa: form.etapa.toUpperCase(),
       processoId: vinculoTipo === "processo" ? form.processoId || null : null,
-      advogadoId: form.responsavelId,
+      advogadoId: isAdmin ? form.responsavelId : currentUserOption?.id ?? form.responsavelId,
       participantesIds: form.participantesIds,
       etiqueta: form.etiqueta.trim() || null,
       descricao: form.descricao.trim() || null,
@@ -447,18 +570,27 @@ export function AtividadeModal({
                     </div>
                     <div className="space-y-1.5">
                       <Label>Responsavel *</Label>
-                      <select
-                        value={form.responsavelId}
-                        onChange={(e) => updateField("responsavelId", e.target.value)}
-                        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none"
-                      >
-                        <option value="">Selecione</option>
-                        {usuarios.map((usuario) => (
-                          <option key={usuario.id} value={usuario.id}>
-                            {usuario.nome}
-                          </option>
-                        ))}
-                      </select>
+                      {isAdmin ? (
+                        <select
+                          value={form.responsavelId}
+                          onChange={(e) => updateField("responsavelId", e.target.value)}
+                          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none"
+                        >
+                          <option value="">Selecione</option>
+                          {usuarios.map((usuario) => (
+                            <option key={usuario.id} value={usuario.id}>
+                              {usuario.nome}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <>
+                          <Input value={currentUserOption?.nome ?? ""} readOnly />
+                          <p className="text-xs text-muted-foreground">
+                            Apenas administradores podem atribuir a atividade para outro responsavel.
+                          </p>
+                        </>
+                      )}
                     </div>
 
                     <div className="space-y-1.5">
@@ -542,9 +674,23 @@ export function AtividadeModal({
                     <div className="space-y-1.5 md:col-span-2">
                       <Label>Vincular a</Label>
                       <div className="flex flex-wrap gap-2">
+                        {canClearVinculo && (
+                          <button
+                            type="button"
+                            onClick={handleLimparVinculo}
+                            className={cn(
+                              "rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
+                              !form.vinculoTipo
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-border bg-card text-muted-foreground hover:border-primary/40",
+                            )}
+                          >
+                            Sem vinculo
+                          </button>
+                        )}
                         <button
                           type="button"
-                          onClick={() => updateField("vinculoTipo", "processo")}
+                          onClick={() => handleSelecionarVinculo("processo")}
                           className={cn(
                             "rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
                             form.vinculoTipo === "processo"
@@ -557,7 +703,7 @@ export function AtividadeModal({
                         {!isPrazo && !isAudiencia && (
                           <button
                             type="button"
-                            onClick={() => updateField("vinculoTipo", "atendimento")}
+                            onClick={() => handleSelecionarVinculo("atendimento")}
                             className={cn(
                               "rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
                               form.vinculoTipo === "atendimento"
@@ -577,41 +723,108 @@ export function AtividadeModal({
                           Caso (futuro)
                         </button>
                       </div>
+                      <p className="text-xs text-muted-foreground">
+                        {canClearVinculo
+                          ? "O vinculo e opcional para tarefas e eventos. Pode trocar ou remover sem fechar o modal."
+                          : "Prazo e audiencia continuam a exigir processo vinculado."}
+                      </p>
                     </div>
 
                     {showProcessoVinculo && (
-                      <div className="space-y-1.5 md:col-span-2">
-                        <Label>{isAudiencia ? "Processo *" : "Processo, caso ou atendimento"}</Label>
-                        <select
-                          value={form.processoId}
-                          onChange={(e) => updateField("processoId", e.target.value)}
-                          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none"
-                        >
-                          <option value="">Selecione um processo</option>
-                          {processos.map((processo) => (
-                            <option key={processo.id} value={processo.id}>
-                              {processo.numero}{processo.clienteNome ? ` - ${processo.clienteNome}` : ""}
-                            </option>
-                          ))}
-                        </select>
+                      <div className="space-y-3 md:col-span-2">
+                        <Label>{isAudiencia || isPrazo ? "Processo *" : "Buscar processo"}</Label>
+                        <Input
+                          value={form.vinculoBusca}
+                          onChange={(e) => updateField("vinculoBusca", e.target.value)}
+                          placeholder="Buscar por numero do processo ou cliente..."
+                        />
+                        {processoSelecionado && (
+                          <div className="rounded-xl border border-primary/30 bg-primary/5 px-3 py-3 text-sm">
+                            <p className="font-medium text-foreground">{processoSelecionado.numero}</p>
+                            {processoSelecionado.clienteNome && (
+                              <p className="text-xs text-muted-foreground">{processoSelecionado.clienteNome}</p>
+                            )}
+                          </div>
+                        )}
+                        <div className="scroll-subtle max-h-48 space-y-2 overflow-y-auto pr-1">
+                          {processosFiltrados.length === 0 ? (
+                            <div className="rounded-xl border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
+                              Nenhum processo encontrado para essa busca.
+                            </div>
+                          ) : (
+                            processosFiltrados.slice(0, 10).map((processo) => {
+                              const selected = processo.id === form.processoId;
+                              return (
+                                <button
+                                  key={processo.id}
+                                  type="button"
+                                  onClick={() => updateField("processoId", processo.id)}
+                                  className={cn(
+                                    "flex w-full flex-col rounded-xl border px-3 py-3 text-left transition-colors",
+                                    selected
+                                      ? "border-primary bg-primary/10"
+                                      : "border-border bg-card/60 hover:border-primary/30",
+                                  )}
+                                >
+                                  <span className="text-sm font-medium text-foreground">{processo.numero}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {processo.clienteNome || "Sem cliente vinculado"}
+                                  </span>
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
                       </div>
                     )}
 
                     {showAtendimentoVinculo && (
-                      <div className="space-y-1.5 md:col-span-2">
-                        <Label>Atendimento vinculado</Label>
-                        <select
-                          value={form.vinculoReferenciaId}
-                          onChange={(e) => updateField("vinculoReferenciaId", e.target.value)}
-                          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none"
-                        >
-                          <option value="">Selecione um atendimento</option>
-                          {atendimentos.map((atendimento) => (
-                            <option key={atendimento.id} value={atendimento.id}>
-                              {atendimento.assunto} - {atendimento.clienteNome}
-                            </option>
-                          ))}
-                        </select>
+                      <div className="space-y-3 md:col-span-2">
+                        <Label>Buscar atendimento</Label>
+                        <Input
+                          value={form.vinculoBusca}
+                          onChange={(e) => updateField("vinculoBusca", e.target.value)}
+                          placeholder="Buscar por assunto, cliente ou processo..."
+                        />
+                        {atendimentoSelecionado && (
+                          <div className="rounded-xl border border-primary/30 bg-primary/5 px-3 py-3 text-sm">
+                            <p className="font-medium text-foreground">{atendimentoSelecionado.assunto}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {atendimentoSelecionado.clienteNome}
+                              {atendimentoSelecionado.processoNumero ? ` • ${atendimentoSelecionado.processoNumero}` : ""}
+                            </p>
+                          </div>
+                        )}
+                        <div className="scroll-subtle max-h-48 space-y-2 overflow-y-auto pr-1">
+                          {atendimentosFiltrados.length === 0 ? (
+                            <div className="rounded-xl border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
+                              Nenhum atendimento encontrado para essa busca.
+                            </div>
+                          ) : (
+                            atendimentosFiltrados.slice(0, 10).map((atendimento) => {
+                              const selected = atendimento.id === form.vinculoReferenciaId;
+                              return (
+                                <button
+                                  key={atendimento.id}
+                                  type="button"
+                                  onClick={() => updateField("vinculoReferenciaId", atendimento.id)}
+                                  className={cn(
+                                    "flex w-full flex-col rounded-xl border px-3 py-3 text-left transition-colors",
+                                    selected
+                                      ? "border-primary bg-primary/10"
+                                      : "border-border bg-card/60 hover:border-primary/30",
+                                  )}
+                                >
+                                  <span className="text-sm font-medium text-foreground">{atendimento.assunto}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {atendimento.clienteNome}
+                                    {atendimento.processoNumero ? ` • ${atendimento.processoNumero}` : ""}
+                                  </span>
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
                       </div>
                     )}
 
@@ -648,7 +861,13 @@ export function AtividadeModal({
                       <>
                         <div className="space-y-1.5">
                           <Label>Alerta interno</Label>
-                          <Input type="number" min="0" value={form.alertaValor} onChange={(e) => updateField("alertaValor", e.target.value)} placeholder="Ex.: 2" />
+                          <Input
+                            type="text"
+                            inputMode="numeric"
+                            value={form.alertaValor}
+                            onChange={(e) => updateField("alertaValor", sanitizeIntegerInput(e.target.value))}
+                            placeholder="Ex.: 2"
+                          />
                         </div>
                         <div className="space-y-1.5">
                           <Label>Unidade do alerta</Label>
@@ -741,7 +960,7 @@ export function AtividadeModal({
                   </div>
 
                   <div className="space-y-2 text-sm text-muted-foreground">
-                    <p>Responsavel: <span className="text-foreground">{usuarios.find((usuario) => usuario.id === form.responsavelId)?.nome || "Nao definido"}</span></p>
+                    <p>Responsavel: <span className="text-foreground">{responsavelSelecionado?.nome || "Nao definido"}</span></p>
                     <p>Coluna: <span className="text-foreground">{ETAPA_OPTIONS.find((option) => option.value === form.etapa)?.label}</span></p>
                     {form.vinculoTipo && (
                       <p>Vinculo: <span className="text-foreground capitalize">{form.vinculoTipo}</span></p>

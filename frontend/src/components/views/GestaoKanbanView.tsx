@@ -11,9 +11,11 @@ import {
   SquareKanban,
 } from "lucide-react";
 
+import { PrazoDetalheSheet } from "@/components/prazos/PrazoDetalheSheet";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/context/AuthContext";
 import { useUnidade } from "@/context/UnidadeContext";
 import { cn } from "@/lib/utils";
 import { prazosApi } from "@/services/api";
@@ -121,10 +123,30 @@ function replacePrazo(columns: KanbanColumnsState, prazoAtualizado: Prazo): Kanb
   return cleaned;
 }
 
+function removePrazo(columns: KanbanColumnsState, prazoId: string): KanbanColumnsState {
+  return {
+    a_fazer: columns.a_fazer.filter((item) => item.id !== prazoId),
+    em_andamento: columns.em_andamento.filter((item) => item.id !== prazoId),
+    concluido: columns.concluido.filter((item) => item.id !== prazoId),
+  };
+}
+
+function isPrazoParticipant(prazo: Prazo, userId?: string) {
+  return Boolean(userId && prazo.participantes?.some((participante) => participante.id === userId));
+}
+
+function canOperatePrazo(prazo: Prazo, userId?: string, userRole?: string) {
+  if (!userId) return false;
+  if (userRole?.toLowerCase() === "administrador") return true;
+  return prazo.advogadoId === userId || isPrazoParticipant(prazo, userId);
+}
+
 export const GestaoKanbanView = () => {
+  const { user } = useAuth();
   const { unidadeSelecionada } = useUnidade();
   const [columns, setColumns] = useState<KanbanColumnsState>(EMPTY_COLUMNS);
   const [loading, setLoading] = useState(true);
+  const [prazoSelecionadoId, setPrazoSelecionadoId] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState<KanbanEtapa | null>(null);
   const [updatingIds, setUpdatingIds] = useState<Record<string, boolean>>({});
   const dragRef = useRef<DragPayload>(null);
@@ -279,12 +301,18 @@ export const GestaoKanbanView = () => {
                   columns[etapa].map((prazo) => {
                     const atrasado = !prazo.concluido && prazo.data < hoje;
                     const updating = Boolean(updatingIds[prazo.id]);
+                    const canOperate = canOperatePrazo(prazo, user?.id, user?.papel);
 
                     return (
                       <article
                         key={prazo.id}
-                        draggable={!updating}
+                        onClick={() => setPrazoSelecionadoId(prazo.id)}
+                        draggable={canOperate && !updating}
                         onDragStart={(event) => {
+                          if (!canOperate) {
+                            event.preventDefault();
+                            return;
+                          }
                           dragRef.current = { prazoId: prazo.id, origem: etapa };
                           event.dataTransfer.effectAllowed = "move";
                           event.dataTransfer.setData("text/plain", prazo.id);
@@ -294,7 +322,8 @@ export const GestaoKanbanView = () => {
                           setDragOver(null);
                         }}
                         className={cn(
-                          "cursor-grab rounded-2xl border border-border bg-card p-4 shadow-sm transition-all active:cursor-grabbing",
+                          "rounded-2xl border border-border bg-card p-4 shadow-sm transition-all",
+                          canOperate ? "cursor-grab active:cursor-grabbing" : "cursor-default",
                           atrasado && "border-red-500/30 bg-red-500/5",
                           updating && "opacity-70",
                         )}
@@ -312,37 +341,45 @@ export const GestaoKanbanView = () => {
 
                           <div className="flex items-center gap-2">
                             {updating && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 rounded-full"
-                                  disabled={updating}
-                                  draggable={false}
-                                  onPointerDown={(event) => event.stopPropagation()}
-                                  onClick={(event) => event.stopPropagation()}
-                                  onDragStart={(event) => event.preventDefault()}
-                                >
-                                  <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-                                  <span className="sr-only">Alterar etapa do prazo</span>
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-48">
-                                {KANBAN_ORDER.map((destino) => (
-                                  <DropdownMenuItem
-                                    key={destino}
-                                    disabled={destino === etapa || updating}
-                                    onSelect={() => {
-                                      void moverPrazo(prazo.id, etapa, destino);
-                                    }}
-                                  >
-                                    Mover para {KANBAN_META[destino].titulo}
-                                  </DropdownMenuItem>
-                                ))}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                            <GripVertical className="h-4 w-4 text-muted-foreground" />
+                            {canOperate ? (
+                              <>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 rounded-full"
+                                      disabled={updating}
+                                      draggable={false}
+                                      onPointerDown={(event) => event.stopPropagation()}
+                                      onClick={(event) => event.stopPropagation()}
+                                      onDragStart={(event) => event.preventDefault()}
+                                    >
+                                      <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+                                      <span className="sr-only">Alterar etapa do prazo</span>
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-48">
+                                    {KANBAN_ORDER.map((destino) => (
+                                      <DropdownMenuItem
+                                        key={destino}
+                                        disabled={destino === etapa || updating}
+                                        onSelect={() => {
+                                          void moverPrazo(prazo.id, etapa, destino);
+                                        }}
+                                      >
+                                        Mover para {KANBAN_META[destino].titulo}
+                                      </DropdownMenuItem>
+                                    ))}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                                <GripVertical className="h-4 w-4 text-muted-foreground" />
+                              </>
+                            ) : (
+                              <span className="rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground">
+                                Somente leitura
+                              </span>
+                            )}
                           </div>
                         </div>
 
@@ -384,6 +421,27 @@ export const GestaoKanbanView = () => {
           ))}
         </div>
       )}
+
+      <PrazoDetalheSheet
+        open={Boolean(prazoSelecionadoId)}
+        prazoId={prazoSelecionadoId}
+        onClose={() => setPrazoSelecionadoId(null)}
+        onPrazoAtualizado={(prazoAtualizado) => {
+          setColumns((current) => {
+            const next = replacePrazo(current, prazoAtualizado);
+            columnsRef.current = next;
+            return next;
+          });
+        }}
+        onPrazoExcluido={(prazoId) => {
+          setColumns((current) => {
+            const next = removePrazo(current, prazoId);
+            columnsRef.current = next;
+            return next;
+          });
+          setPrazoSelecionadoId((current) => (current === prazoId ? null : current));
+        }}
+      />
     </div>
   );
 };

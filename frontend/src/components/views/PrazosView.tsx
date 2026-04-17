@@ -16,9 +16,11 @@ import {
 } from "lucide-react";
 
 import { CalendarioPrazos } from "@/components/prazos/CalendarioPrazos";
+import { PrazoDetalheSheet } from "@/components/prazos/PrazoDetalheSheet";
 import { EditarPrazoModal } from "@/components/modals/EditarPrazoModal";
 import { AtividadeModal } from "@/components/produtividade/AtividadeModal";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
 import { prazosApi } from "@/services/api";
 import { toast } from "sonner";
@@ -66,7 +68,33 @@ const etapaLabel: Record<EtapaPrazo, string> = {
   concluido: "Concluido",
 };
 
-function PrazoCard({ prazo, onAtualizar }: { prazo: Prazo; onAtualizar: () => void }) {
+function isPrazoParticipant(prazo: Prazo, userId?: string) {
+  return Boolean(userId && prazo.participantes?.some((participante) => participante.id === userId));
+}
+
+function canEditPrazo(prazo: Prazo, userId?: string, userRole?: string) {
+  if (!userId) return false;
+  if (userRole?.toLowerCase() === "administrador") return true;
+  return prazo.advogadoId === userId;
+}
+
+function canOperatePrazo(prazo: Prazo, userId?: string, userRole?: string) {
+  return canEditPrazo(prazo, userId, userRole) || isPrazoParticipant(prazo, userId);
+}
+
+function PrazoCard({
+  prazo,
+  onAtualizar,
+  canEdit,
+  canOperate,
+  onSelect,
+}: {
+  prazo: Prazo;
+  onAtualizar: () => void;
+  canEdit: boolean;
+  canOperate: boolean;
+  onSelect: () => void;
+}) {
   const [loading, setLoading] = useState(false);
   const [editando, setEditando] = useState(false);
 
@@ -107,8 +135,9 @@ function PrazoCard({ prazo, onAtualizar }: { prazo: Prazo; onAtualizar: () => vo
   return (
     <>
       <div
+        onClick={onSelect}
         className={cn(
-          "flex items-start gap-3 rounded-xl border p-4 transition-all hover:border-primary/30",
+          "flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition-all hover:border-primary/30",
           prazo.concluido
             ? "border-border/50 bg-muted/20 opacity-60"
             : atrasado
@@ -146,6 +175,16 @@ function PrazoCard({ prazo, onAtualizar }: { prazo: Prazo; onAtualizar: () => vo
               {prazo.titulo}
             </p>
             <div className="flex items-center gap-1.5">
+              {!canEdit && canOperate && (
+                <span className="rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground">
+                  Participante
+                </span>
+              )}
+              {!canOperate && (
+                <span className="rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground">
+                  Somente leitura
+                </span>
+              )}
               {prazo.etapa && prazo.tipo === "tarefa_interna" && (
                 <span className="rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground">
                   {etapaLabel[prazo.etapa]}
@@ -174,25 +213,33 @@ function PrazoCard({ prazo, onAtualizar }: { prazo: Prazo; onAtualizar: () => vo
               {new Date(`${prazo.data}T00:00:00`).toLocaleDateString("pt-BR")}
               {prazo.hora ? ` - ${prazo.hora}` : ""}
             </span>
-            <div className="flex items-center gap-2">
-              {!prazo.concluido && (
-                <Button size="sm" variant="ghost" onClick={handleConcluir} disabled={loading} className="h-7 gap-1.5 px-2.5 text-xs text-green-500 hover:bg-green-500/10 hover:text-green-600">
-                  <CheckCircle className="h-3.5 w-3.5" />
-                  Concluir
-                </Button>
-              )}
-              {prazo.concluido && (
-                <Button size="sm" variant="ghost" onClick={handleConcluir} disabled={loading} className="h-7 px-2.5 text-xs text-muted-foreground">
-                  Reabrir
-                </Button>
-              )}
-              <Button size="sm" variant="ghost" onClick={() => setEditando(true)} className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground">
-                <Pencil className="h-3.5 w-3.5" />
-              </Button>
-              <Button size="sm" variant="ghost" onClick={handleExcluir} disabled={loading} className="h-7 w-7 p-0 text-red-500/60 hover:bg-red-500/10 hover:text-red-600">
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
+            {canOperate ? (
+              <div className="flex items-center gap-2">
+                {!prazo.concluido && (
+                  <Button size="sm" variant="ghost" onClick={handleConcluir} disabled={loading} className="h-7 gap-1.5 px-2.5 text-xs text-green-500 hover:bg-green-500/10 hover:text-green-600">
+                    <CheckCircle className="h-3.5 w-3.5" />
+                    Concluir
+                  </Button>
+                )}
+                {prazo.concluido && (
+                  <Button size="sm" variant="ghost" onClick={handleConcluir} disabled={loading} className="h-7 px-2.5 text-xs text-muted-foreground">
+                    Reabrir
+                  </Button>
+                )}
+                {canEdit && (
+                  <Button size="sm" variant="ghost" onClick={(event) => { event.stopPropagation(); setEditando(true); }} className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground">
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+                {canEdit && (
+                  <Button size="sm" variant="ghost" onClick={handleExcluir} disabled={loading} className="h-7 w-7 p-0 text-red-500/60 hover:bg-red-500/10 hover:text-red-600">
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <span className="text-xs text-muted-foreground">Somente leitura.</span>
+            )}
           </div>
         </div>
       </div>
@@ -211,7 +258,17 @@ function PrazoCard({ prazo, onAtualizar }: { prazo: Prazo; onAtualizar: () => vo
   );
 }
 
-function TarefaKanbanCard({ prazo, onAtualizar }: { prazo: Prazo; onAtualizar: () => void }) {
+function TarefaKanbanCard({
+  prazo,
+  onAtualizar,
+  canOperate,
+  onSelect,
+}: {
+  prazo: Prazo;
+  onAtualizar: () => void;
+  canOperate: boolean;
+  onSelect: () => void;
+}) {
   const [loading, setLoading] = useState(false);
   const etapaAtual = prazo.etapa ?? (prazo.concluido ? "concluido" : "a_fazer");
 
@@ -228,7 +285,7 @@ function TarefaKanbanCard({ prazo, onAtualizar }: { prazo: Prazo; onAtualizar: (
   };
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
+    <div onClick={onSelect} className="cursor-pointer rounded-xl border border-border bg-card p-4">
       <div className="space-y-2">
         <div className="flex items-start justify-between gap-2">
           <p className="text-sm font-medium text-foreground">{prazo.titulo}</p>
@@ -246,32 +303,36 @@ function TarefaKanbanCard({ prazo, onAtualizar }: { prazo: Prazo; onAtualizar: (
           {new Date(`${prazo.data}T00:00:00`).toLocaleDateString("pt-BR")}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 pt-2">
-          {etapaAtual !== "a_fazer" && (
-            <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => mover("a_fazer")} disabled={loading}>
-              <MoveLeft className="h-3.5 w-3.5" />
-              Voltar
-            </Button>
-          )}
-          {etapaAtual === "a_fazer" && (
-            <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => mover("em_andamento")} disabled={loading}>
-              <MoveRight className="h-3.5 w-3.5" />
-              Iniciar
-            </Button>
-          )}
-          {etapaAtual === "em_andamento" && (
-            <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => mover("concluido")} disabled={loading}>
-              <CheckCircle className="h-3.5 w-3.5" />
-              Concluir
-            </Button>
-          )}
-          {etapaAtual === "concluido" && (
-            <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => mover("em_andamento")} disabled={loading}>
-              <MoveLeft className="h-3.5 w-3.5" />
-              Reabrir
-            </Button>
-          )}
-        </div>
+        {canOperate ? (
+          <div className="flex flex-wrap items-center gap-2 pt-2">
+            {etapaAtual !== "a_fazer" && (
+              <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={(event) => { event.stopPropagation(); void mover("a_fazer"); }} disabled={loading}>
+                <MoveLeft className="h-3.5 w-3.5" />
+                Voltar
+              </Button>
+            )}
+            {etapaAtual === "a_fazer" && (
+              <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={(event) => { event.stopPropagation(); void mover("em_andamento"); }} disabled={loading}>
+                <MoveRight className="h-3.5 w-3.5" />
+                Iniciar
+              </Button>
+            )}
+            {etapaAtual === "em_andamento" && (
+              <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={(event) => { event.stopPropagation(); void mover("concluido"); }} disabled={loading}>
+                <CheckCircle className="h-3.5 w-3.5" />
+                Concluir
+              </Button>
+            )}
+            {etapaAtual === "concluido" && (
+              <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={(event) => { event.stopPropagation(); void mover("em_andamento"); }} disabled={loading}>
+                <MoveLeft className="h-3.5 w-3.5" />
+                Reabrir
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="pt-2 text-xs text-muted-foreground">Somente leitura.</div>
+        )}
       </div>
     </div>
   );
@@ -281,9 +342,11 @@ type Filtro = "todos" | "pendentes" | "urgentes" | "concluidos";
 type ModoVisualizacao = "lista" | "kanban";
 
 export const PrazosView = () => {
+  const { user } = useAuth();
   const [filtro, setFiltro] = useState<Filtro>("pendentes");
   const [modoVisualizacao, setModoVisualizacao] = useState<ModoVisualizacao>("lista");
   const [dataSelecionada, setDataSelecionada] = useState<string | null>(null);
+  const [prazoSelecionadoId, setPrazoSelecionadoId] = useState<string | null>(null);
   const [modalAberto, setModalAberto] = useState(false);
   const [dataInicial, setDataInicial] = useState<string | undefined>();
   const [prazos, setPrazos] = useState<Prazo[]>([]);
@@ -304,6 +367,19 @@ export const PrazosView = () => {
   useEffect(() => {
     carregarPrazos();
   }, [carregarPrazos]);
+
+  const atualizarPrazoLocal = useCallback((prazoAtualizado: Prazo) => {
+    setPrazos((current) =>
+      current.some((prazo) => prazo.id === prazoAtualizado.id)
+        ? current.map((prazo) => (prazo.id === prazoAtualizado.id ? prazoAtualizado : prazo))
+        : [...current, prazoAtualizado],
+    );
+  }, []);
+
+  const removerPrazoLocal = useCallback((prazoId: string) => {
+    setPrazos((current) => current.filter((prazo) => prazo.id !== prazoId));
+    setPrazoSelecionadoId((current) => (current === prazoId ? null : current));
+  }, []);
 
   const prazosFiltrados = prazos
     .filter((prazo) => {
@@ -413,7 +489,13 @@ export const PrazosView = () => {
                         </div>
                       ) : (
                         tarefasPorEtapa[etapa].map((prazo) => (
-                          <TarefaKanbanCard key={prazo.id} prazo={prazo} onAtualizar={carregarPrazos} />
+                          <TarefaKanbanCard
+                            key={prazo.id}
+                            prazo={prazo}
+                            onAtualizar={carregarPrazos}
+                            canOperate={canOperatePrazo(prazo, user?.id, user?.papel)}
+                            onSelect={() => setPrazoSelecionadoId(prazo.id)}
+                          />
                         ))
                       )}
                     </div>
@@ -429,7 +511,14 @@ export const PrazosView = () => {
           ) : (
             <div className="space-y-3">
               {prazosFiltrados.map((prazo) => (
-                <PrazoCard key={prazo.id} prazo={prazo} onAtualizar={carregarPrazos} />
+                <PrazoCard
+                  key={prazo.id}
+                  prazo={prazo}
+                  onAtualizar={carregarPrazos}
+                  canEdit={canEditPrazo(prazo, user?.id, user?.papel)}
+                  canOperate={canOperatePrazo(prazo, user?.id, user?.papel)}
+                  onSelect={() => setPrazoSelecionadoId(prazo.id)}
+                />
               ))}
             </div>
           )}
@@ -443,6 +532,14 @@ export const PrazosView = () => {
           onSaved={carregarPrazos}
         />
       )}
+
+      <PrazoDetalheSheet
+        open={Boolean(prazoSelecionadoId)}
+        prazoId={prazoSelecionadoId}
+        onClose={() => setPrazoSelecionadoId(null)}
+        onPrazoAtualizado={atualizarPrazoLocal}
+        onPrazoExcluido={removerPrazoLocal}
+      />
     </div>
   );
 };

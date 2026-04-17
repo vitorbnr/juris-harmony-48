@@ -17,4 +17,6 @@ public class NotificacaoResponse {
     private boolean lida;
     private String criadaEm;
     private String link;
+    private String referenciaTipo;
+    private String referenciaId;
 }

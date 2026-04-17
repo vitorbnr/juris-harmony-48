@@ -3,12 +3,14 @@ package com.viana.service;
 import com.viana.dto.request.AtualizarPrazoRequest;
 import com.viana.dto.request.CriarPrazoEventoRequest;
 import com.viana.dto.request.CriarPrazoRequest;
+import com.viana.dto.response.PrazoDetalheResponse;
 import com.viana.dto.response.PrazoResponse;
 import com.viana.exception.BusinessException;
 import com.viana.exception.ResourceNotFoundException;
 import com.viana.model.Atendimento;
 import com.viana.model.EventoJuridico;
 import com.viana.model.Prazo;
+import com.viana.model.PrazoComentario;
 import com.viana.model.Processo;
 import com.viana.model.Unidade;
 import com.viana.model.Usuario;
@@ -23,8 +25,10 @@ import com.viana.model.enums.TipoNotificacao;
 import com.viana.model.enums.TipoPrazo;
 import com.viana.model.enums.TipoUnidadeAlertaPrazo;
 import com.viana.model.enums.TipoVinculoPrazo;
+import com.viana.model.enums.UserRole;
 import com.viana.repository.AtendimentoRepository;
 import com.viana.repository.EventoJuridicoRepository;
+import com.viana.repository.PrazoComentarioRepository;
 import com.viana.repository.PrazoRepository;
 import com.viana.repository.ProcessoRepository;
 import com.viana.repository.UnidadeRepository;
@@ -47,10 +51,13 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class PrazoService {
 
+    private static final String REFERENCIA_TIPO_PRAZO = "PRAZO";
+
     private final PrazoRepository prazoRepository;
     private final ProcessoRepository processoRepository;
     private final AtendimentoRepository atendimentoRepository;
     private final EventoJuridicoRepository eventoJuridicoRepository;
+    private final PrazoComentarioRepository prazoComentarioRepository;
     private final UsuarioRepository usuarioRepository;
     private final UnidadeRepository unidadeRepository;
     private final LogAuditoriaService logAuditoriaService;
@@ -87,6 +94,105 @@ public class PrazoService {
     }
 
     @Transactional(readOnly = true)
+    public PrazoResponse buscarPorId(UUID id, UUID usuarioLogadoId) {
+        Prazo prazo = prazoRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Prazo nao encontrado"));
+        Usuario usuarioLogado = findUsuarioOrThrow(usuarioLogadoId);
+
+        validarPermissaoVisualizacaoPrazo(prazo, usuarioLogado, "Voce nao tem permissao para visualizar este prazo.");
+        return toResponse(prazo);
+    }
+
+    @Transactional(readOnly = true)
+    public PrazoDetalheResponse buscarDetalhePorId(UUID id, UUID usuarioLogadoId) {
+        Prazo prazo = prazoRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Prazo nao encontrado"));
+        Usuario usuarioLogado = findUsuarioOrThrow(usuarioLogadoId);
+
+        validarPermissaoVisualizacaoPrazo(prazo, usuarioLogado, "Voce nao tem permissao para visualizar este prazo.");
+
+        List<PrazoComentario> comentarios = prazoComentarioRepository.findByPrazoIdOrderByCriadoEmDesc(prazo.getId());
+        List<LogAuditoriaService.LogAuditoriaResponse> historicoLogs =
+                logAuditoriaService.listarPorReferencia(REFERENCIA_TIPO_PRAZO, prazo.getId());
+
+        String criadoPorNome = historicoLogs.stream()
+                .filter(log -> TipoAcao.CRIOU.name().equals(log.getAcao()))
+                .reduce((first, second) -> second)
+                .map(LogAuditoriaService.LogAuditoriaResponse::getUsuarioNome)
+                .orElse(null);
+
+        List<PrazoDetalheResponse.HistoricoInfo> historico = historicoLogs.stream()
+                .map(this::toHistoricoInfo)
+                .toList();
+
+        if (historico.isEmpty()) {
+            historico = List.of(PrazoDetalheResponse.HistoricoInfo.builder()
+                    .id("sintetico-criacao-" + prazo.getId())
+                    .descricao("Prazo registado no sistema.")
+                    .acao(TipoAcao.CRIOU.name())
+                    .usuarioNome(criadoPorNome)
+                    .dataHora(prazo.getCriadoEm() != null ? prazo.getCriadoEm().toString() : null)
+                    .build());
+        }
+
+        Processo processo = prazo.getProcesso();
+        EventoJuridico eventoJuridico = prazo.getEventoJuridico();
+
+        return PrazoDetalheResponse.builder()
+                .prazo(toResponse(prazo))
+                .criadoEm(prazo.getCriadoEm() != null ? prazo.getCriadoEm().toString() : null)
+                .criadoPorNome(criadoPorNome)
+                .unidadeNome(prazo.getUnidade() != null ? prazo.getUnidade().getNome() : null)
+                .processo(processo == null ? null : PrazoDetalheResponse.ProcessoInfo.builder()
+                        .id(processo.getId().toString())
+                        .numero(processo.getNumero())
+                        .clienteNome(processo.getCliente() != null ? processo.getCliente().getNome() : null)
+                        .tribunal(processo.getTribunal())
+                        .vara(processo.getVara())
+                        .build())
+                .eventoJuridico(toEventoInfo(eventoJuridico))
+                .comentarios(comentarios.stream().map(this::toComentarioInfo).toList())
+                .historico(historico)
+                .build();
+    }
+
+    @Transactional
+    public PrazoDetalheResponse.ComentarioInfo adicionarComentario(UUID id, String conteudo, UUID usuarioLogadoId) {
+        Prazo prazo = prazoRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Prazo nao encontrado"));
+        Usuario usuarioLogado = findUsuarioOrThrow(usuarioLogadoId);
+
+        validarPermissaoVisualizacaoPrazo(prazo, usuarioLogado, "Voce nao tem permissao para comentar neste prazo.");
+
+        String conteudoNormalizado = normalizeTextoOpcional(conteudo, 2000);
+        if (conteudoNormalizado == null) {
+            throw new BusinessException("Comentario e obrigatorio.");
+        }
+
+        PrazoComentario comentario = PrazoComentario.builder()
+                .prazo(prazo)
+                .usuario(usuarioLogado)
+                .conteudo(conteudoNormalizado)
+                .build();
+
+        PrazoComentario salvo = prazoComentarioRepository.save(comentario);
+
+        try {
+            logAuditoriaService.registrar(
+                    usuarioLogadoId,
+                    TipoAcao.EDITOU,
+                    ModuloLog.PRAZOS,
+                    "Comentario interno adicionado ao prazo: " + prazo.getTitulo(),
+                    REFERENCIA_TIPO_PRAZO,
+                    prazo.getId()
+            );
+        } catch (Exception ignored) {
+        }
+
+        return toComentarioInfo(salvo);
+    }
+
+    @Transactional(readOnly = true)
     public long contarAtrasados(UUID advogadoId) {
         return prazoRepository.countByAdvogadoIdAndConcluidoFalseAndDataLessThan(advogadoId, LocalDate.now());
     }
@@ -103,6 +209,7 @@ public class PrazoService {
 
     @Transactional
     public PrazoResponse criar(CriarPrazoRequest request, UUID usuarioLogadoId) {
+        Usuario usuarioLogado = findUsuarioOrThrow(usuarioLogadoId);
         Prazo prazo = criarPrazoInterno(
                 request.getTitulo(),
                 request.getData(),
@@ -128,7 +235,7 @@ public class PrazoService {
                 request.getAdvogadoId(),
                 request.getParticipantesIds(),
                 null,
-                usuarioLogadoId
+                usuarioLogado
         );
         return toResponse(prazo);
     }
@@ -137,6 +244,7 @@ public class PrazoService {
     public PrazoResponse criarAPartirDoEvento(UUID eventoId, CriarPrazoEventoRequest request, UUID usuarioLogadoId) {
         EventoJuridico evento = eventoJuridicoRepository.findById(eventoId)
                 .orElseThrow(() -> new ResourceNotFoundException("Evento juridico nao encontrado"));
+        Usuario usuarioLogado = findUsuarioOrThrow(usuarioLogadoId);
 
         UUID processoId = evento.getProcesso() != null ? evento.getProcesso().getId() : null;
         UUID unidadeId = evento.getProcesso() != null && evento.getProcesso().getUnidade() != null
@@ -146,7 +254,7 @@ public class PrazoService {
                 ? request.getAdvogadoId()
                 : evento.getResponsavel() != null
                 ? evento.getResponsavel().getId()
-                : usuarioLogadoId;
+                : usuarioLogado.getId();
 
         String descricao = request.getDescricao();
         if ((descricao == null || descricao.isBlank()) && evento.getDescricao() != null) {
@@ -178,7 +286,7 @@ public class PrazoService {
                 advogadoId,
                 null,
                 evento,
-                usuarioLogadoId
+                usuarioLogado
         );
 
         if (evento.getStatus() == StatusEventoJuridico.NOVO) {
@@ -193,10 +301,9 @@ public class PrazoService {
     public PrazoResponse atualizar(UUID id, AtualizarPrazoRequest request, UUID usuarioLogadoId) {
         Prazo prazo = prazoRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Prazo nao encontrado"));
+        Usuario usuarioLogado = findUsuarioOrThrow(usuarioLogadoId);
 
-        if (prazo.getAdvogado() == null || !prazo.getAdvogado().getId().equals(usuarioLogadoId)) {
-            throw new BusinessException("Voce nao tem permissao para editar prazos de outros usuarios.");
-        }
+        validarPermissaoGestaoPrazo(prazo, usuarioLogado, "Voce nao tem permissao para editar prazos de outros usuarios.");
 
         Processo processoAnterior = prazo.getProcesso();
 
@@ -246,9 +353,7 @@ public class PrazoService {
             prazo.setUnidade(unidade);
         }
         if (request.getAdvogadoId() != null) {
-            Usuario advogado = usuarioRepository.findById(request.getAdvogadoId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Usuario responsavel nao encontrado"));
-            prazo.setAdvogado(advogado);
+            prazo.setAdvogado(resolveResponsavelPermitido(request.getAdvogadoId(), usuarioLogado));
         }
         if (request.getParticipantesIds() != null) {
             prazo.setParticipantes(resolveParticipantes(request.getParticipantesIds(), prazo.getAdvogado() != null ? prazo.getAdvogado().getId() : null));
@@ -262,8 +367,14 @@ public class PrazoService {
         atualizarProximoPrazoProcesso(salvo.getProcesso());
 
         try {
-            logAuditoriaService.registrar(usuarioLogadoId, TipoAcao.EDITOU, ModuloLog.PRAZOS,
-                    "Prazo atualizado: " + salvo.getTitulo());
+            logAuditoriaService.registrar(
+                    usuarioLogadoId,
+                    TipoAcao.EDITOU,
+                    ModuloLog.PRAZOS,
+                    "Prazo atualizado: " + salvo.getTitulo(),
+                    REFERENCIA_TIPO_PRAZO,
+                    salvo.getId()
+            );
         } catch (Exception ignored) {
         }
 
@@ -274,15 +385,27 @@ public class PrazoService {
     public PrazoResponse marcarConcluido(UUID id, UUID usuarioLogadoId) {
         Prazo prazo = prazoRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Prazo nao encontrado"));
+        Usuario usuarioLogado = findUsuarioOrThrow(usuarioLogadoId);
 
-        if (prazo.getAdvogado() == null || !prazo.getAdvogado().getId().equals(usuarioLogadoId)) {
-            throw new BusinessException("Voce nao tem permissao para alterar prazos de outros usuarios.");
-        }
+        validarPermissaoFluxoPrazo(prazo, usuarioLogado, "Voce nao tem permissao para alterar prazos de outros usuarios.");
 
         prazo.setConcluido(!prazo.getConcluido());
         prazo.setEtapa(prazo.getConcluido() ? EtapaPrazo.CONCLUIDO : EtapaPrazo.A_FAZER);
         Prazo salvo = prazoRepository.save(prazo);
         atualizarProximoPrazoProcesso(salvo.getProcesso());
+
+        try {
+            logAuditoriaService.registrar(
+                    usuarioLogadoId,
+                    TipoAcao.EDITOU,
+                    ModuloLog.PRAZOS,
+                    (salvo.getConcluido() ? "Prazo concluido: " : "Prazo reaberto: ") + salvo.getTitulo(),
+                    REFERENCIA_TIPO_PRAZO,
+                    salvo.getId()
+            );
+        } catch (Exception ignored) {
+        }
+
         return toResponse(salvo);
     }
 
@@ -295,10 +418,9 @@ public class PrazoService {
     public PrazoResponse atualizarEtapaKanban(UUID id, String etapa, UUID usuarioLogadoId) {
         Prazo prazo = prazoRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Prazo nao encontrado"));
+        Usuario usuarioLogado = findUsuarioOrThrow(usuarioLogadoId);
 
-        if (prazo.getAdvogado() == null || !prazo.getAdvogado().getId().equals(usuarioLogadoId)) {
-            throw new BusinessException("Voce nao tem permissao para alterar tarefas de outros usuarios.");
-        }
+        validarPermissaoFluxoPrazo(prazo, usuarioLogado, "Voce nao tem permissao para alterar tarefas de outros usuarios.");
 
         EtapaPrazo etapaPrazo = parseEnumRequired(EtapaPrazo.class, etapa, "Etapa");
         prazo.setEtapa(etapaPrazo);
@@ -312,7 +434,9 @@ public class PrazoService {
                     usuarioLogadoId,
                     TipoAcao.EDITOU,
                     ModuloLog.PRAZOS,
-                    "Prazo movido no Kanban para " + etapaPrazo.name() + ": " + salvo.getTitulo()
+                    "Prazo movido no Kanban para " + etapaPrazo.name() + ": " + salvo.getTitulo(),
+                    REFERENCIA_TIPO_PRAZO,
+                    salvo.getId()
             );
         } catch (Exception ignored) {
         }
@@ -359,9 +483,24 @@ public class PrazoService {
     }
 
     @Transactional
-    public void excluir(UUID id) {
+    public void excluir(UUID id, UUID usuarioLogadoId) {
         Prazo prazo = prazoRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Prazo nao encontrado"));
+        Usuario usuarioLogado = findUsuarioOrThrow(usuarioLogadoId);
+
+        validarPermissaoGestaoPrazo(prazo, usuarioLogado, "Voce nao tem permissao para excluir prazos de outros usuarios.");
+
+        try {
+            logAuditoriaService.registrar(
+                    usuarioLogadoId,
+                    TipoAcao.EXCLUIU,
+                    ModuloLog.PRAZOS,
+                    "Prazo excluido: " + prazo.getTitulo(),
+                    REFERENCIA_TIPO_PRAZO,
+                    prazo.getId()
+            );
+        } catch (Exception ignored) {
+        }
 
         Processo processo = prazo.getProcesso();
         prazoRepository.delete(prazo);
@@ -409,6 +548,50 @@ public class PrazoService {
                 .build();
     }
 
+    private PrazoDetalheResponse.EventoJuridicoInfo toEventoInfo(EventoJuridico eventoJuridico) {
+        if (eventoJuridico == null) {
+            return null;
+        }
+
+        return PrazoDetalheResponse.EventoJuridicoInfo.builder()
+                .id(eventoJuridico.getId().toString())
+                .fonte(eventoJuridico.getFonte() != null ? eventoJuridico.getFonte().name() : null)
+                .tipo(eventoJuridico.getTipo() != null ? eventoJuridico.getTipo().name() : null)
+                .status(eventoJuridico.getStatus() != null ? eventoJuridico.getStatus().name() : null)
+                .titulo(eventoJuridico.getTitulo())
+                .descricao(eventoJuridico.getDescricao())
+                .orgaoJulgador(eventoJuridico.getOrgaoJulgador())
+                .referenciaExterna(eventoJuridico.getReferenciaExterna())
+                .linkOficial(eventoJuridico.getLinkOficial())
+                .destinatario(eventoJuridico.getDestinatario())
+                .parteRelacionada(eventoJuridico.getParteRelacionada())
+                .dataEvento(eventoJuridico.getDataEvento() != null ? eventoJuridico.getDataEvento().toString() : null)
+                .responsavelId(eventoJuridico.getResponsavel() != null ? eventoJuridico.getResponsavel().getId().toString() : null)
+                .responsavelNome(eventoJuridico.getResponsavel() != null ? eventoJuridico.getResponsavel().getNome() : null)
+                .criadoEm(eventoJuridico.getCriadoEm() != null ? eventoJuridico.getCriadoEm().toString() : null)
+                .build();
+    }
+
+    private PrazoDetalheResponse.ComentarioInfo toComentarioInfo(PrazoComentario comentario) {
+        return PrazoDetalheResponse.ComentarioInfo.builder()
+                .id(comentario.getId().toString())
+                .conteudo(comentario.getConteudo())
+                .criadoEm(comentario.getCriadoEm() != null ? comentario.getCriadoEm().toString() : null)
+                .autorId(comentario.getUsuario() != null ? comentario.getUsuario().getId().toString() : null)
+                .autorNome(comentario.getUsuario() != null ? comentario.getUsuario().getNome() : null)
+                .build();
+    }
+
+    private PrazoDetalheResponse.HistoricoInfo toHistoricoInfo(LogAuditoriaService.LogAuditoriaResponse log) {
+        return PrazoDetalheResponse.HistoricoInfo.builder()
+                .id(log.getId())
+                .descricao(log.getDescricao())
+                .acao(log.getAcao())
+                .usuarioNome(log.getUsuarioNome())
+                .dataHora(log.getDataHora())
+                .build();
+    }
+
     private Prazo criarPrazoInterno(
             String titulo,
             LocalDate data,
@@ -434,7 +617,7 @@ public class PrazoService {
             UUID advogadoId,
             List<UUID> participantesIds,
             EventoJuridico eventoJuridico,
-            UUID usuarioLogadoId
+            Usuario usuarioLogado
     ) {
         TipoPrazo tipoEnum = parseEnumRequired(TipoPrazo.class, tipo, "Tipo");
         PrioridadePrazo prioridadeEnum = parseEnumRequired(PrioridadePrazo.class, prioridade, "Prioridade");
@@ -449,9 +632,7 @@ public class PrazoService {
                     .orElseThrow(() -> new ResourceNotFoundException("Processo nao encontrado"));
         }
 
-        UUID advogadoResponsavelId = advogadoId != null ? advogadoId : usuarioLogadoId;
-        Usuario advogado = usuarioRepository.findById(advogadoResponsavelId)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario responsavel nao encontrado"));
+        Usuario advogado = resolveResponsavelPermitido(advogadoId, usuarioLogado);
 
         Unidade unidade = null;
         if (unidadeId != null) {
@@ -498,8 +679,14 @@ public class PrazoService {
         atualizarProximoPrazoProcesso(salvo.getProcesso());
 
         try {
-            logAuditoriaService.registrar(usuarioLogadoId, TipoAcao.CRIOU, ModuloLog.PRAZOS,
-                    "Prazo criado: " + titulo + " para " + data);
+            logAuditoriaService.registrar(
+                    usuarioLogado.getId(),
+                    TipoAcao.CRIOU,
+                    ModuloLog.PRAZOS,
+                    "Prazo criado: " + titulo + " para " + data,
+                    REFERENCIA_TIPO_PRAZO,
+                    salvo.getId()
+            );
             notificacaoService.criarNotificacao(
                     advogado.getId(),
                     "Novo Prazo Registrado",
@@ -520,6 +707,74 @@ public class PrazoService {
         }
 
         return salvo;
+    }
+
+    private Usuario resolveResponsavelPermitido(UUID advogadoId, Usuario usuarioLogado) {
+        UUID responsavelId = advogadoId != null ? advogadoId : usuarioLogado.getId();
+        if (!isAdministrador(usuarioLogado) && !responsavelId.equals(usuarioLogado.getId())) {
+            throw new BusinessException("Apenas administradores podem atribuir atividades a outro responsavel.");
+        }
+
+        Usuario advogado = usuarioRepository.findById(responsavelId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario responsavel nao encontrado"));
+        validarResponsavelAtivo(advogado);
+        return advogado;
+    }
+
+    private void validarPermissaoGestaoPrazo(Prazo prazo, Usuario usuarioLogado, String mensagemErro) {
+        if (isAdministrador(usuarioLogado)) {
+            return;
+        }
+
+        if (!isResponsavelDoPrazo(prazo, usuarioLogado.getId())) {
+            throw new BusinessException(mensagemErro);
+        }
+    }
+
+    private void validarPermissaoFluxoPrazo(Prazo prazo, Usuario usuarioLogado, String mensagemErro) {
+        if (isAdministrador(usuarioLogado)) {
+            return;
+        }
+
+        if (isResponsavelDoPrazo(prazo, usuarioLogado.getId()) || isParticipanteDoPrazo(prazo, usuarioLogado.getId())) {
+            return;
+        }
+
+        throw new BusinessException(mensagemErro);
+    }
+
+    private void validarPermissaoVisualizacaoPrazo(Prazo prazo, Usuario usuarioLogado, String mensagemErro) {
+        validarPermissaoFluxoPrazo(prazo, usuarioLogado, mensagemErro);
+    }
+
+    private boolean isResponsavelDoPrazo(Prazo prazo, UUID usuarioId) {
+        return prazo.getAdvogado() != null
+                && usuarioId != null
+                && prazo.getAdvogado().getId().equals(usuarioId);
+    }
+
+    private boolean isParticipanteDoPrazo(Prazo prazo, UUID usuarioId) {
+        if (usuarioId == null || prazo.getParticipantes() == null || prazo.getParticipantes().isEmpty()) {
+            return false;
+        }
+
+        return prazo.getParticipantes().stream()
+                .anyMatch(participante -> usuarioId.equals(participante.getId()));
+    }
+
+    private boolean isAdministrador(Usuario usuario) {
+        return usuario != null && usuario.getPapel() == UserRole.ADMINISTRADOR;
+    }
+
+    private void validarResponsavelAtivo(Usuario usuario) {
+        if (!Boolean.TRUE.equals(usuario.getAtivo())) {
+            throw new BusinessException("O responsavel selecionado esta inativo.");
+        }
+    }
+
+    private Usuario findUsuarioOrThrow(UUID usuarioId) {
+        return usuarioRepository.findById(usuarioId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario logado nao encontrado"));
     }
 
     private Set<Usuario> resolveParticipantes(List<UUID> participantesIds, UUID advogadoResponsavelId) {

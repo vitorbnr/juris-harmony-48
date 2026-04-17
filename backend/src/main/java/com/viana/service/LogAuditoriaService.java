@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +24,18 @@ public class LogAuditoriaService {
 
     @Transactional
     public void registrar(UUID usuarioId, TipoAcao acao, ModuloLog modulo, String descricao) {
+        registrar(usuarioId, acao, modulo, descricao, null, null);
+    }
+
+    @Transactional
+    public void registrar(
+            UUID usuarioId,
+            TipoAcao acao,
+            ModuloLog modulo,
+            String descricao,
+            String referenciaTipo,
+            UUID referenciaId
+    ) {
         Usuario usuario = usuarioRepository.findById(usuarioId).orElse(null);
         if (usuario == null) return;
 
@@ -31,6 +44,8 @@ public class LogAuditoriaService {
                 .acao(acao)
                 .modulo(modulo)
                 .descricao(descricao)
+                .referenciaTipo(referenciaTipo)
+                .referenciaId(referenciaId)
                 .build();
 
         logRepository.save(log);
@@ -42,6 +57,14 @@ public class LogAuditoriaService {
                 .map(this::toResponse);
     }
 
+    @Transactional(readOnly = true)
+    public List<LogAuditoriaResponse> listarPorReferencia(String referenciaTipo, UUID referenciaId) {
+        return logRepository.findByReferenciaTipoAndReferenciaIdOrderByDataHoraDesc(referenciaTipo, referenciaId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
     private LogAuditoriaResponse toResponse(LogAuditoria l) {
         return LogAuditoriaResponse.builder()
                 .id(l.getId().toString())
@@ -50,6 +73,8 @@ public class LogAuditoriaService {
                 .modulo(l.getModulo().name())
                 .descricao(l.getDescricao())
                 .dataHora(l.getDataHora().toString())
+                .referenciaTipo(l.getReferenciaTipo())
+                .referenciaId(l.getReferenciaId() != null ? l.getReferenciaId().toString() : null)
                 .build();
     }
 
@@ -64,5 +89,7 @@ public class LogAuditoriaService {
         private String modulo;
         private String descricao;
         private String dataHora;
+        private String referenciaTipo;
+        private String referenciaId;
     }
 }

@@ -3,11 +3,16 @@ import {
   AlertCircle,
   CalendarClock,
   Check,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Filter,
   Loader2,
+  MoreHorizontal,
+  MoveLeft,
+  MoveRight,
   NotebookPen,
+  Pencil,
   Plus,
   Save,
 } from "lucide-react";
@@ -31,6 +36,8 @@ import { ptBR } from "date-fns/locale";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { EditarPrazoModal } from "@/components/modals/EditarPrazoModal";
+import { PrazoDetalheSheet } from "@/components/prazos/PrazoDetalheSheet";
 import { AtividadeModal } from "@/components/produtividade/AtividadeModal";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -42,7 +49,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { notasPessoaisApi, prazosApi } from "@/services/api";
 import { toast } from "sonner";
-import type { NotaPessoal, Prazo } from "@/types";
+import type { EtapaPrazo, NotaPessoal, Prazo } from "@/types";
 
 type AgendaModo = "mensal" | "semanal";
 type SaveStatus = "idle" | "typing" | "saving" | "saved" | "error";
@@ -96,6 +103,39 @@ function getTipoClass(tipo: Prazo["tipo"]) {
   }[tipo];
 }
 
+const etapaLabel: Record<EtapaPrazo, string> = {
+  a_fazer: "A Fazer",
+  em_andamento: "Em andamento",
+  concluido: "Concluido",
+};
+
+function normalizeEtapa(prazo: Prazo): EtapaPrazo {
+  if (prazo.etapa) return prazo.etapa;
+  return prazo.concluido ? "concluido" : "a_fazer";
+}
+
+function isPrazoParticipant(prazo: Prazo, userId?: string) {
+  return Boolean(userId && prazo.participantes?.some((participante) => participante.id === userId));
+}
+
+function canEditPrazo(prazo: Prazo, userId?: string, userRole?: string) {
+  if (!userId) return false;
+  if (userRole?.toLowerCase() === "administrador") return true;
+  return prazo.advogadoId === userId;
+}
+
+function canOperatePrazo(prazo: Prazo, userId?: string, userRole?: string) {
+  return canEditPrazo(prazo, userId, userRole) || isPrazoParticipant(prazo, userId);
+}
+
+function mergePrazoAtualizado(prazos: Prazo[], prazoAtualizado: Prazo) {
+  const existe = prazos.some((prazo) => prazo.id === prazoAtualizado.id);
+  const next = existe
+    ? prazos.map((prazo) => (prazo.id === prazoAtualizado.id ? prazoAtualizado : prazo))
+    : [...prazos, prazoAtualizado];
+  return sortPrazosByDate(next);
+}
+
 function SaveIndicator({ status, dataAtualizacao }: { status: SaveStatus; dataAtualizacao?: string | null }) {
   if (status === "saving") {
     return (
@@ -141,42 +181,179 @@ function SaveIndicator({ status, dataAtualizacao }: { status: SaveStatus; dataAt
   );
 }
 
-function AgendaPrazoCard({ prazo }: { prazo: Prazo }) {
+function AgendaPrazoCard({
+  prazo,
+  userId,
+  userRole,
+  onPrazoAtualizado,
+  onRefresh,
+  onSelect,
+}: {
+  prazo: Prazo;
+  userId?: string;
+  userRole?: string;
+  onPrazoAtualizado: (prazo: Prazo) => void;
+  onRefresh: () => void;
+  onSelect: () => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [editando, setEditando] = useState(false);
   const atrasado = !prazo.concluido && prazo.data < new Date().toISOString().slice(0, 10);
+  const etapaAtual = normalizeEtapa(prazo);
+  const canEdit = canEditPrazo(prazo, userId, userRole);
+  const canOperate = canOperatePrazo(prazo, userId, userRole);
+
+  const mover = async (etapa: EtapaPrazo) => {
+    setLoading(true);
+    try {
+      const prazoAtualizado = await prazosApi.atualizarEtapaKanban(prazo.id, etapa.toUpperCase());
+      onPrazoAtualizado(prazoAtualizado);
+      toast.success(`Atividade movida para ${etapaLabel[etapa]}.`);
+    } catch {
+      toast.error("Nao foi possivel atualizar o andamento desta atividade.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const acaoPrimaria =
+    etapaAtual === "a_fazer"
+      ? { label: "Iniciar", etapa: "em_andamento" as EtapaPrazo, icon: MoveRight }
+      : etapaAtual === "em_andamento"
+        ? { label: "Concluir", etapa: "concluido" as EtapaPrazo, icon: CheckCircle2 }
+        : { label: "Reabrir", etapa: "em_andamento" as EtapaPrazo, icon: MoveLeft };
+  const AcaoPrimariaIcon = acaoPrimaria.icon;
 
   return (
-    <article
-      className={cn(
-        "rounded-xl border px-3 py-3",
-        atrasado ? "border-red-500/30 bg-red-500/5" : "border-border bg-card/80",
-      )}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-medium text-foreground">{prazo.titulo}</p>
-            <span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-medium", getTipoClass(prazo.tipo))}>
-              {getTipoLabel(prazo.tipo)}
-            </span>
+    <>
+      <article
+        onClick={onSelect}
+        className={cn(
+          "cursor-pointer rounded-xl border px-3 py-3",
+          atrasado ? "border-red-500/30 bg-red-500/5" : "border-border bg-card/80",
+        )}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm font-medium text-foreground">{prazo.titulo}</p>
+              <span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-medium", getTipoClass(prazo.tipo))}>
+                {getTipoLabel(prazo.tipo)}
+              </span>
+              {!canEdit && canOperate && (
+                <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                  Participante
+                </span>
+              )}
+            </div>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              {prazo.processoNumero && <p className="truncate font-mono">{prazo.processoNumero}</p>}
+              {prazo.advogadoNome && <p>{prazo.advogadoNome}</p>}
+              {prazo.local && <p>{prazo.local}</p>}
+            </div>
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            {prazo.processoNumero && <p className="truncate font-mono">{prazo.processoNumero}</p>}
-            {prazo.advogadoNome && <p>{prazo.advogadoNome}</p>}
-            {prazo.local && <p>{prazo.local}</p>}
+
+          <div className="flex items-center gap-2">
+            {loading && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+            <span
+              className={cn(
+                "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                atrasado
+                  ? "border-red-500/30 bg-red-500/10 text-red-300"
+                  : "border-border bg-muted/40 text-muted-foreground",
+              )}
+            >
+              {prazo.diaInteiro ? "Dia todo" : prazo.hora ? prazo.hora.slice(0, 5) : "Sem hora"}
+            </span>
+            {(canOperate || canEdit) && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 rounded-full"
+                    disabled={loading}
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <span className="sr-only">Mais acoes</span>
+                    <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  {canOperate &&
+                    (["a_fazer", "em_andamento", "concluido"] as EtapaPrazo[]).map((etapa) => (
+                      <DropdownMenuItem
+                        key={etapa}
+                        disabled={loading || etapa === etapaAtual}
+                        onSelect={() => {
+                          void mover(etapa);
+                        }}
+                      >
+                        Mover para {etapaLabel[etapa]}
+                      </DropdownMenuItem>
+                    ))}
+                  {canEdit && (
+                    <DropdownMenuItem
+                      disabled={loading}
+                      onSelect={() => {
+                        setEditando(true);
+                      }}
+                    >
+                      Editar atividade
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </div>
-        <span
-          className={cn(
-            "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium",
-            atrasado
-              ? "border-red-500/30 bg-red-500/10 text-red-300"
-              : "border-border bg-muted/40 text-muted-foreground",
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+            {etapaLabel[etapaAtual]}
+          </span>
+          {prazo.concluido && (
+            <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
+              Finalizado
+            </span>
           )}
-        >
-          {prazo.diaInteiro ? "Dia todo" : prazo.hora ? prazo.hora.slice(0, 5) : "Sem hora"}
-        </span>
-      </div>
-    </article>
+        </div>
+
+        {(canOperate || canEdit) && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/50 pt-3">
+            {canOperate && (
+              <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={(event) => { event.stopPropagation(); void mover(acaoPrimaria.etapa); }} disabled={loading}>
+                <AcaoPrimariaIcon className="h-3.5 w-3.5" />
+                {acaoPrimaria.label}
+              </Button>
+            )}
+            {canOperate && etapaAtual !== "a_fazer" && (
+              <Button size="sm" variant="ghost" className="h-8 gap-1.5 text-muted-foreground" onClick={(event) => { event.stopPropagation(); void mover("a_fazer"); }} disabled={loading}>
+                <MoveLeft className="h-3.5 w-3.5" />
+                Voltar para A Fazer
+              </Button>
+            )}
+            {canEdit && (
+              <Button size="sm" variant="ghost" className="h-8 gap-1.5 text-muted-foreground" onClick={(event) => { event.stopPropagation(); setEditando(true); }} disabled={loading}>
+                <Pencil className="h-3.5 w-3.5" />
+                Editar
+              </Button>
+            )}
+          </div>
+        )}
+      </article>
+
+      {editando && canEdit && (
+        <EditarPrazoModal
+          prazo={prazo}
+          onClose={() => setEditando(false)}
+          onSaved={() => {
+            setEditando(false);
+            onRefresh();
+          }}
+        />
+      )}
+    </>
   );
 }
 
@@ -187,6 +364,7 @@ export const AgendaNotasView = () => {
   const [modo, setModo] = useState<AgendaModo>("mensal");
   const [referencia, setReferencia] = useState(new Date());
   const [dataSelecionada, setDataSelecionada] = useState<Date | undefined>(new Date());
+  const [prazoSelecionadoId, setPrazoSelecionadoId] = useState<string | null>(null);
   const [prazos, setPrazos] = useState<Prazo[]>([]);
   const [loadingAgenda, setLoadingAgenda] = useState(true);
   const [filtroTipo, setFiltroTipo] = useState<FiltroTipoAtividade>("todos");
@@ -220,6 +398,10 @@ export const AgendaNotasView = () => {
       })
       .finally(() => setLoadingAgenda(false));
   }, [range.fim, range.inicio, unidadeSelecionada]);
+
+  const atualizarPrazoLocal = useCallback((prazoAtualizado: Prazo) => {
+    setPrazos((current) => mergePrazoAtualizado(current, prazoAtualizado));
+  }, []);
 
   useEffect(() => {
     carregarAgenda();
@@ -482,7 +664,17 @@ export const AgendaNotasView = () => {
                     Nenhuma atividade para este dia.
                   </div>
                 ) : (
-                  prazosDoDiaSelecionado.map((prazo) => <AgendaPrazoCard key={prazo.id} prazo={prazo} />)
+                  prazosDoDiaSelecionado.map((prazo) => (
+                    <AgendaPrazoCard
+                      key={prazo.id}
+                      prazo={prazo}
+                      userId={user?.id}
+                      userRole={user?.papel}
+                      onPrazoAtualizado={atualizarPrazoLocal}
+                      onRefresh={carregarAgenda}
+                      onSelect={() => setPrazoSelecionadoId(prazo.id)}
+                    />
+                  ))
                 )}
               </div>
             </div>
@@ -519,7 +711,17 @@ export const AgendaNotasView = () => {
                         Sem atividades.
                       </div>
                     ) : (
-                      prazosDoDia.map((prazo) => <AgendaPrazoCard key={prazo.id} prazo={prazo} />)
+                      prazosDoDia.map((prazo) => (
+                        <AgendaPrazoCard
+                          key={prazo.id}
+                          prazo={prazo}
+                          userId={user?.id}
+                          userRole={user?.papel}
+                          onPrazoAtualizado={atualizarPrazoLocal}
+                          onRefresh={carregarAgenda}
+                          onSelect={() => setPrazoSelecionadoId(prazo.id)}
+                        />
+                      ))
                     )}
                   </div>
                 </div>
@@ -622,6 +824,17 @@ export const AgendaNotasView = () => {
         onClose={() => setModalAberto(false)}
         onSaved={() => {
           carregarAgenda();
+        }}
+      />
+
+      <PrazoDetalheSheet
+        open={Boolean(prazoSelecionadoId)}
+        prazoId={prazoSelecionadoId}
+        onClose={() => setPrazoSelecionadoId(null)}
+        onPrazoAtualizado={atualizarPrazoLocal}
+        onPrazoExcluido={(prazoId) => {
+          setPrazos((current) => current.filter((prazo) => prazo.id !== prazoId));
+          setPrazoSelecionadoId((current) => (current === prazoId ? null : current));
         }}
       />
     </div>
