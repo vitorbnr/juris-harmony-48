@@ -55,6 +55,14 @@ type AgendaModo = "mensal" | "semanal";
 type SaveStatus = "idle" | "typing" | "saving" | "saved" | "error";
 type FiltroTipoAtividade = "todos" | "tarefa_interna" | "prazo_processual" | "reuniao" | "audiencia";
 type FiltroAtribuicao = "todos" | "responsavel" | "participante";
+type AgendaPrazoCardProps = {
+  prazo: Prazo;
+  userId?: string;
+  userRole?: string;
+  onPrazoAtualizado: (prazo: Prazo) => void;
+  onRefresh: () => void;
+  onSelect: () => void;
+};
 
 function getAgendaRange(modo: AgendaModo, referencia: Date) {
   if (modo === "semanal") {
@@ -101,6 +109,10 @@ function getTipoClass(tipo: Prazo["tipo"]) {
     reuniao: "border-violet-500/30 bg-violet-500/10 text-violet-200",
     audiencia: "border-amber-500/30 bg-amber-500/10 text-amber-200",
   }[tipo];
+}
+
+function getPrazoTimeLabel(prazo: Prazo) {
+  return prazo.diaInteiro ? "Dia todo" : prazo.hora ? prazo.hora.slice(0, 5) : "Sem hora";
 }
 
 const etapaLabel: Record<EtapaPrazo, string> = {
@@ -188,14 +200,7 @@ function AgendaPrazoCard({
   onPrazoAtualizado,
   onRefresh,
   onSelect,
-}: {
-  prazo: Prazo;
-  userId?: string;
-  userRole?: string;
-  onPrazoAtualizado: (prazo: Prazo) => void;
-  onRefresh: () => void;
-  onSelect: () => void;
-}) {
+}: AgendaPrazoCardProps) {
   const [loading, setLoading] = useState(false);
   const [editando, setEditando] = useState(false);
   const atrasado = !prazo.concluido && prazo.data < new Date().toISOString().slice(0, 10);
@@ -263,7 +268,7 @@ function AgendaPrazoCard({
                   : "border-border bg-muted/40 text-muted-foreground",
               )}
             >
-              {prazo.diaInteiro ? "Dia todo" : prazo.hora ? prazo.hora.slice(0, 5) : "Sem hora"}
+              {getPrazoTimeLabel(prazo)}
             </span>
             {(canOperate || canEdit) && (
               <DropdownMenu>
@@ -339,6 +344,168 @@ function AgendaPrazoCard({
                 Editar
               </Button>
             )}
+          </div>
+        )}
+      </article>
+
+      {editando && canEdit && (
+        <EditarPrazoModal
+          prazo={prazo}
+          onClose={() => setEditando(false)}
+          onSaved={() => {
+            setEditando(false);
+            onRefresh();
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+function AgendaPrazoCompactCard({
+  prazo,
+  userId,
+  userRole,
+  onPrazoAtualizado,
+  onRefresh,
+  onSelect,
+}: AgendaPrazoCardProps) {
+  const [loading, setLoading] = useState(false);
+  const [editando, setEditando] = useState(false);
+  const atrasado = !prazo.concluido && prazo.data < new Date().toISOString().slice(0, 10);
+  const etapaAtual = normalizeEtapa(prazo);
+  const canEdit = canEditPrazo(prazo, userId, userRole);
+  const canOperate = canOperatePrazo(prazo, userId, userRole);
+
+  const mover = async (etapa: EtapaPrazo) => {
+    setLoading(true);
+    try {
+      const prazoAtualizado = await prazosApi.atualizarEtapaKanban(prazo.id, etapa.toUpperCase());
+      onPrazoAtualizado(prazoAtualizado);
+      toast.success(`Atividade movida para ${etapaLabel[etapa]}.`);
+    } catch {
+      toast.error("Nao foi possivel atualizar o andamento desta atividade.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const acaoPrimaria =
+    etapaAtual === "a_fazer"
+      ? { label: "Iniciar", etapa: "em_andamento" as EtapaPrazo, icon: MoveRight }
+      : etapaAtual === "em_andamento"
+        ? { label: "Concluir", etapa: "concluido" as EtapaPrazo, icon: CheckCircle2 }
+        : { label: "Reabrir", etapa: "em_andamento" as EtapaPrazo, icon: MoveLeft };
+  const AcaoPrimariaIcon = acaoPrimaria.icon;
+  const detalhesCompactos = [prazo.advogadoNome, prazo.processoNumero, prazo.local].filter(Boolean).slice(0, 2);
+
+  return (
+    <>
+      <article
+        onClick={onSelect}
+        className={cn(
+          "cursor-pointer rounded-xl border px-3 py-2.5 transition-colors",
+          atrasado ? "border-red-500/30 bg-red-500/5" : "border-border bg-card/80 hover:bg-card",
+        )}
+      >
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start gap-2">
+              <p className="line-clamp-2 flex-1 text-sm font-medium leading-5 text-foreground">{prazo.titulo}</p>
+              <span
+                className={cn(
+                  "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                  atrasado
+                    ? "border-red-500/30 bg-red-500/10 text-red-300"
+                    : "border-border bg-muted/40 text-muted-foreground",
+                )}
+              >
+                {getPrazoTimeLabel(prazo)}
+              </span>
+            </div>
+
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-medium", getTipoClass(prazo.tipo))}>
+                {getTipoLabel(prazo.tipo)}
+              </span>
+              <span className="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                {etapaLabel[etapaAtual]}
+              </span>
+              {!canEdit && canOperate && (
+                <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                  Participante
+                </span>
+              )}
+            </div>
+
+            {detalhesCompactos.length > 0 && (
+              <div className="mt-2 space-y-1 text-[11px] text-muted-foreground">
+                {detalhesCompactos.map((detalhe) => (
+                  <p key={detalhe} className={cn("truncate", detalhe === prazo.processoNumero && "font-mono")}>
+                    {detalhe}
+                  </p>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {(canOperate || canEdit) && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 shrink-0 rounded-full"
+                  disabled={loading}
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <span className="sr-only">Mais acoes</span>
+                  <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                {canOperate &&
+                  (["a_fazer", "em_andamento", "concluido"] as EtapaPrazo[]).map((etapa) => (
+                    <DropdownMenuItem
+                      key={etapa}
+                      disabled={loading || etapa === etapaAtual}
+                      onSelect={() => {
+                        void mover(etapa);
+                      }}
+                    >
+                      Mover para {etapaLabel[etapa]}
+                    </DropdownMenuItem>
+                  ))}
+                {canEdit && (
+                  <DropdownMenuItem
+                    disabled={loading}
+                    onSelect={() => {
+                      setEditando(true);
+                    }}
+                  >
+                    Editar atividade
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+
+        {canOperate && (
+          <div className="mt-3 border-t border-border/50 pt-3">
+            <Button
+              size="sm"
+              variant={etapaAtual === "concluido" ? "ghost" : "outline"}
+              className="h-8 w-full gap-1.5 rounded-lg text-xs"
+              onClick={(event) => {
+                event.stopPropagation();
+                void mover(acaoPrimaria.etapa);
+              }}
+              disabled={loading}
+            >
+              {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <AcaoPrimariaIcon className="h-3.5 w-3.5" />}
+              {acaoPrimaria.label}
+            </Button>
           </div>
         )}
       </article>
@@ -579,17 +746,17 @@ export const AgendaNotasView = () => {
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : modo === "mensal" ? (
-          <div className="space-y-4">
-            <div className="rounded-2xl border border-border bg-card/60 p-4">
-              <div className="mb-3 grid grid-cols-7 gap-3">
+          <div className="space-y-3">
+            <div className="rounded-2xl border border-border bg-card/60 p-3 md:p-4">
+              <div className="mb-2 grid grid-cols-7 gap-2 md:mb-3 md:gap-3">
                 {["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"].map((label) => (
-                  <div key={label} className="px-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                  <div key={label} className="px-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground md:px-2 md:text-[11px]">
                     {label}
                   </div>
                 ))}
               </div>
 
-              <div className="grid grid-cols-7 gap-3">
+              <div className="grid grid-cols-7 gap-2 md:gap-3">
                 {diasDoMes.map((dia) => {
                   const atividadesDoDia = sortPrazosByDate(
                     prazosFiltrados.filter((prazo) => isSameDay(parseISO(prazo.data), dia)),
@@ -601,7 +768,7 @@ export const AgendaNotasView = () => {
                       type="button"
                       onClick={() => setDataSelecionada(dia)}
                       className={cn(
-                        "min-h-[118px] rounded-2xl border p-3 text-left transition-all",
+                        "min-h-[92px] rounded-xl border px-2.5 py-2 text-left transition-all md:min-h-[104px] md:rounded-2xl md:p-3",
                         isSameMonth(dia, referencia)
                           ? "border-border bg-background/70 hover:border-primary/40"
                           : "border-border/60 bg-background/30 text-muted-foreground",
@@ -609,7 +776,7 @@ export const AgendaNotasView = () => {
                       )}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <span className={cn("text-sm font-semibold", !isSameMonth(dia, referencia) && "opacity-60")}>
+                        <span className={cn("text-sm font-semibold md:text-base", !isSameMonth(dia, referencia) && "opacity-60")}>
                           {format(dia, "dd")}
                         </span>
                         {atividadesDoDia.length > 0 && (
@@ -619,24 +786,24 @@ export const AgendaNotasView = () => {
                         )}
                       </div>
 
-                      <div className="mt-3 space-y-1.5">
-                        {atividadesDoDia.slice(0, 2).map((prazo) => (
+                      <div className="mt-2 space-y-1">
+                        {atividadesDoDia.slice(0, 1).map((prazo) => (
                           <div
                             key={prazo.id}
                             className={cn(
-                              "rounded-xl border px-2 py-1 text-[11px]",
+                              "rounded-lg border px-2 py-1 text-[10px] md:text-[11px]",
                               getTipoClass(prazo.tipo),
                             )}
                           >
                             <div className="truncate font-medium">{prazo.titulo}</div>
                             <div className="mt-1 truncate opacity-80">
-                              {prazo.diaInteiro ? "Dia inteiro" : prazo.hora ? prazo.hora.slice(0, 5) : "Sem hora"}
+                              {getPrazoTimeLabel(prazo)}
                             </div>
                           </div>
                         ))}
-                        {atividadesDoDia.length > 2 && (
-                          <div className="rounded-xl border border-dashed border-border px-2 py-1.5 text-[11px] text-muted-foreground">
-                            +{atividadesDoDia.length - 2} atividade(s)
+                        {atividadesDoDia.length > 1 && (
+                          <div className="rounded-lg border border-dashed border-border px-2 py-1.5 text-[10px] text-muted-foreground md:text-[11px]">
+                            +{atividadesDoDia.length - 1} atividade(s)
                           </div>
                         )}
                       </div>
@@ -680,53 +847,60 @@ export const AgendaNotasView = () => {
             </div>
           </div>
         ) : (
-          <div className="grid gap-3 xl:grid-cols-7">
-            {diasDaSemana.map((dia) => {
-              const prazosDoDia = sortPrazosByDate(
-                prazosFiltrados.filter((prazo) => isSameDay(parseISO(prazo.data), dia)),
-              );
+          <div className="scroll-subtle -mx-1 overflow-x-auto px-1 pb-1">
+            <div className="grid min-w-full grid-flow-col auto-cols-[minmax(220px,1fr)] gap-3 2xl:auto-cols-fr">
+              {diasDaSemana.map((dia) => {
+                const prazosDoDia = sortPrazosByDate(
+                  prazosFiltrados.filter((prazo) => isSameDay(parseISO(prazo.data), dia)),
+                );
 
-              return (
-                <div
-                  key={dia.toISOString()}
-                  className={cn(
-                    "rounded-2xl border border-border bg-card/50 p-3",
-                    dataSelecionada && isSameDay(dia, dataSelecionada) && "ring-2 ring-primary/30",
-                  )}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setDataSelecionada(dia)}
-                    className="mb-3 w-full rounded-xl bg-background/70 px-3 py-2 text-left transition-colors hover:bg-background"
-                  >
-                    <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
-                      {format(dia, "EEE", { locale: ptBR })}
-                    </p>
-                    <p className="mt-1 text-lg font-semibold text-foreground">{format(dia, "dd")}</p>
-                  </button>
-
-                  <div className="space-y-2">
-                    {prazosDoDia.length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-border px-3 py-4 text-xs text-muted-foreground">
-                        Sem atividades.
-                      </div>
-                    ) : (
-                      prazosDoDia.map((prazo) => (
-                        <AgendaPrazoCard
-                          key={prazo.id}
-                          prazo={prazo}
-                          userId={user?.id}
-                          userRole={user?.papel}
-                          onPrazoAtualizado={atualizarPrazoLocal}
-                          onRefresh={carregarAgenda}
-                          onSelect={() => setPrazoSelecionadoId(prazo.id)}
-                        />
-                      ))
+                return (
+                  <div
+                    key={dia.toISOString()}
+                    className={cn(
+                      "flex min-h-[340px] flex-col rounded-2xl border border-border bg-card/50 p-3",
+                      dataSelecionada && isSameDay(dia, dataSelecionada) && "ring-2 ring-primary/30",
                     )}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setDataSelecionada(dia)}
+                      className="mb-3 w-full rounded-xl bg-background/70 px-3 py-2.5 text-left transition-colors hover:bg-background"
+                    >
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                        {format(dia, "EEE", { locale: ptBR }).replace(".", "")}
+                      </p>
+                      <div className="mt-1 flex items-end justify-between gap-2">
+                        <p className="text-xl font-semibold text-foreground">{format(dia, "dd")}</p>
+                        <Badge variant="outline" className="rounded-full px-2 py-0 text-[10px]">
+                          {prazosDoDia.length} atividade(s)
+                        </Badge>
+                      </div>
+                    </button>
+
+                    <div className="space-y-2.5">
+                      {prazosDoDia.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-border px-3 py-5 text-xs text-muted-foreground">
+                          Sem atividades.
+                        </div>
+                      ) : (
+                        prazosDoDia.map((prazo) => (
+                          <AgendaPrazoCompactCard
+                            key={prazo.id}
+                            prazo={prazo}
+                            userId={user?.id}
+                            userRole={user?.papel}
+                            onPrazoAtualizado={atualizarPrazoLocal}
+                            onRefresh={carregarAgenda}
+                            onSelect={() => setPrazoSelecionadoId(prazo.id)}
+                          />
+                        ))
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
@@ -762,7 +936,7 @@ export const AgendaNotasView = () => {
   );
 
   return (
-    <div className="flex min-h-full flex-col gap-6 p-6 md:p-8">
+    <div className="flex min-h-full flex-col gap-6 p-6 md:h-full md:min-h-0 md:overflow-hidden md:p-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-lg font-semibold text-foreground">Agenda & Notas</h3>
@@ -804,7 +978,7 @@ export const AgendaNotasView = () => {
           <div className="overflow-hidden rounded-2xl border border-border bg-card">{notesContent}</div>
         </div>
       ) : (
-        <div className="min-h-[760px] flex-1 overflow-hidden rounded-2xl border border-border bg-card shadow-[0_30px_80px_-45px_rgba(0,0,0,0.65)]">
+        <div className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-border bg-card shadow-[0_30px_80px_-45px_rgba(0,0,0,0.65)]">
           <ResizablePanelGroup direction="horizontal">
             <ResizablePanel defaultSize={68} minSize={50}>
               {agendaContent}
