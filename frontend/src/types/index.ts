@@ -105,6 +105,61 @@ export interface Atendimento {
   dataAtualizacao: string;
 }
 
+export interface DashboardPrazoResumo {
+  id: string;
+  titulo: string;
+  data: string;
+  prioridade: string;
+  concluido: boolean;
+}
+
+export interface DashboardProcessosPorCidade {
+  cidade: string;
+  estado: string;
+  unidadeId: string;
+  unidadeNome: string;
+  totalProcessos: number;
+}
+
+export interface DashboardProcessosPorArea {
+  area: string;
+  quantidade: number;
+}
+
+export interface DashboardProcessoResumo {
+  id: string;
+  numero: string;
+  clienteNome: string;
+  ultimaMovimentacao: string | null;
+  diasParados: number;
+}
+
+export interface DashboardMovimentacaoRecente {
+  processoId: string | null;
+  processoNumero: string | null;
+  clienteNome: string | null;
+  data: string | null;
+  dataHora: string | null;
+  descricao: string;
+  tipo: string | null;
+  origem: string | null;
+}
+
+export interface DashboardMetricas {
+  totalClientes: number;
+  processosAtivos: number;
+  prazosSemana: number;
+  prazosAtrasados: number;
+  prazosHoje: number;
+  tarefasAbertas: number;
+  proximosPrazos: DashboardPrazoResumo[];
+  processosRecentes: Processo[];
+  ultimasMovimentacoes: DashboardMovimentacaoRecente[];
+  processosPorCidade: DashboardProcessosPorCidade[];
+  processosPorArea: DashboardProcessosPorArea[];
+  processosParados: DashboardProcessoResumo[];
+}
+
 // ─── Processos ───────────────────────────────────────────────────────────────
 
 export type StatusProcesso =

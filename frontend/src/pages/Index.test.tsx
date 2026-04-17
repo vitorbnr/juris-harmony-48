@@ -20,15 +20,27 @@ vi.mock("@/components/RecentProcesses", () => ({
 }));
 
 vi.mock("@/components/UpcomingDeadlines", () => ({
-  UpcomingDeadlines: () => <div>Proximos prazos</div>,
+  UpcomingDeadlines: () => <div>Próximos prazos</div>,
 }));
 
 vi.mock("@/components/UrgencyPanel", () => ({
-  UrgencyPanel: () => <div>Painel de urgencia</div>,
+  UrgencyPanel: () => <div>Painel de urgência</div>,
 }));
 
 vi.mock("@/components/QuickActions", () => ({
-  QuickActions: () => <div>Acoes rapidas</div>,
+  QuickActions: () => <div>Ações rápidas</div>,
+}));
+
+vi.mock("@/components/ProcessosPorAreaChart", () => ({
+  ProcessosPorAreaChart: () => <div>Demandas por área</div>,
+}));
+
+vi.mock("@/components/StagnantProcesses", () => ({
+  StagnantProcesses: () => <div>Processos parados</div>,
+}));
+
+vi.mock("@/components/BlocoNotasDashboard", () => ({
+  BlocoNotasDashboard: () => <div>Bloco de notas</div>,
 }));
 
 vi.mock("@/components/views/InboxJuridicaView", () => ({
@@ -81,6 +93,12 @@ vi.mock("@/lib/api", () => ({
         prazosAtrasados: 0,
         prazosHoje: 0,
         tarefasAbertas: 0,
+        proximosPrazos: [],
+        processosRecentes: [],
+        ultimasMovimentacoes: [],
+        processosPorCidade: [],
+        processosPorArea: [],
+        processosParados: [],
       },
     }),
   },
@@ -89,7 +107,7 @@ vi.mock("@/lib/api", () => ({
 const expectedMenuOrder = [
   "Dashboard",
   "Inbox Juridica",
-  "Gestao Kanban",
+  "Gestão Kanban",
   "Agenda e Notas",
   "Clientes",
   "Atendimentos",

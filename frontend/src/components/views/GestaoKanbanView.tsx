@@ -237,7 +237,7 @@ export const GestaoKanbanView = () => {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <SquareKanban className="h-5 w-5 text-primary" />
-            <h3 className="text-lg font-semibold text-foreground">Gestao Kanban de Prazos</h3>
+            <h3 className="text-lg font-semibold text-foreground">Gestão Kanban de Prazos</h3>
           </div>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
             Arraste os cards entre as colunas ou use o menu de 3 pontos em cada tarefa para reorganizar o fluxo de

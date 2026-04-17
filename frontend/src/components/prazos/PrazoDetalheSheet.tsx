@@ -600,7 +600,7 @@ export function PrazoDetalheSheet({
                           </div>
                         ) : (
                           <div className="mt-5 rounded-2xl border border-dashed border-border bg-background/60 px-5 py-10 text-sm text-muted-foreground">
-                            O modulo de publicacoes sera ligado aqui futuramente. Este espaco ja esta preparado para receber a fonte oficial, o teor util e o historico da vinculacao quando essa camada entrar no sistema.
+                            O modulo de publicações sera ligado aqui futuramente. Este espaco ja esta preparado para receber a fonte oficial, o teor util e o historico da vinculacao quando essa camada entrar no sistema.
                           </div>
                         )}
                       </section>

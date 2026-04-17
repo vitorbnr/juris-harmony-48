@@ -777,7 +777,7 @@ export const InboxJuridicaView = () => {
           <div className="space-y-1">
             <p className="text-sm font-medium text-foreground">Nenhum evento encontrado</p>
             <p className="text-sm text-muted-foreground">
-              Quando novas movimentacoes, publicacoes ou intimacoes forem importadas, elas aparecerao aqui.
+              Quando novas movimentacoes, publicações ou intimacoes forem importadas, elas aparecerao aqui.
             </p>
           </div>
         </div>

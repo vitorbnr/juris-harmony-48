@@ -1,5 +1,5 @@
 import api from "@/lib/api";
-import type { Atendimento, NotaPessoal, Prazo, PrazoComentario, PrazoDetalhe, Processo } from "@/types";
+import type { Atendimento, DashboardMetricas, NotaPessoal, Prazo, PrazoComentario, PrazoDetalhe } from "@/types";
 
 type ApiParams = Record<string, unknown>;
 
@@ -152,22 +152,7 @@ export interface CriarPublicacaoDjenRequest {
   horaEvento?: string | null;
 }
 
-export interface DashboardResponse {
-  totalClientes: number;
-  processosAtivos: number;
-  prazosSemana: number;
-  prazosAtrasados: number;
-  prazosHoje: number;
-  tarefasAbertas: number;
-  proximosPrazos: Array<{
-    id: string;
-    titulo: string;
-    data: string;
-    prioridade: string;
-    concluido: boolean;
-  }>;
-  processosRecentes: Processo[];
-}
+export type DashboardResponse = DashboardMetricas;
 
 export interface CalcularPrazoResponse {
   dataSugerida: string;
@@ -236,7 +221,7 @@ function cleanParams<T extends ApiParams | undefined>(params: T): T {
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 export const dashboardApi = {
-  get: () => api.get("/dashboard").then(r => r.data as DashboardResponse),
+  get: () => api.get("/dashboard/metricas").then(r => r.data as DashboardResponse),
 };
 
 // ─── Processos ────────────────────────────────────────────────────────────────

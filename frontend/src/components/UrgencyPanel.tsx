@@ -1,13 +1,4 @@
 import { AlertTriangle, CalendarClock, ClipboardList } from "lucide-react";
-import { useEffect, useState } from "react";
-
-import { dashboardApi } from "@/services/api";
-
-interface DashboardUrgency {
-  prazosAtrasados: number;
-  prazosHoje: number;
-  tarefasAbertas: number;
-}
 
 const cards = [
   {
@@ -30,54 +21,55 @@ const cards = [
   },
 ] as const;
 
-export const UrgencyPanel = () => {
-  const [data, setData] = useState<DashboardUrgency>({
-    prazosAtrasados: 0,
-    prazosHoje: 0,
-    tarefasAbertas: 0,
-  });
+interface UrgencyPanelProps {
+  prazosAtrasados?: number;
+  prazosHoje?: number;
+  tarefasAbertas?: number;
+  loading?: boolean;
+}
 
-  useEffect(() => {
-    dashboardApi
-      .get()
-      .then((response) => {
-        setData({
-          prazosAtrasados: response.prazosAtrasados ?? 0,
-          prazosHoje: response.prazosHoje ?? 0,
-          tarefasAbertas: response.tarefasAbertas ?? 0,
-        });
-      })
-      .catch(() =>
-        setData({
-          prazosAtrasados: 0,
-          prazosHoje: 0,
-          tarefasAbertas: 0,
-        }),
-      );
-  }, []);
+export const UrgencyPanel = ({
+  prazosAtrasados = 0,
+  prazosHoje = 0,
+  tarefasAbertas = 0,
+  loading = false,
+}: UrgencyPanelProps) => {
+  const data = {
+    prazosAtrasados,
+    prazosHoje,
+    tarefasAbertas,
+  };
 
   return (
     <div className="rounded-xl border border-border bg-card p-6 opacity-0 animate-fade-in" style={{ animationDelay: "320ms" }}>
       <div className="mb-5 flex items-center justify-between">
-        <h3 className="font-heading text-lg font-semibold text-foreground">Painel de urgencia</h3>
+        <h3 className="font-heading text-lg font-semibold text-foreground">Painel de urgência</h3>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        {cards.map((card) => {
-          const Icon = card.icon;
-          const value = data[card.key];
+      {loading ? (
+        <div className="grid gap-3 sm:grid-cols-3">
+          {[...Array(3)].map((_, index) => (
+            <div key={index} className="h-28 animate-pulse rounded-xl bg-muted/40" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-3">
+          {cards.map((card) => {
+            const Icon = card.icon;
+            const value = data[card.key];
 
-          return (
-            <div key={card.key} className={`rounded-xl border p-4 ${card.cls}`}>
-              <div className="mb-3 flex items-center justify-between">
-                <Icon className="h-4 w-4" />
-                <span className="text-2xl font-semibold">{value}</span>
+            return (
+              <div key={card.key} className={`rounded-xl border p-4 ${card.cls}`}>
+                <div className="mb-3 flex items-center justify-between">
+                  <Icon className="h-4 w-4" />
+                  <span className="text-2xl font-semibold">{value}</span>
+                </div>
+                <p className="text-sm font-medium">{card.label}</p>
               </div>
-              <p className="text-sm font-medium">{card.label}</p>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

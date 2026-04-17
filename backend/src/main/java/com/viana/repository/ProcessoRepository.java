@@ -1,14 +1,18 @@
 package com.viana.repository;
 
+import com.viana.dto.response.ProcessosPorAreaDTO;
+import com.viana.dto.response.ProcessosPorCidadeDTO;
 import com.viana.model.Processo;
 import com.viana.model.enums.StatusProcesso;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -142,4 +146,62 @@ public interface ProcessoRepository extends JpaRepository<Processo, UUID> {
     default List<Processo> findRecentesDashboard() {
         return findRecentesDashboard(org.springframework.data.domain.PageRequest.of(0, 5));
     }
+
+    @Query("""
+        SELECT new com.viana.dto.response.ProcessosPorCidadeDTO(
+            u.cidade,
+            u.estado,
+            u.id,
+            u.nome,
+            count(p)
+        )
+        FROM Processo p
+        JOIN p.unidade u
+        WHERE p.status IN :statuses
+          AND NOT (
+              UPPER(p.numero) LIKE 'ATD-%'
+              AND p.status = com.viana.model.enums.StatusProcesso.AGUARDANDO
+              AND p.dataDistribuicao IS NULL
+          )
+        GROUP BY u.cidade, u.estado, u.id, u.nome
+        ORDER BY count(p) DESC, u.cidade ASC, u.nome ASC
+    """)
+    List<ProcessosPorCidadeDTO> countProcessosAtivosPorCidadeUnidade(@Param("statuses") List<StatusProcesso> statuses);
+
+    @Query("""
+        SELECT new com.viana.dto.response.ProcessosPorAreaDTO(
+            p.tipo,
+            count(p)
+        )
+        FROM Processo p
+        WHERE p.status IN :statuses
+          AND NOT (
+              UPPER(p.numero) LIKE 'ATD-%'
+              AND p.status = com.viana.model.enums.StatusProcesso.AGUARDANDO
+              AND p.dataDistribuicao IS NULL
+          )
+        GROUP BY p.tipo
+        ORDER BY count(p) DESC, p.tipo ASC
+    """)
+    List<ProcessosPorAreaDTO> countProcessosAtivosPorArea(@Param("statuses") List<StatusProcesso> statuses);
+
+    @EntityGraph(attributePaths = {"cliente", "unidade"})
+    @Query("""
+        SELECT p
+        FROM Processo p
+        WHERE p.status IN :statuses
+          AND p.ultimaMovimentacao IS NOT NULL
+          AND p.ultimaMovimentacao < :dataLimite
+          AND NOT (
+              UPPER(p.numero) LIKE 'ATD-%'
+              AND p.status = com.viana.model.enums.StatusProcesso.AGUARDANDO
+              AND p.dataDistribuicao IS NULL
+          )
+        ORDER BY p.ultimaMovimentacao ASC, p.atualizadoEm ASC
+    """)
+    List<Processo> findProcessosAtivosParadosDesde(
+            @Param("statuses") List<StatusProcesso> statuses,
+            @Param("dataLimite") LocalDate dataLimite,
+            Pageable pageable
+    );
 }

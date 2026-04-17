@@ -7,6 +7,9 @@ import { RecentProcesses } from "@/components/RecentProcesses";
 import { UpcomingDeadlines } from "@/components/UpcomingDeadlines";
 import { UrgencyPanel } from "@/components/UrgencyPanel";
 import { QuickActions } from "@/components/QuickActions";
+import { ProcessosPorAreaChart } from "@/components/ProcessosPorAreaChart";
+import { StagnantProcesses } from "@/components/StagnantProcesses";
+import { BlocoNotasDashboard } from "@/components/BlocoNotasDashboard";
 import { AtendimentosView } from "@/components/views/AtendimentosView";
 import { GestaoKanbanView } from "@/components/views/GestaoKanbanView";
 import { ProcessosView } from "@/components/views/ProcessosView";
@@ -19,46 +22,95 @@ import { IndicadoresView } from "@/components/views/IndicadoresView";
 import { ConfiguracoesView } from "@/components/views/ConfiguracoesView";
 import { UnidadeProvider } from "@/context/UnidadeContext";
 import { normalizeSectionId, type AppSectionId } from "@/lib/navigation";
-import api from "@/lib/api";
+import { dashboardApi } from "@/services/api";
+import type { DashboardMetricas } from "@/types";
 
-interface DashboardStats {
-  totalClientes: number;
-  processosAtivos: number;
-  prazosSemana: number;
-  prazosAtrasados: number;
-  prazosHoje: number;
-  tarefasAbertas: number;
-}
+const EMPTY_DASHBOARD_METRICS: DashboardMetricas = {
+  totalClientes: 0,
+  processosAtivos: 0,
+  prazosSemana: 0,
+  prazosAtrasados: 0,
+  prazosHoje: 0,
+  tarefasAbertas: 0,
+  proximosPrazos: [],
+  processosRecentes: [],
+  ultimasMovimentacoes: [],
+  processosPorCidade: [],
+  processosPorArea: [],
+  processosParados: [],
+};
+
+const normalizeDashboardMetrics = (data: Partial<DashboardMetricas>): DashboardMetricas => ({
+  ...EMPTY_DASHBOARD_METRICS,
+  ...data,
+  proximosPrazos: Array.isArray(data.proximosPrazos) ? data.proximosPrazos : [],
+  processosRecentes: Array.isArray(data.processosRecentes) ? data.processosRecentes : [],
+  ultimasMovimentacoes: Array.isArray(data.ultimasMovimentacoes) ? data.ultimasMovimentacoes : [],
+  processosPorCidade: Array.isArray(data.processosPorCidade) ? data.processosPorCidade : [],
+  processosPorArea: Array.isArray(data.processosPorArea) ? data.processosPorArea : [],
+  processosParados: Array.isArray(data.processosParados) ? data.processosParados : [],
+});
 
 const DashboardContent = ({ onNavigate }: { onNavigate: (id: string) => void }) => {
-  const [stats, setStats] = useState<DashboardStats>({
-    totalClientes: 0,
-    processosAtivos: 0,
-    prazosSemana: 0,
-    prazosAtrasados: 0,
-    prazosHoje: 0,
-    tarefasAbertas: 0,
-  });
+  const [dashboardData, setDashboardData] = useState<DashboardMetricas>(EMPTY_DASHBOARD_METRICS);
+  const [loadingDashboard, setLoadingDashboard] = useState(true);
 
   useEffect(() => {
-    api.get("/dashboard").then(res => setStats(res.data)).catch(() => {});
+    let ativo = true;
+
+    dashboardApi
+      .get()
+      .then((data) => {
+        if (!ativo) return;
+        setDashboardData(normalizeDashboardMetrics(data));
+      })
+      .catch(() => {
+        if (!ativo) return;
+        setDashboardData(EMPTY_DASHBOARD_METRICS);
+      })
+      .finally(() => {
+        if (ativo) {
+          setLoadingDashboard(false);
+        }
+      });
+
+    return () => {
+      ativo = false;
+    };
   }, []);
 
   return (
     <div className="p-6 md:p-8 space-y-6">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <StatCard icon={Scale}         label="Processos Ativos"   value={stats.processosAtivos} change="Ativos no momento"  changeType="positive" delay={0} />
-        <StatCard icon={Users}         label="Clientes"           value={stats.totalClientes}   change="Cadastrados"        changeType="positive" delay={75} />
-        <StatCard icon={CalendarClock} label="Prazos esta Semana" value={stats.prazosSemana}    change="Pendentes"          changeType="negative" delay={150} />
+        <StatCard icon={Scale}         label="Processos Ativos"   value={dashboardData.processosAtivos} change="Ativos no momento"  changeType="positive" delay={0} />
+        <StatCard icon={Users}         label="Clientes"           value={dashboardData.totalClientes}   change="Cadastrados"        changeType="positive" delay={75} />
+        <StatCard icon={CalendarClock} label="Prazos esta Semana" value={dashboardData.prazosSemana}    change="Pendentes"          changeType="negative" delay={150} />
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <RecentProcesses onNavigate={onNavigate} />
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+        <div className="space-y-6 xl:col-span-8">
+          <RecentProcesses
+            onNavigate={onNavigate}
+            movimentacoes={dashboardData.ultimasMovimentacoes}
+            loading={loadingDashboard}
+          />
+
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <ProcessosPorAreaChart data={dashboardData.processosPorArea} loading={loadingDashboard} />
+            <StagnantProcesses processos={dashboardData.processosParados} loading={loadingDashboard} />
+          </div>
         </div>
-        <div className="space-y-6">
-          <UrgencyPanel />
-          <UpcomingDeadlines />
+
+        <div className="space-y-6 xl:col-span-4">
+          <UrgencyPanel
+            prazosAtrasados={dashboardData.prazosAtrasados}
+            prazosHoje={dashboardData.prazosHoje}
+            tarefasAbertas={dashboardData.tarefasAbertas}
+            loading={loadingDashboard}
+          />
           <QuickActions />
+          <UpcomingDeadlines prazos={dashboardData.proximosPrazos} loading={loadingDashboard} />
+          <BlocoNotasDashboard />
         </div>
       </div>
     </div>

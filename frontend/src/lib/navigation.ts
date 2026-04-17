@@ -51,8 +51,8 @@ export const appSections: AppSectionConfig[] = [
   },
   {
     id: "gestao-kanban",
-    label: "Gestao Kanban",
-    title: "Gestao Kanban",
+    label: "Gestão Kanban",
+    title: "Gestão Kanban",
     subtitle: "Mova prazos entre etapas com drag-and-drop e acompanhe o fluxo em tempo real.",
     icon: SquareKanban,
   },
@@ -86,9 +86,9 @@ export const appSections: AppSectionConfig[] = [
   },
   {
     id: "publicacoes",
-    label: "Publicacoes",
-    title: "Publicacoes",
-    subtitle: "Central dedicada ao acompanhamento de publicacoes juridicas.",
+    label: "Publicações",
+    title: "Publicações",
+    subtitle: "Central dedicada ao acompanhamento de publicações jurídicas.",
     icon: Newspaper,
   },
   {

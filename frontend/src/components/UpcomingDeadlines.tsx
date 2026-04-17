@@ -1,8 +1,6 @@
-import { useEffect, useState } from "react";
 import { AlertTriangle, CalendarClock } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { dashboardApi } from "@/services/api";
 
 interface PrazoProximo {
   id: string;
@@ -12,18 +10,13 @@ interface PrazoProximo {
   concluido: boolean;
 }
 
-export const UpcomingDeadlines = () => {
-  const [prazos, setPrazos] = useState<PrazoProximo[]>([]);
+interface Props {
+  prazos?: PrazoProximo[];
+  loading?: boolean;
+}
 
-  useEffect(() => {
-    dashboardApi
-      .get()
-      .then((data) => {
-        const items = data.proximosPrazos ?? [];
-        setPrazos(Array.isArray(items) ? items.slice(0, 4) : []);
-      })
-      .catch(() => setPrazos([]));
-  }, []);
+export const UpcomingDeadlines = ({ prazos = [], loading = false }: Props) => {
+  const itens = prazos.slice(0, 4);
 
   const getDaysUntil = (dateStr: string) => {
     const date = new Date(dateStr + "T00:00:00");
@@ -36,10 +29,14 @@ export const UpcomingDeadlines = () => {
         <h3 className="font-heading text-lg font-semibold text-foreground">Proximos prazos</h3>
       </div>
       <div className="space-y-3">
-        {prazos.length === 0 ? (
+        {loading ? (
+          [...Array(3)].map((_, index) => (
+            <div key={index} className="h-14 animate-pulse rounded-lg bg-muted/40" />
+          ))
+        ) : itens.length === 0 ? (
           <p className="py-4 text-center text-sm text-muted-foreground">Nenhum prazo pendente</p>
         ) : (
-          prazos.map((prazo) => {
+          itens.map((prazo) => {
             const days = getDaysUntil(prazo.data);
             const urgent = prazo.prioridade === "alta" || days <= 3;
 

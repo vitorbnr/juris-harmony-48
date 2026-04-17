@@ -4,7 +4,7 @@ import { PlaceholderView } from "./PlaceholderView";
 export const PublicacoesView = () => (
   <PlaceholderView
     icon={Newspaper}
-    title="Publicacoes"
-    description="Esta area foi reservada no remanejamento para a futura implementacao do modulo de publicacoes."
+    title="Publicações"
+    description="Esta area foi reservada no remanejamento para a futura implementação do modulo de publicações."
   />
 );

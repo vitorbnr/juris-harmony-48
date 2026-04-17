@@ -718,7 +718,7 @@ export function AtividadeModal({
                           type="button"
                           disabled
                           className="rounded-full border border-dashed border-border px-3 py-1.5 text-xs font-medium text-muted-foreground opacity-70"
-                          title="Base preparada para implementacao futura do modulo de Casos."
+                          title="Base preparada para implementação futura do modulo de Casos."
                         >
                           Caso (futuro)
                         </button>
