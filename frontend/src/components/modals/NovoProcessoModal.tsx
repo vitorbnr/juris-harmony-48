@@ -248,7 +248,7 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
       return;
     }
     if (advogadosSelecionados.length === 0) {
-      const message = "Selecione ao menos um advogado responsavel.";
+      const message = "Selecione ao menos um advogado responsável.";
       setAdvogadosError(message);
       toast.error(message);
       return;
@@ -382,7 +382,7 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
                 name="dataDistribuicao"
                 render={({ field }) => (
                   <FormItem className="space-y-1.5">
-                    <FormLabel>Data distribuicao</FormLabel>
+                    <FormLabel>Data distribuição</FormLabel>
                     <FormControl>
                       <Input type="date" value={field.value} onChange={field.onChange} />
                     </FormControl>
@@ -423,7 +423,7 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
             </div>
 
             <div className="space-y-2">
-              <Label>Advogados Responsaveis *</Label>
+              <Label>Advogados Responsáveis *</Label>
 
               {advogadosSelecionados.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
@@ -480,7 +480,7 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
 
               {advogadosSelecionados.length === 0 && (
                 <p className={`text-xs ${advogadosError ? "text-destructive" : "text-muted-foreground"}`}>
-                  {advogadosError || "Selecione ao menos um advogado responsavel."}
+                  {advogadosError || "Selecione ao menos um advogado responsável."}
                 </p>
               )}
             </div>

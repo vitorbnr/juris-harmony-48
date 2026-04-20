@@ -105,7 +105,7 @@ export function EditarProcessoModal({ processo, onClose, onSaved }: Props) {
 
   const salvarDados = async () => {
     if (advogadosSelecionados.length === 0) {
-      const message = "Selecione ao menos um advogado responsavel.";
+      const message = "Selecione ao menos um advogado responsável.";
       setAdvogadosError(message);
       toast.error(message);
       return;
@@ -249,7 +249,7 @@ export function EditarProcessoModal({ processo, onClose, onSaved }: Props) {
                   </div>
                 ) : (
                   <p className={`text-xs ${advogadosError ? "text-destructive" : "text-muted-foreground"}`}>
-                    {advogadosError || "Selecione ao menos um advogado responsavel."}
+                    {advogadosError || "Selecione ao menos um advogado responsável."}
                   </p>
                 )}
 

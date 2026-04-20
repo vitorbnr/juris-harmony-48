@@ -22,9 +22,10 @@ describe("UnidadeContext", () => {
     // Vamos apenas testar se o estado muda, e se unidadeAtual reflete isso.
     
     act(() => {
-      result.current.setUnidadeSelecionada("1");
+      result.current.setUnidadeSelecionada("1", "Cocos");
     });
 
     expect(result.current.unidadeSelecionada).toBe("1");
+    expect(result.current.unidadeAtual).toEqual({ id: "1", nome: "Cocos" });
   });
 });

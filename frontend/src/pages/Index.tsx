@@ -84,7 +84,7 @@ const DashboardContent = ({ onNavigate }: { onNavigate: (id: string) => void }) 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard icon={Scale}         label="Processos Ativos"   value={dashboardData.processosAtivos} change="Ativos no momento"  changeType="positive" delay={0} />
         <StatCard icon={Users}         label="Clientes"           value={dashboardData.totalClientes}   change="Cadastrados"        changeType="positive" delay={75} />
-        <StatCard icon={CalendarClock} label="Prazos esta Semana" value={dashboardData.prazosSemana}    change="Pendentes"          changeType="negative" delay={150} />
+        <StatCard icon={CalendarClock} label="Prazos esta semana" value={dashboardData.prazosSemana}    change="Pendentes"          changeType="negative" delay={150} />
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">

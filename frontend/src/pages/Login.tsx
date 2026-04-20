@@ -37,7 +37,7 @@ const Login = () => {
       {/* Painel esquerdo decorativo */}
       <div className="hidden lg:flex lg:w-1/2 sidebar-gradient relative items-center justify-center p-12">
         <div className="absolute top-6 left-6">
-          <ThemeToggle />
+          <ThemeToggle className="text-white/80 hover:bg-white/10 hover:text-white" />
         </div>
         <img
           src="/logo.png"

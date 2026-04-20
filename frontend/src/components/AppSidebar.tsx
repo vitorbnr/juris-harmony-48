@@ -4,8 +4,6 @@ import { useState } from "react";
 import { appSections, configuracoesSection } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 
-import { ThemeToggle } from "./ThemeToggle";
-
 interface AppSidebarProps {
   activeItem: string;
   onNavigate: (id: string) => void;
@@ -84,8 +82,7 @@ export const AppSidebar = ({ activeItem, onNavigate }: AppSidebarProps) => {
           {!collapsed && <span>{configuracoesSection.label}</span>}
         </button>
 
-        <div className={cn("mt-2 flex items-center px-1", collapsed ? "flex-col gap-2" : "justify-between")}>
-          <ThemeToggle />
+        <div className={cn("mt-2 flex items-center px-1", collapsed ? "justify-center" : "justify-end")}>
           <button
             onClick={() => setCollapsed(!collapsed)}
             className="rounded-lg p-2 text-sidebar-muted transition-colors hover:bg-sidebar-accent/40 hover:text-sidebar-foreground"

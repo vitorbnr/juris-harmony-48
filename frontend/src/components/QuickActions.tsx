@@ -255,12 +255,12 @@ export const QuickActions = () => {
     }
 
     if (!notaClienteId) {
-      toast.error("Selecione o cliente da nota rapida.");
+      toast.error("Selecione o cliente da nota rápida.");
       return;
     }
 
     if (!notaConteudo.trim()) {
-      toast.error("Descreva a anotacao da ligacao.");
+      toast.error("Descreva a anotação da ligação.");
       return;
     }
 
@@ -322,7 +322,7 @@ export const QuickActions = () => {
   return (
     <>
       <div className="bg-card rounded-xl border border-border p-6 opacity-0 animate-fade-in" style={{ animationDelay: "500ms" }}>
-        <h3 className="mb-4 font-heading text-lg font-semibold text-foreground">Acoes Rapidas</h3>
+        <h3 className="mb-4 font-heading text-lg font-semibold text-foreground">Ações Rápidas</h3>
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={() => setModalProcesso(true)}
@@ -361,7 +361,7 @@ export const QuickActions = () => {
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400 transition-transform group-hover:scale-105">
               <FileText className="h-5 w-5" />
             </div>
-            <span className="text-center text-xs font-medium text-foreground">Nota Rapida</span>
+            <span className="text-center text-xs font-medium text-foreground">Nota Rápida</span>
           </button>
 
           <button
@@ -522,8 +522,8 @@ export const QuickActions = () => {
       >
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Nota Rapida</DialogTitle>
-            <DialogDescription>Registe rapidamente uma anotacao de ligacao vinculada ao cliente.</DialogDescription>
+            <DialogTitle>Nota Rápida</DialogTitle>
+            <DialogDescription>Registe rapidamente uma anotacao de ligação vinculada ao cliente.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -539,7 +539,7 @@ export const QuickActions = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="quick-note-content">Anotacao da ligacao</Label>
+              <Label htmlFor="quick-note-content">Anotação da ligação</Label>
               <Textarea
                 id="quick-note-content"
                 value={notaConteudo}

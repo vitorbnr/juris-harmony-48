@@ -92,7 +92,6 @@ function ClienteDrawer({
     { label: "Telefone", value: cliente.telefone || "—" },
     { label: "Cidade / UF", value: `${cliente.cidade || "—"} — ${cliente.estado || "—"}` },
     { label: "Cadastro", value: cliente.dataCadastro ? new Date(cliente.dataCadastro).toLocaleDateString("pt-BR") : "—" },
-    { label: "Advogado Responsável", value: cliente.advogadoResponsavel || "—" },
     { label: "Unidade", value: cliente.unidadeNome || "—" },
     { label: "Status", value: cliente.isFalecido ? "Falecido" : "Ativo" },
   ];
@@ -348,14 +347,11 @@ export const ClientesView = () => {
               </div>
 
               <div className="mt-3 flex items-center justify-between border-t border-border/60 pt-3">
-                <span className="text-xs text-muted-foreground">{cliente.advogadoResponsavel || "—"}</span>
-                <div className="flex items-center gap-1.5">
-                  <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
-                    <MapPin className="h-2.5 w-2.5" />
-                    {cliente.unidadeNome || "—"}
-                  </span>
-                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-                </div>
+                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                  <MapPin className="h-2.5 w-2.5" />
+                  {cliente.unidadeNome || "—"}
+                </span>
+                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
               </div>
             </div>
           ))}
@@ -368,7 +364,6 @@ export const ClientesView = () => {
                 <th className="px-5 py-3 text-left text-xs font-medium tracking-wide text-muted-foreground">Cliente</th>
                 <th className="hidden px-5 py-3 text-left text-xs font-medium tracking-wide text-muted-foreground md:table-cell">CPF / CNPJ</th>
                 <th className="hidden px-5 py-3 text-left text-xs font-medium tracking-wide text-muted-foreground lg:table-cell">Contato</th>
-                <th className="hidden px-5 py-3 text-left text-xs font-medium tracking-wide text-muted-foreground lg:table-cell">Responsável</th>
                 <th className="px-5 py-3 text-left text-xs font-medium tracking-wide text-muted-foreground">Processos</th>
                 <th className="px-3 py-3" />
               </tr>
@@ -410,7 +405,6 @@ export const ClientesView = () => {
                     <p className="text-sm text-foreground">{cliente.telefone || "—"}</p>
                     <p className="text-xs text-muted-foreground">{cliente.email || "—"}</p>
                   </td>
-                  <td className="hidden px-5 py-3.5 text-muted-foreground lg:table-cell">{cliente.advogadoResponsavel || "—"}</td>
                   <td className="px-5 py-3.5">
                     <span className="inline-flex items-center gap-1 rounded-full bg-accent px-2 py-1 text-xs font-medium text-foreground">
                       <Scale className="h-3 w-3" />

@@ -41,7 +41,7 @@ export const RecentProcesses = ({ onNavigate, movimentacoes = [], loading = fals
     <div className="mb-5 flex items-center justify-between">
       <div>
         <h3 className="font-heading text-lg font-semibold text-foreground">Últimas movimentações</h3>
-        <p className="text-xs text-muted-foreground">Movimentacoes mais recentes dos processos ativos</p>
+        <p className="text-xs text-muted-foreground">Movimentações mais recentes dos processos ativos</p>
       </div>
       {onNavigate && (
         <button

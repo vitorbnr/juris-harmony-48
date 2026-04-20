@@ -38,8 +38,8 @@ export const appSections: AppSectionConfig[] = [
   {
     id: "dashboard",
     label: "Dashboard",
-    title: (userName) => `Ola, ${userName}`,
-    subtitle: "Aqui esta o resumo do escritorio hoje.",
+    title: (userName) => `Olá, ${userName}`,
+    subtitle: "Aqui está o resumo do escritório hoje.",
     icon: LayoutDashboard,
   },
   {
@@ -109,9 +109,9 @@ export const appSections: AppSectionConfig[] = [
 
 export const configuracoesSection: AppSectionConfig = {
   id: "configuracoes",
-  label: "Configuracoes",
-  title: "Configuracoes",
-  subtitle: "Gerencie perfil, equipe e preferencias do sistema.",
+  label: "Configurações",
+  title: "Configurações",
+  subtitle: "Gerencie perfil, equipe e preferências do sistema.",
   icon: Settings2,
 };
 
