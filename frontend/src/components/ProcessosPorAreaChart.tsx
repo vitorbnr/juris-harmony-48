@@ -107,7 +107,7 @@ export const ProcessosPorAreaChart = ({ data = [], loading = false }: Props) => 
         ) : (
           <>
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-xl border border-border/70 bg-background/40 px-4 py-3.5">
+              <div className="surface-panel rounded-2xl border border-border/70 px-4 py-3.5">
                 <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                   Total ativo
                 </p>
@@ -119,7 +119,7 @@ export const ProcessosPorAreaChart = ({ data = [], loading = false }: Props) => 
                 </p>
               </div>
 
-              <div className="rounded-xl border border-border/70 bg-background/40 px-4 py-3.5">
+              <div className="surface-panel rounded-2xl border border-border/70 px-4 py-3.5">
                 <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                   Maior frente
                 </p>
@@ -193,7 +193,7 @@ export const ProcessosPorAreaChart = ({ data = [], loading = false }: Props) => 
                 return (
                   <div
                     key={item.area}
-                    className="rounded-xl border border-border/70 bg-background/40 px-4 py-3"
+                    className="surface-panel rounded-2xl border border-border/70 px-4 py-3"
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0 flex items-center gap-3">

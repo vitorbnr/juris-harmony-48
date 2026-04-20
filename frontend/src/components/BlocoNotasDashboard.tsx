@@ -86,7 +86,7 @@ export const BlocoNotasDashboard = () => {
         : "text-muted-foreground";
 
   return (
-    <div className="rounded-xl border border-border bg-card p-6 opacity-0 animate-fade-in" style={{ animationDelay: "680ms" }}>
+    <div className="surface-card rounded-[1.35rem] border border-border/80 p-6 opacity-0 animate-fade-in" style={{ animationDelay: "680ms" }}>
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
@@ -106,7 +106,7 @@ export const BlocoNotasDashboard = () => {
         value={conteudo}
         onChange={(event) => setConteudo(event.target.value)}
         placeholder="Registe recados de ligacao, pontos de atencao e lembretes pessoais..."
-        className="min-h-[260px] resize-none border-border/80 bg-background/40"
+        className="min-h-[260px] resize-none border-border/80 bg-background/55"
         disabled={carregando}
       />
     </div>

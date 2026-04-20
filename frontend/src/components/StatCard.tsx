@@ -23,22 +23,23 @@ export const StatCard = ({
   return (
     <div
       className={cn(
-        "bg-card rounded-xl border border-border p-5 opacity-0 animate-fade-in",
-        className
+        "surface-card relative overflow-hidden rounded-[1.35rem] border border-border/80 p-5 opacity-0 animate-fade-in",
+        className,
       )}
       style={{ animationDelay: `${delay}ms` }}
     >
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/35 to-transparent" />
       <div className="flex items-start justify-between">
-        <div className="w-10 h-10 rounded-lg bg-accent flex items-center justify-center">
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/15">
           <Icon className="h-5 w-5 text-primary" />
         </div>
         {change && (
           <span
             className={cn(
-              "text-xs font-semibold px-2 py-0.5 rounded-full",
+              "rounded-full px-2.5 py-1 text-xs font-semibold",
               changeType === "positive" && "bg-primary/15 text-primary",
               changeType === "negative" && "bg-destructive/15 text-destructive",
-              changeType === "neutral" && "bg-muted text-muted-foreground"
+              changeType === "neutral" && "bg-muted/80 text-muted-foreground",
             )}
           >
             {change}
@@ -46,8 +47,8 @@ export const StatCard = ({
         )}
       </div>
       <div className="mt-4">
-        <p className="text-2xl font-heading font-bold text-foreground">{value}</p>
-        <p className="text-sm text-muted-foreground mt-1">{label}</p>
+        <p className="text-3xl font-heading font-bold tracking-tight text-foreground">{value}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{label}</p>
       </div>
     </div>
   );

@@ -153,11 +153,15 @@ const Index = () => {
 
   return (
     <UnidadeProvider>
-      <div className="flex min-h-screen bg-background">
+      <div className="app-shell flex min-h-screen bg-transparent">
         <AppSidebar activeItem={activeItem} onNavigate={handleNavigate} />
-        <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
+        <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 top-0 z-0 h-48 bg-gradient-to-b from-primary/8 via-primary/3 to-transparent"
+          />
           <DashboardHeader activeItem={activeItem} onNavigate={handleNavigate} />
-          <div className="flex-1 min-h-0 overflow-auto">
+          <div className="relative z-10 flex-1 min-h-0 overflow-auto">
             {renderContent(activeItem, handleNavigate)}
           </div>
         </main>

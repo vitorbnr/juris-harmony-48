@@ -24,7 +24,7 @@ export const UpcomingDeadlines = ({ prazos = [], loading = false }: Props) => {
   };
 
   return (
-    <div className="rounded-xl border border-border bg-card p-6 opacity-0 animate-fade-in" style={{ animationDelay: "400ms" }}>
+    <div className="surface-card rounded-[1.35rem] border border-border/80 p-6 opacity-0 animate-fade-in" style={{ animationDelay: "400ms" }}>
       <div className="mb-5 flex items-center justify-between">
         <h3 className="font-heading text-lg font-semibold text-foreground">Proximos prazos</h3>
       </div>
@@ -43,9 +43,9 @@ export const UpcomingDeadlines = ({ prazos = [], loading = false }: Props) => {
             return (
               <div
                 key={prazo.id}
-                className="flex cursor-pointer items-center gap-3 rounded-lg px-4 py-3 transition-colors hover:bg-accent/50"
+                className="surface-panel flex cursor-pointer items-center gap-3 rounded-2xl border border-border/70 px-4 py-3 transition-colors hover:bg-accent/50"
               >
-                <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg", urgent ? "bg-destructive/10" : "bg-accent")}>
+                <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl", urgent ? "bg-destructive/10" : "bg-accent")}>
                   {urgent ? (
                     <AlertTriangle className="h-4 w-4 text-destructive" />
                   ) : (

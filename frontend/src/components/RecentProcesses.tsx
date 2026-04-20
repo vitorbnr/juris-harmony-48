@@ -37,7 +37,7 @@ interface Props {
 }
 
 export const RecentProcesses = ({ onNavigate, movimentacoes = [], loading = false }: Props) => (
-  <div className="rounded-xl border border-border bg-card p-6 opacity-0 animate-fade-in" style={{ animationDelay: "200ms" }}>
+  <div className="surface-card rounded-[1.35rem] border border-border/80 p-6 opacity-0 animate-fade-in" style={{ animationDelay: "200ms" }}>
     <div className="mb-5 flex items-center justify-between">
       <div>
         <h3 className="font-heading text-lg font-semibold text-foreground">Últimas movimentações</h3>
@@ -69,7 +69,7 @@ export const RecentProcesses = ({ onNavigate, movimentacoes = [], loading = fals
         {movimentacoes.map((movimentacao, index) => (
           <div
             key={`${movimentacao.processoId ?? "sem-processo"}-${movimentacao.dataHora ?? movimentacao.data ?? index}`}
-            className="rounded-xl border border-border/70 bg-background/40 p-4"
+            className="surface-panel rounded-2xl border border-border/70 p-4"
           >
             <div className="flex items-start gap-3">
               <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">

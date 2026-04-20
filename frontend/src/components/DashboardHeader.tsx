@@ -43,11 +43,11 @@ import { notificacoesApi, unidadesApi } from "@/services/api";
 import type { Notificacao, Unidade } from "@/types";
 
 const tipoCor: Record<string, string> = {
-  prazo: "bg-red-500/15 text-red-300",
-  tarefa: "bg-amber-500/15 text-amber-300",
-  financeiro: "bg-yellow-500/15 text-yellow-300",
-  documento: "bg-blue-500/15 text-blue-300",
-  sistema: "bg-primary/15 text-primary",
+  prazo: "border border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-300",
+  tarefa: "border border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  financeiro: "border border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  documento: "border border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-300",
+  sistema: "border border-primary/20 bg-primary/10 text-primary",
 };
 
 const notificationLabel: Record<string, string> = {
@@ -258,8 +258,8 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
                 if (notificacao.link && onNavigate) onNavigate(notificacao.link);
               }}
               className={cn(
-                "flex w-full items-start gap-3 rounded-xl border border-transparent px-3 py-3 text-left transition-all hover:border-primary/15 hover:bg-muted/40",
-                !notificacao.lida && "bg-primary/5",
+                "surface-panel flex w-full items-start gap-3 rounded-2xl border border-transparent px-3 py-3 text-left transition-all hover:border-primary/15 hover:bg-accent/55 hover:shadow-sm",
+                !notificacao.lida && "border-primary/10 bg-primary/5",
               )}
             >
               <span
@@ -298,11 +298,11 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
 
   return (
     <>
-      <header className="sticky top-0 z-20 flex flex-col gap-4 border-b border-border bg-card/70 px-4 py-3.5 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between sm:px-6">
+      <header className="sticky top-0 z-20 flex flex-col gap-4 border-b border-border/70 bg-background/78 px-4 py-3.5 shadow-[0_18px_40px_-36px_rgba(15,23,42,0.75)] backdrop-blur-2xl sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div className="min-w-0 flex-1">
           <h2 className="truncate font-heading text-xl font-semibold text-foreground">{section.title}</h2>
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <p className="text-xs text-muted-foreground">{section.subtitle}</p>
+            <p className="text-xs text-muted-foreground/90">{section.subtitle}</p>
 
             {showUnitSelector && (
               <DropdownMenu open={unidadeOpen} onOpenChange={setUnidadeOpen}>
@@ -313,7 +313,7 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
                       "flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-all",
                       unidadeSelecionada !== "todas"
                         ? "border-primary/30 bg-primary/10 text-primary"
-                        : "border-border/70 bg-secondary/70 text-muted-foreground hover:text-foreground",
+                        : "border-border/70 bg-card/75 text-muted-foreground shadow-sm hover:bg-accent/70 hover:text-foreground",
                     )}
                   >
                     <MapPin className="h-3.5 w-3.5" />
@@ -361,19 +361,19 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
         <div className="flex shrink-0 items-center justify-end gap-1.5 sm:gap-2">
           <WeatherWidget />
 
-          <ThemeToggle className="border border-border/70 bg-secondary/70 shadow-sm hover:bg-accent/80" />
+          <ThemeToggle className="border border-border/70 bg-card/80 shadow-[0_12px_24px_-18px_rgba(15,23,42,0.35)] hover:bg-accent/85" />
 
           <Popover open={notifOpen} onOpenChange={setNotifOpen}>
             <PopoverTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon"
-                className="relative h-9 w-9 rounded-xl border border-border/70 bg-secondary/70 shadow-sm hover:bg-accent/80"
+                className="relative h-9 w-9 rounded-xl border border-border/70 bg-card/80 shadow-[0_12px_24px_-18px_rgba(15,23,42,0.35)] hover:bg-accent/85"
                 aria-label="Abrir notificacoes"
               >
-                <Bell className="h-4 w-4 text-muted-foreground" />
+                <Bell className="h-4 w-4 text-foreground/70" />
                 {unreadCount > 0 && (
-                  <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground ring-2 ring-card">
+                  <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground ring-2 ring-background">
                     {unreadCount > 99 ? "99+" : unreadCount}
                   </span>
                 )}
@@ -384,7 +384,7 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
               align="end"
               sideOffset={10}
               collisionPadding={16}
-              className="w-[min(24rem,calc(100vw-1rem))] rounded-2xl border-border/80 bg-card/95 p-0 shadow-2xl backdrop-blur-xl"
+              className="w-[min(24rem,calc(100vw-1rem))] rounded-[1.5rem] border-border/80 bg-popover/95 p-0 shadow-[0_30px_80px_-44px_rgba(15,23,42,0.52)] backdrop-blur-xl"
             >
               <div className="border-b border-border/70 px-4 py-4">
                 <div className="flex items-center justify-between gap-3">
@@ -437,7 +437,7 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
             <DropdownMenuTrigger asChild>
               <Button
                 size="icon"
-                className="h-9 w-9 rounded-xl bg-primary text-primary-foreground shadow-sm transition-transform hover:scale-[1.02] hover:bg-primary/90"
+                className="h-9 w-9 rounded-xl bg-primary text-primary-foreground shadow-[0_18px_34px_-20px_rgba(15,23,42,0.5)] transition-transform hover:scale-[1.02] hover:bg-primary/90"
                 aria-label="Abrir criacao rapida"
               >
                 <Plus className="h-4 w-4" />
@@ -474,7 +474,7 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="rounded-full transition-transform hover:scale-[1.02]"
+                className="rounded-full border border-border/60 bg-card/65 p-0.5 shadow-sm transition-[transform,box-shadow] hover:scale-[1.02] hover:shadow-md"
                 aria-label="Abrir menu do utilizador"
               >
                 <Avatar className="h-9 w-9 cursor-pointer border-2 border-primary/30 shadow-sm" title={user?.nome}>

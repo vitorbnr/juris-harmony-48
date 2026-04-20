@@ -5,13 +5,13 @@ const cards = [
     key: "prazosAtrasados",
     label: "Atrasados",
     icon: AlertTriangle,
-    cls: "border-red-500/20 bg-red-500/5 text-red-400",
+    cls: "border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-300",
   },
   {
     key: "prazosHoje",
     label: "Vencem hoje",
     icon: CalendarClock,
-    cls: "border-yellow-500/20 bg-yellow-500/5 text-yellow-400",
+    cls: "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300",
   },
   {
     key: "tarefasAbertas",
@@ -41,7 +41,7 @@ export const UrgencyPanel = ({
   };
 
   return (
-    <div className="rounded-xl border border-border bg-card p-6 opacity-0 animate-fade-in" style={{ animationDelay: "320ms" }}>
+    <div className="surface-card rounded-[1.35rem] border border-border/80 p-6 opacity-0 animate-fade-in" style={{ animationDelay: "320ms" }}>
       <div className="mb-5 flex items-center justify-between">
         <h3 className="font-heading text-lg font-semibold text-foreground">Painel de urgência</h3>
       </div>
@@ -59,7 +59,7 @@ export const UrgencyPanel = ({
             const value = data[card.key];
 
             return (
-              <div key={card.key} className={`rounded-xl border p-4 ${card.cls}`}>
+              <div key={card.key} className={`surface-panel rounded-2xl border p-4 ${card.cls}`}>
                 <div className="mb-3 flex items-center justify-between">
                   <Icon className="h-4 w-4" />
                   <span className="text-2xl font-semibold">{value}</span>

@@ -13,7 +13,7 @@ const formatarData = (data: string | null) => {
 };
 
 export const StagnantProcesses = ({ processos = [], loading = false }: Props) => (
-  <div className="rounded-xl border border-border bg-card p-6 opacity-0 animate-fade-in" style={{ animationDelay: "620ms" }}>
+  <div className="surface-card rounded-[1.35rem] border border-border/80 p-6 opacity-0 animate-fade-in" style={{ animationDelay: "620ms" }}>
     <div className="mb-5 flex items-center justify-between gap-4">
       <div>
         <h3 className="font-heading text-lg font-semibold text-foreground">Processos Parados</h3>
@@ -38,7 +38,7 @@ export const StagnantProcesses = ({ processos = [], loading = false }: Props) =>
     ) : (
       <div className="space-y-3">
         {processos.map((processo) => (
-          <div key={processo.id} className="rounded-xl border border-border/70 bg-background/40 p-4">
+          <div key={processo.id} className="surface-panel rounded-2xl border border-border/70 p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-foreground">{processo.numero}</p>
@@ -49,7 +49,7 @@ export const StagnantProcesses = ({ processos = [], loading = false }: Props) =>
                   </p>
                 )}
               </div>
-              <span className="shrink-0 rounded-full bg-destructive/10 px-2.5 py-1 text-[11px] font-semibold text-destructive/90">
+              <span className="shrink-0 rounded-full bg-destructive/10 px-2.5 py-1 text-[11px] font-semibold text-destructive">
                 Parado ha {processo.diasParados} dias
               </span>
             </div>
