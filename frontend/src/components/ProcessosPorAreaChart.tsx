@@ -81,7 +81,7 @@ export const ProcessosPorAreaChart = ({ data = [], loading = false }: Props) => 
   return (
     <Card className="border-border bg-card opacity-0 animate-fade-in" style={{ animationDelay: "560ms" }}>
       <CardHeader className="pb-4">
-        <CardTitle className="text-lg font-semibold text-foreground">Demandas por Area</CardTitle>
+        <CardTitle className="text-lg font-semibold text-foreground">Demandas por área</CardTitle>
         <CardDescription>Volume de processos ativos</CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">

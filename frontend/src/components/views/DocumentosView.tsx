@@ -35,6 +35,7 @@ import { toast } from "sonner";
 import type {
   AcervoCidadeDocumento,
   AcervoClienteDocumento,
+  Cliente,
   Documento,
   PastaInternaNode,
   Processo,
@@ -96,6 +97,7 @@ const MAX_SIZE_BYTES = 100 * 1024 * 1024;
 
 type DocumentoDestino = "cliente" | "interno";
 type OrdenacaoDocumentos = "recentes" | "antigos" | "nome_asc" | "nome_desc" | "categoria";
+type ClienteAcervoSource = Pick<Cliente, "id" | "nome" | "initials" | "cidade" | "estado" | "ativo">;
 
 type DocumentSelection =
   | { type: "overview" }
@@ -128,6 +130,87 @@ function normalizeText(value?: string | null) {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
+}
+
+function buildInitials(nome?: string | null) {
+  const normalizedName = (nome ?? "").trim();
+  if (!normalizedName) return "CL";
+
+  return normalizedName
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
+function buildCidadeGroupKey(cidade?: string | null, estado?: string | null) {
+  return `${normalizeText(cidade)}::${normalizeText(estado)}`;
+}
+
+function buildCidadeLabel(cidade?: string | null, estado?: string | null) {
+  const cidadeLabel = cidade?.trim() || "Sem cidade";
+  const estadoLabel = estado?.trim() || "--";
+  return `${cidadeLabel} - ${estadoLabel}`;
+}
+
+function sortAcervoClientes(clientes: AcervoClienteDocumento[]) {
+  return [...clientes].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }));
+}
+
+function mergeAcervoComClientes(
+  acervoBase: AcervoCidadeDocumento[],
+  clientesBase: ClienteAcervoSource[],
+): AcervoCidadeDocumento[] {
+  const grouped = new Map<string, AcervoCidadeDocumento>();
+
+  acervoBase.forEach((cidade) => {
+    const groupKey = buildCidadeGroupKey(cidade.cidade, cidade.estado);
+    const clientesUnicos = new Map(cidade.clientes.map((cliente) => [cliente.id, cliente]));
+
+    grouped.set(groupKey, {
+      ...cidade,
+      clientes: sortAcervoClientes(Array.from(clientesUnicos.values())),
+      totalClientes: clientesUnicos.size,
+    });
+  });
+
+  clientesBase
+    .filter((cliente) => cliente.ativo !== false)
+    .forEach((cliente) => {
+      const groupKey = buildCidadeGroupKey(cliente.cidade, cliente.estado);
+      const clienteAcervo: AcervoClienteDocumento = {
+        id: cliente.id,
+        nome: cliente.nome,
+        initials: cliente.initials || buildInitials(cliente.nome),
+      };
+
+      const existing = grouped.get(groupKey);
+
+      if (existing) {
+        if (!existing.clientes.some((item) => item.id === cliente.id)) {
+          const nextClientes = sortAcervoClientes([...existing.clientes, clienteAcervo]);
+          grouped.set(groupKey, {
+            ...existing,
+            clientes: nextClientes,
+            totalClientes: nextClientes.length,
+          });
+        }
+        return;
+      }
+
+      grouped.set(groupKey, {
+        chave: `cidade:${groupKey}`,
+        cidade: cliente.cidade || "Sem cidade",
+        estado: cliente.estado || "--",
+        label: buildCidadeLabel(cliente.cidade, cliente.estado),
+        clientes: [clienteAcervo],
+        totalClientes: 1,
+      });
+    });
+
+  return Array.from(grouped.values()).sort((a, b) => a.label.localeCompare(b.label, "pt-BR", { sensitivity: "base" }));
 }
 
 function normalizeDocumento(doc: Documento & { uploadadoPor?: string }): Documento {
@@ -586,7 +669,7 @@ export const DocumentosView = () => {
   const [documentoEditando, setDocumentoEditando] = useState<Documento | null>(null);
   const [novaPastaAberta, setNovaPastaAberta] = useState(false);
   const [documentos, setDocumentos] = useState<Documento[]>([]);
-  const [todosClientes, setTodosClientes] = useState<{ id: string; nome: string }[]>([]);
+  const [todosClientes, setTodosClientes] = useState<ClienteAcervoSource[]>([]);
   const [todosProcessos, setTodosProcessos] = useState<Processo[]>([]);
   const [acervoClientes, setAcervoClientes] = useState<AcervoCidadeDocumento[]>([]);
   const [pastasInternas, setPastasInternas] = useState<PastaInternaNode[]>([]);
@@ -723,6 +806,31 @@ export const DocumentosView = () => {
     void carregarDocumentos();
   }, [carregarDocumentos]);
 
+  const clientesAcervoBase = SHOULD_MERGE_DEMO_DOCUMENTS
+    ? (() => {
+        const merged = new Map<string, ClienteAcervoSource>();
+        clientesMock.forEach((cliente) => {
+          merged.set(cliente.id, cliente);
+        });
+        todosClientes.forEach((cliente) => {
+          merged.set(cliente.id, cliente);
+        });
+        return Array.from(merged.values());
+      })()
+    : todosClientes;
+
+  const acervoAgrupado = mergeAcervoComClientes(acervoClientes, clientesAcervoBase);
+
+  useEffect(() => {
+    setExpandedCities((prev) => {
+      const next = { ...prev };
+      acervoAgrupado.forEach((cidade) => {
+        if (next[cidade.chave] === undefined) next[cidade.chave] = true;
+      });
+      return next;
+    });
+  }, [acervoAgrupado]);
+
   const handleDownload = async (doc: Documento) => {
     try {
       if (isDocumentoDemo(doc)) {
@@ -851,7 +959,7 @@ export const DocumentosView = () => {
   const buscaNormalizada = normalizeText(busca);
 
   const cidadePorClienteId = new Map<string, string>();
-  acervoClientes.forEach((cidade) => {
+  acervoAgrupado.forEach((cidade) => {
     cidade.clientes.forEach((cliente) => {
       cidadePorClienteId.set(cliente.id, cidade.label);
     });
@@ -924,7 +1032,7 @@ export const DocumentosView = () => {
       }
     });
 
-  const acervoFiltrado = acervoClientes
+  const acervoFiltrado = acervoAgrupado
     .map((cidade) => {
       if (!buscaNormalizada) return cidade;
 
@@ -953,7 +1061,7 @@ export const DocumentosView = () => {
 
   const clientesDaCidade =
     selecao.type === "cidade"
-      ? selecao.cidade.clientes.filter((cliente) =>
+      ? (acervoAgrupado.find((cidade) => cidade.chave === selecao.cidade.chave)?.clientes ?? selecao.cidade.clientes).filter((cliente) =>
           !buscaNormalizada || normalizeText(cliente.nome).includes(buscaNormalizada),
         )
       : [];
@@ -979,13 +1087,13 @@ export const DocumentosView = () => {
 
   const abrirTodasCidades = () => {
     setExpandedCities(
-      Object.fromEntries(acervoClientes.map((cidade) => [cidade.chave, true])),
+      Object.fromEntries(acervoAgrupado.map((cidade) => [cidade.chave, true])),
     );
   };
 
   const fecharTodasCidades = () => {
     setExpandedCities(
-      Object.fromEntries(acervoClientes.map((cidade) => [cidade.chave, false])),
+      Object.fromEntries(acervoAgrupado.map((cidade) => [cidade.chave, false])),
     );
   };
 
@@ -1091,7 +1199,7 @@ export const DocumentosView = () => {
               <MapPin className="h-3.5 w-3.5" />
               <span>Escritório Viana</span>
             </button>
-            {acervoVisivel && !loadingEstruturas && acervoClientes.length > 0 && (
+            {acervoVisivel && !loadingEstruturas && acervoAgrupado.length > 0 && (
               <div className="flex items-center gap-2 text-[10px]">
                 <button
                   type="button"

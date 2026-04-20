@@ -23,7 +23,6 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
-import { useUnidade } from "@/context/UnidadeContext";
 import { cn } from "@/lib/utils";
 import { atendimentosApi, clientesApi, processosApi } from "@/services/api";
 import { toast } from "sonner";
@@ -73,7 +72,6 @@ export function NovoAtendimentoModal({
   initialData = null,
 }: NovoAtendimentoModalProps) {
   const { user } = useAuth();
-  const { unidadeSelecionada } = useUnidade();
   const modoEdicao = Boolean(initialData);
 
   const [loading, setLoading] = useState(false);
@@ -91,9 +89,7 @@ export function NovoAtendimentoModal({
   }, [initialData]);
 
   useEffect(() => {
-    const unidadeId = unidadeSelecionada !== "todas" ? unidadeSelecionada : user?.unidadeId;
-
-    clientesApi.listar({ unidadeId, size: 1000 })
+    clientesApi.listar({ size: 1000 })
       .then((data) => {
         const items = data.content ?? data;
         setClientes(Array.isArray(items) ? items : []);
@@ -102,7 +98,7 @@ export function NovoAtendimentoModal({
         setClientes([]);
         toast.error("Nao foi possivel carregar os clientes.");
       });
-  }, [unidadeSelecionada, user?.unidadeId]);
+  }, []);
 
   useEffect(() => {
     if (!form.clienteId) {
@@ -112,7 +108,6 @@ export function NovoAtendimentoModal({
 
     setCarregandoProcessos(true);
     processosApi.listar({
-      unidadeId: unidadeSelecionada !== "todas" ? unidadeSelecionada : user?.unidadeId,
       clienteId: form.clienteId,
       size: 100,
     })
@@ -128,7 +123,7 @@ export function NovoAtendimentoModal({
         toast.error("Nao foi possivel carregar os processos do cliente.");
       })
       .finally(() => setCarregandoProcessos(false));
-  }, [form.clienteId, unidadeSelecionada, user?.unidadeId]);
+  }, [form.clienteId]);
 
   const clienteSelecionado = useMemo(
     () => clientes.find((cliente) => cliente.id === form.clienteId) ?? null,
@@ -189,7 +184,6 @@ export function NovoAtendimentoModal({
       const payload = {
         clienteId: form.clienteId,
         usuarioId: user.id,
-        unidadeId: unidadeSelecionada !== "todas" ? unidadeSelecionada : user.unidadeId,
         processoId,
         tipoVinculo: processoId ? "PROCESSO" : null,
         vinculoReferenciaId: processoId,

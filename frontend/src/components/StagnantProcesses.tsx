@@ -16,8 +16,8 @@ export const StagnantProcesses = ({ processos = [], loading = false }: Props) =>
   <div className="surface-card rounded-[1.35rem] border border-border/80 p-6 opacity-0 animate-fade-in" style={{ animationDelay: "620ms" }}>
     <div className="mb-5 flex items-center justify-between gap-4">
       <div>
-        <h3 className="font-heading text-lg font-semibold text-foreground">Processos Parados</h3>
-        <p className="text-xs text-muted-foreground">Sem movimentacao ha mais de 60 dias</p>
+        <h3 className="font-heading text-lg font-semibold text-foreground">Processos parados</h3>
+        <p className="text-xs text-muted-foreground">Sem movimentacao há mais de 60 dias</p>
       </div>
       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
         <AlertTriangle className="h-4 w-4" />

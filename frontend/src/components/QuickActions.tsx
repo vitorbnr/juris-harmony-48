@@ -322,7 +322,7 @@ export const QuickActions = () => {
   return (
     <>
       <div className="surface-card rounded-[1.35rem] border border-border/80 p-6 opacity-0 animate-fade-in" style={{ animationDelay: "500ms" }}>
-        <h3 className="mb-4 font-heading text-lg font-semibold text-foreground">Ações Rápidas</h3>
+        <h3 className="mb-4 font-heading text-lg font-semibold text-foreground">Ações rápidas</h3>
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={() => setModalProcesso(true)}
