@@ -16,12 +16,15 @@ import java.util.UUID;
 @Repository
 public interface DocumentoRepository extends JpaRepository<Documento, UUID> {
 
-    Page<Documento> findByPastaId(UUID pastaId, Pageable pageable);
-    Page<Documento> findByClienteId(UUID clienteId, Pageable pageable);
-    Page<Documento> findByProcessoId(UUID processoId, Pageable pageable);
-    List<Documento> findByPastaIdIsNull();
-    boolean existsByPastaId(UUID pastaId);
+    Page<Documento> findByPastaIdAndDeletedAtIsNull(UUID pastaId, Pageable pageable);
+    Page<Documento> findByClienteIdAndDeletedAtIsNull(UUID clienteId, Pageable pageable);
+    Page<Documento> findByProcessoIdAndDeletedAtIsNull(UUID processoId, Pageable pageable);
+    List<Documento> findByPastaIdIsNullAndDeletedAtIsNull();
+    boolean existsByPastaIdAndDeletedAtIsNull(UUID pastaId);
     Optional<Documento> findByStorageKey(String storageKey);
+
+    @Query("SELECT d.storageKey FROM Documento d WHERE d.storageKey IS NOT NULL")
+    List<String> findAllStorageKeys();
 
     @Query("""
         SELECT d FROM Documento d
@@ -30,6 +33,7 @@ public interface DocumentoRepository extends JpaRepository<Documento, UUID> {
         LEFT JOIN FETCH d.uploadedPor
         WHERE (:clienteId IS NULL OR d.cliente.id = :clienteId)
         AND (:processoId IS NULL OR d.processo.id = :processoId)
+        AND d.deletedAt IS NULL
         AND (:unidadeId IS NULL
              OR (d.processo IS NOT NULL AND d.processo.unidade.id = :unidadeId)
              OR (d.processo IS NULL AND d.cliente IS NOT NULL AND d.cliente.unidade.id = :unidadeId)
@@ -52,6 +56,7 @@ public interface DocumentoRepository extends JpaRepository<Documento, UUID> {
         LEFT JOIN FETCH d.processo
         LEFT JOIN FETCH d.uploadedPor
         WHERE d.cliente.id = :clienteId
+        AND d.deletedAt IS NULL
         AND (:unidadeId IS NULL OR d.cliente.unidade.id = :unidadeId)
         ORDER BY d.dataUpload DESC
     """)
@@ -66,6 +71,7 @@ public interface DocumentoRepository extends JpaRepository<Documento, UUID> {
         LEFT JOIN FETCH d.processo
         LEFT JOIN FETCH d.uploadedPor
         WHERE d.processo.id = :processoId
+        AND d.deletedAt IS NULL
         AND (:unidadeId IS NULL OR d.processo.unidade.id = :unidadeId)
         ORDER BY d.dataUpload DESC
     """)
@@ -81,6 +87,7 @@ public interface DocumentoRepository extends JpaRepository<Documento, UUID> {
         LEFT JOIN FETCH d.uploadedPor
         LEFT JOIN d.pasta p
         WHERE p.id = :pastaId
+        AND d.deletedAt IS NULL
         AND (:unidadeId IS NULL
              OR (p.processo IS NOT NULL AND p.processo.unidade.id = :unidadeId)
              OR (p.processo IS NULL AND p.cliente IS NOT NULL AND p.cliente.unidade.id = :unidadeId)
@@ -100,8 +107,25 @@ public interface DocumentoRepository extends JpaRepository<Documento, UUID> {
         )
         FROM Documento d
         WHERE d.cliente IS NOT NULL
+        AND d.deletedAt IS NULL
         AND (:unidadeId IS NULL OR d.cliente.unidade.id = :unidadeId)
         ORDER BY d.cliente.nome ASC
     """)
     List<Map<String, String>> findDistinctClientes(@Param("unidadeId") UUID unidadeId);
+
+    @Query("""
+        SELECT d FROM Documento d
+        LEFT JOIN FETCH d.cliente
+        LEFT JOIN FETCH d.processo
+        LEFT JOIN FETCH d.uploadedPor
+        LEFT JOIN FETCH d.deletedBy
+        WHERE d.deletedAt IS NOT NULL
+        AND (:unidadeId IS NULL
+             OR (d.processo IS NOT NULL AND d.processo.unidade.id = :unidadeId)
+             OR (d.processo IS NULL AND d.cliente IS NOT NULL AND d.cliente.unidade.id = :unidadeId)
+             OR (d.processo IS NULL AND d.cliente IS NULL AND d.pasta IS NOT NULL AND d.pasta.unidade.id = :unidadeId)
+             OR (d.processo IS NULL AND d.cliente IS NULL AND d.uploadedPor.unidade.id = :unidadeId))
+        ORDER BY d.deletedAt DESC, d.dataUpload DESC
+    """)
+    Page<Documento> findDeletedWithScope(@Param("unidadeId") UUID unidadeId, Pageable pageable);
 }

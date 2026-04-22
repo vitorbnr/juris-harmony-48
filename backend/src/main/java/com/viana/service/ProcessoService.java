@@ -7,24 +7,27 @@ import com.viana.dto.request.ParteProcessoRequest;
 import com.viana.dto.request.RepresentanteParteRequest;
 import com.viana.dto.response.DatajudCapaResponse;
 import com.viana.dto.response.DatajudMovimentacaoResponse;
+import com.viana.dto.response.ProcessoDetalheResponse;
 import com.viana.dto.response.ProcessoResponse;
 import com.viana.exception.BusinessException;
 import com.viana.exception.ResourceNotFoundException;
 import com.viana.model.Cliente;
 import com.viana.model.FonteSync;
 import com.viana.model.Movimentacao;
+import com.viana.model.Prazo;
 import com.viana.model.Processo;
 import com.viana.model.ProcessoEtiqueta;
 import com.viana.model.ProcessoParte;
 import com.viana.model.ProcessoParteRepresentante;
 import com.viana.model.Unidade;
 import com.viana.model.Usuario;
+import com.viana.model.enums.FonteIntegracao;
 import com.viana.model.enums.ModuloLog;
 import com.viana.model.enums.OrigemMovimentacao;
 import com.viana.model.enums.PoloProcessual;
-import com.viana.model.enums.FonteIntegracao;
 import com.viana.model.enums.StatusIntegracao;
 import com.viana.model.enums.StatusProcesso;
+import com.viana.model.enums.StatusProcessoDossie;
 import com.viana.model.enums.TipoParteProcessual;
 import com.viana.model.enums.TipoAcao;
 import com.viana.model.enums.TipoMovimentacao;
@@ -34,6 +37,7 @@ import com.viana.model.enums.TipoReferenciaIntegracao;
 import com.viana.repository.ClienteRepository;
 import com.viana.repository.FonteSyncRepository;
 import com.viana.repository.MovimentacaoRepository;
+import com.viana.repository.PrazoRepository;
 import com.viana.repository.ProcessoRepository;
 import com.viana.repository.UnidadeRepository;
 import com.viana.repository.UsuarioRepository;
@@ -66,6 +70,7 @@ public class ProcessoService {
     private final UsuarioRepository usuarioRepository;
     private final UnidadeRepository unidadeRepository;
     private final MovimentacaoRepository movimentacaoRepository;
+    private final PrazoRepository prazoRepository;
     private final LogAuditoriaService logAuditoriaService;
     private final DatajudClientService datajudClientService;
     private final FonteSyncService fonteSyncService;
@@ -109,20 +114,17 @@ public class ProcessoService {
     }
 
     @Transactional
-    public ProcessoResponse buscarPorId(UUID id) {
-        Processo processo = findOrThrow(id);
+    public ProcessoDetalheResponse buscarPorId(UUID id) {
+        Processo processo = findDetalheOrThrow(id);
 
         if (deveSincronizarMovimentacoesDatajud(processo)) {
             sincronizarMovimentacoesDatajud(processo, false);
+            processo = findDetalheOrThrow(id);
         }
 
-        ProcessoResponse response = toResponse(processo);
-        response.setMovimentacoes(
-                movimentacaoRepository.findTimelineByProcessoId(id).stream()
-                        .map(this::toMovimentacaoResponse)
-                        .toList()
-        );
-        return response;
+        List<Movimentacao> timeline = movimentacaoRepository.findTimelineByProcessoId(id);
+        List<Prazo> prazosVinculados = prazoRepository.findByProcessoIdOrderByDossie(id);
+        return toDetalheResponse(processo, timeline, prazosVinculados);
     }
 
     @Transactional
@@ -411,14 +413,13 @@ public class ProcessoService {
     }
 
     private void atualizarUltimaMovimentacao(Processo processo, LocalDate data) {
-        if (data == null) {
-            return;
+        if (data != null && (processo.getUltimaMovimentacao() == null || data.isAfter(processo.getUltimaMovimentacao()))) {
+            processo.setUltimaMovimentacao(data);
         }
 
-        if (processo.getUltimaMovimentacao() == null || data.isAfter(processo.getUltimaMovimentacao())) {
-            processo.setUltimaMovimentacao(data);
-            processoRepository.save(processo);
-        }
+        // Toca o processo sempre que entra uma nova movimentacao para refletir a atividade recente na ordenacao.
+        processo.setAtualizadoEm(LocalDateTime.now());
+        processoRepository.save(processo);
     }
 
     private LocalDate parseLocalDate(String data, String dataHora) {
@@ -460,6 +461,217 @@ public class ProcessoService {
     private Processo findOrThrow(UUID id) {
         return processoRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Processo não encontrado"));
+    }
+
+    private Processo findDetalheOrThrow(UUID id) {
+        return processoRepository.findDetalheById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Processo nao encontrado"));
+    }
+
+    private ProcessoDetalheResponse toDetalheResponse(
+            Processo processo,
+            List<Movimentacao> timeline,
+            List<Prazo> prazosVinculados
+    ) {
+        List<ProcessoDetalheResponse.AdvogadoInfo> advogadoInfos = processo.getAdvogados() == null
+                ? List.of()
+                : processo.getAdvogados().stream()
+                .map(advogado -> ProcessoDetalheResponse.AdvogadoInfo.builder()
+                        .id(advogado.getId().toString())
+                        .nome(advogado.getNome())
+                        .build())
+                .toList();
+
+        String advogadoId = advogadoInfos.isEmpty() ? null : advogadoInfos.get(0).getId();
+        String advogadoNome = advogadoInfos.isEmpty() ? null : advogadoInfos.get(0).getNome();
+
+        return ProcessoDetalheResponse.builder()
+                .id(processo.getId().toString())
+                .npu(processo.getNumero())
+                .numero(processo.getNumero())
+                .clienteId(processo.getCliente() != null ? processo.getCliente().getId().toString() : null)
+                .clienteNome(processo.getCliente() != null ? processo.getCliente().getNome() : null)
+                .titulo(buildTituloProcesso(processo))
+                .tipo(processo.getTipo() != null ? processo.getTipo().name() : null)
+                .tipoAcao(buildTipoAcao(processo.getTipo()))
+                .foro(buildForo(processo))
+                .vara(processo.getVara())
+                .tribunal(processo.getTribunal())
+                .status(resolveStatusDossie(processo.getStatus()))
+                .statusOriginal(processo.getStatus() != null ? processo.getStatus().name() : null)
+                .dataDistribuicao(processo.getDataDistribuicao())
+                .dataUltimaMovimentacao(resolveDataUltimaMovimentacao(processo, timeline))
+                .proximoPrazo(processo.getProximoPrazo())
+                .valorCausa(processo.getValorCausa())
+                .descricao(processo.getDescricao())
+                .etiquetas(processo.getEtiquetas() == null
+                        ? List.of()
+                        : processo.getEtiquetas().stream().map(ProcessoEtiqueta::getNome).toList())
+                .advogados(advogadoInfos)
+                .advogadoId(advogadoId)
+                .advogadoNome(advogadoNome)
+                .partesEnvolvidas(processo.getPartes() == null
+                        ? List.of()
+                        : processo.getPartes().stream().map(this::toParteEnvolvidaResponse).toList())
+                .prazosVinculados(prazosVinculados == null
+                        ? List.of()
+                        : prazosVinculados.stream().map(this::toPrazoVinculadoResponse).toList())
+                .partes(processo.getPartes() == null
+                        ? List.of()
+                        : processo.getPartes().stream().map(this::toDetalheParteResponse).toList())
+                .movimentacoes(timeline == null
+                        ? List.of()
+                        : timeline.stream().map(this::toDetalheMovimentacaoResponse).toList())
+                .unidadeId(processo.getUnidade() != null ? processo.getUnidade().getId().toString() : null)
+                .unidadeNome(processo.getUnidade() != null ? processo.getUnidade().getNome() : null)
+                .build();
+    }
+
+    private ProcessoDetalheResponse.ParteEnvolvidaInfo toParteEnvolvidaResponse(ProcessoParte parte) {
+        return ProcessoDetalheResponse.ParteEnvolvidaInfo.builder()
+                .id(parte.getId() != null ? parte.getId().toString() : null)
+                .nome(parte.getNome())
+                .polo(parte.getPolo() != null ? parte.getPolo().name() : null)
+                .build();
+    }
+
+    private ProcessoDetalheResponse.PrazoVinculadoInfo toPrazoVinculadoResponse(Prazo prazo) {
+        String statusKanban = prazo.getEtapa() != null
+                ? prazo.getEtapa().name()
+                : prazo.getConcluido() ? "CONCLUIDO" : "A_FAZER";
+
+        return ProcessoDetalheResponse.PrazoVinculadoInfo.builder()
+                .id(prazo.getId() != null ? prazo.getId().toString() : null)
+                .titulo(prazo.getTitulo())
+                .dataFatal(prazo.getData())
+                .statusKanban(statusKanban)
+                .build();
+    }
+
+    private ProcessoDetalheResponse.MovimentacaoInfo toDetalheMovimentacaoResponse(Movimentacao movimentacao) {
+        return ProcessoDetalheResponse.MovimentacaoInfo.builder()
+                .id(movimentacao.getId() != null ? movimentacao.getId().toString() : null)
+                .data(movimentacao.getData())
+                .dataHora(movimentacao.getDataHoraOriginal())
+                .descricao(movimentacao.getDescricao())
+                .tipo(movimentacao.getTipo() != null ? movimentacao.getTipo().name() : null)
+                .origem(movimentacao.getOrigem() != null ? movimentacao.getOrigem().name() : null)
+                .orgaoJulgador(movimentacao.getOrgaoJulgador())
+                .build();
+    }
+
+    private ProcessoDetalheResponse.ParteInfo toDetalheParteResponse(ProcessoParte parte) {
+        return ProcessoDetalheResponse.ParteInfo.builder()
+                .id(parte.getId() != null ? parte.getId().toString() : null)
+                .nome(parte.getNome())
+                .documento(parte.getDocumento())
+                .tipo(parte.getTipo() != null ? parte.getTipo().name() : null)
+                .polo(parte.getPolo() != null ? parte.getPolo().name() : null)
+                .principal(parte.getPrincipal())
+                .observacao(parte.getObservacao())
+                .representantes(parte.getRepresentantes() == null
+                        ? List.of()
+                        : parte.getRepresentantes().stream().map(this::toDetalheRepresentanteResponse).toList())
+                .build();
+    }
+
+    private ProcessoDetalheResponse.RepresentanteInfo toDetalheRepresentanteResponse(ProcessoParteRepresentante representante) {
+        return ProcessoDetalheResponse.RepresentanteInfo.builder()
+                .id(representante.getId() != null ? representante.getId().toString() : null)
+                .nome(representante.getNome())
+                .cpf(representante.getCpf())
+                .oab(representante.getOab())
+                .principal(representante.getPrincipal())
+                .usuarioInternoId(representante.getUsuarioInterno() != null ? representante.getUsuarioInterno().getId().toString() : null)
+                .usuarioInternoNome(representante.getUsuarioInterno() != null ? representante.getUsuarioInterno().getNome() : null)
+                .build();
+    }
+
+    private StatusProcessoDossie resolveStatusDossie(StatusProcesso statusProcesso) {
+        if (statusProcesso == null) {
+            return StatusProcessoDossie.ATIVO;
+        }
+
+        return switch (statusProcesso) {
+            case ARQUIVADO, CONCLUIDO -> StatusProcessoDossie.ARQUIVADO;
+            case SUSPENSO -> StatusProcessoDossie.SUSPENSO;
+            default -> StatusProcessoDossie.ATIVO;
+        };
+    }
+
+    private LocalDateTime resolveDataUltimaMovimentacao(Processo processo, List<Movimentacao> timeline) {
+        if (timeline != null && !timeline.isEmpty()) {
+            Movimentacao ultima = timeline.get(0);
+            if (ultima.getDataHoraOriginal() != null) {
+                return ultima.getDataHoraOriginal();
+            }
+            if (ultima.getData() != null) {
+                return ultima.getData().atStartOfDay();
+            }
+        }
+
+        return processo.getUltimaMovimentacao() != null ? processo.getUltimaMovimentacao().atStartOfDay() : null;
+    }
+
+    private String buildTituloProcesso(Processo processo) {
+        List<ProcessoParte> partes = processo.getPartes() == null ? List.of() : processo.getPartes();
+
+        String poloAtivo = partes.stream()
+                .filter(parte -> parte.getPolo() == PoloProcessual.ATIVO)
+                .sorted((left, right) -> Boolean.compare(Boolean.TRUE.equals(right.getPrincipal()), Boolean.TRUE.equals(left.getPrincipal())))
+                .map(ProcessoParte::getNome)
+                .findFirst()
+                .orElse(processo.getCliente() != null ? processo.getCliente().getNome() : null);
+
+        String poloPassivo = partes.stream()
+                .filter(parte -> parte.getPolo() == PoloProcessual.PASSIVO)
+                .sorted((left, right) -> Boolean.compare(Boolean.TRUE.equals(right.getPrincipal()), Boolean.TRUE.equals(left.getPrincipal())))
+                .map(ProcessoParte::getNome)
+                .findFirst()
+                .orElse(null);
+
+        if (poloAtivo != null && poloPassivo != null) {
+            return poloAtivo + " x " + poloPassivo;
+        }
+
+        if (poloAtivo != null) {
+            return poloAtivo;
+        }
+
+        return processo.getNumero();
+    }
+
+    private String buildTipoAcao(TipoProcesso tipoProcesso) {
+        if (tipoProcesso == null) {
+            return "Acao nao informada";
+        }
+
+        return switch (tipoProcesso) {
+            case CIVEL -> "Acao Civel";
+            case TRABALHISTA -> "Acao Trabalhista";
+            case CRIMINAL -> "Acao Criminal";
+            case FAMILIA -> "Acao de Familia";
+            case TRIBUTARIO -> "Acao Tributaria";
+            case EMPRESARIAL -> "Acao Empresarial";
+            case PREVIDENCIARIO -> "Acao Previdenciaria";
+            case ADMINISTRATIVO -> "Acao Administrativa";
+        };
+    }
+
+    private String buildForo(Processo processo) {
+        List<String> partesForo = new ArrayList<>();
+        if (processo.getVara() != null && !processo.getVara().isBlank()) {
+            partesForo.add(processo.getVara().trim());
+        }
+        if (processo.getTribunal() != null && !processo.getTribunal().isBlank()) {
+            partesForo.add(processo.getTribunal().trim());
+        }
+
+        if (partesForo.isEmpty()) {
+            return processo.getUnidade() != null ? processo.getUnidade().getNome() : "Foro nao informado";
+        }
+
+        return String.join(" / ", partesForo);
     }
 
     private ProcessoResponse toResponse(Processo p) {

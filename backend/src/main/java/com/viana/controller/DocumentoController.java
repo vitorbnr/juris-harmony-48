@@ -100,12 +100,32 @@ public class DocumentoController {
                     usuario.getId(),
                     com.viana.model.enums.TipoAcao.BAIXOU,
                     com.viana.model.enums.ModuloLog.DOCUMENTOS,
-                    "Download: " + doc.getNome()
+                    "Download: " + doc.getNome(),
+                    "DOCUMENTO",
+                    doc.getId()
             );
         } catch (Exception ignored) {
         }
 
         return ResponseEntity.ok(Map.of("url", url, "nome", doc.getNome()));
+    }
+
+    @GetMapping("/{id}/preview")
+    public ResponseEntity<Map<String, String>> preview(
+            @PathVariable UUID id,
+            Authentication authentication) {
+        Usuario usuario = getUsuario(authentication);
+        UUID unidadeEscopo = getUnidadeEscopo(usuario);
+        boolean admin = isAdmin(authentication);
+
+        Documento doc = documentoService.findDocumentoAutorizado(id, unidadeEscopo, admin);
+        String url = documentoService.getPreviewUrl(id, unidadeEscopo, admin);
+
+        return ResponseEntity.ok(Map.of(
+                "url", url,
+                "nome", doc.getNome(),
+                "tipo", doc.getTipo()
+        ));
     }
 
     @PutMapping("/{id}")
@@ -115,7 +135,7 @@ public class DocumentoController {
             Authentication authentication) {
         Usuario usuario = getUsuario(authentication);
         return ResponseEntity.ok(
-                documentoService.atualizar(id, request, getUnidadeEscopo(usuario), isAdmin(authentication))
+                documentoService.atualizar(id, request, getUnidadeEscopo(usuario), isAdmin(authentication), usuario.getId())
         );
     }
 
@@ -138,6 +158,27 @@ public class DocumentoController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(new InputStreamResource(stream));
+    }
+
+    @GetMapping("/preview/{encodedKey}")
+    public ResponseEntity<InputStreamResource> previewLocal(
+            @PathVariable String encodedKey,
+            Authentication authentication) throws IOException {
+        String storageKey = encodedKey.replace("__", "/");
+        Usuario usuario = getUsuario(authentication);
+
+        documentoService.validarAcessoStorageKey(
+                storageKey,
+                getUnidadeEscopo(usuario),
+                isAdmin(authentication)
+        );
+
+        InputStream stream = storageService.getLocalStream(storageKey);
+        String mimeType = storageService.getLocalContentType(storageKey);
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(mimeType))
                 .body(new InputStreamResource(stream));
     }
 
@@ -190,10 +231,45 @@ public class DocumentoController {
         );
     }
 
+    @GetMapping("/lixeira")
+    public ResponseEntity<Page<DocumentoResponse>> listarLixeira(
+            @PageableDefault(size = 200, sort = "deletedAt", direction = Sort.Direction.DESC) Pageable pageable,
+            Authentication authentication) {
+        Usuario usuario = getUsuario(authentication);
+        return ResponseEntity.ok(
+                documentoService.listarLixeira(pageable, getUnidadeEscopo(usuario), isAdmin(authentication))
+        );
+    }
+
+    @GetMapping("/{id}/atividades")
+    public ResponseEntity<List<LogAuditoriaService.LogAuditoriaResponse>> listarAtividades(
+            @PathVariable UUID id,
+            Authentication authentication) {
+        Usuario usuario = getUsuario(authentication);
+        return ResponseEntity.ok(
+                documentoService.listarAtividades(id, getUnidadeEscopo(usuario), isAdmin(authentication))
+        );
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> excluir(@PathVariable UUID id, Authentication authentication) {
         Usuario usuario = getUsuario(authentication);
-        documentoService.excluir(id, getUnidadeEscopo(usuario), isAdmin(authentication));
+        documentoService.excluir(id, getUnidadeEscopo(usuario), isAdmin(authentication), usuario.getId());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/restaurar")
+    public ResponseEntity<DocumentoResponse> restaurar(@PathVariable UUID id, Authentication authentication) {
+        Usuario usuario = getUsuario(authentication);
+        return ResponseEntity.ok(
+                documentoService.restaurar(id, getUnidadeEscopo(usuario), isAdmin(authentication), usuario.getId())
+        );
+    }
+
+    @DeleteMapping("/{id}/permanente")
+    public ResponseEntity<Void> excluirPermanentemente(@PathVariable UUID id, Authentication authentication) {
+        Usuario usuario = getUsuario(authentication);
+        documentoService.excluirPermanentemente(id, getUnidadeEscopo(usuario), isAdmin(authentication), usuario.getId());
         return ResponseEntity.noContent().build();
     }
 

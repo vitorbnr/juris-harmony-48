@@ -1,70 +1,63 @@
 import { useCallback, useEffect, useState } from "react";
+import type { ElementType } from "react";
 import {
   AlertCircle,
   Archive,
-  CalendarClock,
   CheckCircle,
   ChevronRight,
   Clock,
-  Download,
   Filter,
-  FileText,
   Loader2,
   MapPin,
   Pause,
-  Pencil,
   Plus,
   RefreshCcw,
   Scale,
   Search,
-  Tag,
-  Upload,
-  X,
 } from "lucide-react";
 
-import { DocumentoUploadModal } from "@/components/modals/DocumentoUploadModal";
-import { EditarProcessoModal } from "@/components/modals/EditarProcessoModal";
+import { ProcessoDossieModal } from "@/components/modals/ProcessoDossieModal";
 import { NovoProcessoModal } from "@/components/modals/NovoProcessoModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/AuthContext";
 import { useUnidade } from "@/context/UnidadeContext";
-import api from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { documentosApi, processosApi } from "@/services/api";
-import type { Documento, Processo, StatusProcesso, TipoProcesso } from "@/types";
+import { processosApi } from "@/services/api";
+import type { Processo, StatusProcesso, TipoProcesso } from "@/types";
 import { toast } from "sonner";
 
-const statusConfig: Record<StatusProcesso, { label: string; class: string; icon: React.ElementType }> = {
+const statusConfig: Record<StatusProcesso, { label: string; className: string; icon: ElementType }> = {
   EM_ANDAMENTO: {
     label: "Em andamento",
-    class: "bg-blue-500/15 text-blue-400 border-blue-500/20",
+    className: "bg-blue-500/15 text-blue-300 border-blue-500/20",
     icon: Clock,
   },
   AGUARDANDO: {
     label: "Aguardando",
-    class: "bg-yellow-500/15 text-yellow-400 border-yellow-500/20",
+    className: "bg-yellow-500/15 text-yellow-300 border-yellow-500/20",
     icon: Clock,
   },
   URGENTE: {
     label: "Urgente",
-    class: "bg-red-500/15 text-red-400 border-red-500/20",
+    className: "bg-red-500/15 text-red-300 border-red-500/20",
     icon: AlertCircle,
   },
   CONCLUIDO: {
     label: "Concluido",
-    class: "bg-primary/15 text-primary border-primary/20",
+    className: "bg-emerald-500/15 text-emerald-300 border-emerald-500/20",
     icon: CheckCircle,
   },
   SUSPENSO: {
     label: "Suspenso",
-    class: "bg-orange-500/15 text-orange-400 border-orange-500/20",
+    className: "bg-orange-500/15 text-orange-300 border-orange-500/20",
     icon: Pause,
   },
   ARQUIVADO: {
     label: "Arquivado",
-    class: "bg-muted text-muted-foreground border-border",
+    className: "bg-muted text-muted-foreground border-border",
     icon: Archive,
   },
 };
@@ -80,387 +73,116 @@ const tiposProcesso: TipoProcesso[] = [
   "ADMINISTRATIVO",
 ];
 
-const tipoMovimentacaoLabel = (tipo?: string) => {
-  switch ((tipo ?? "").toUpperCase()) {
-    case "DESPACHO":
-      return "Despacho";
-    case "SENTENCA":
-      return "Sentenca";
-    case "AUDIENCIA":
-      return "Audiencia";
-    case "PETICAO":
-      return "Peticao";
-    case "PUBLICACAO":
-      return "Publicacao";
-    case "OUTRO":
-      return "Outro";
-    default:
-      return tipo || "Movimentacao";
-  }
-};
+function normalizeDigits(value?: string | null) {
+  return (value ?? "").replace(/\D+/g, "");
+}
 
-const formatarDataMovimentacao = (data?: string, dataHora?: string) => {
-  if (dataHora) {
-    const parsed = new Date(dataHora);
-    if (!Number.isNaN(parsed.getTime())) {
-      return parsed.toLocaleString("pt-BR", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    }
+function maskNpu(value?: string | null) {
+  if (!value) return "NPU nao informado";
+
+  const digits = normalizeDigits(value);
+  if (digits.length === 20) {
+    return `${digits.slice(0, 7)}-${digits.slice(7, 9)}.${digits.slice(9, 13)}.${digits.slice(13, 14)}.${digits.slice(14, 16)}.${digits.slice(16)}`;
   }
 
-  if (data) {
-    const parsed = new Date(`${data}T00:00:00`);
-    if (!Number.isNaN(parsed.getTime())) {
-      return parsed.toLocaleDateString("pt-BR");
-    }
-  }
+  return value;
+}
 
-  return "Data nao informada";
-};
+function formatDate(value?: string | null) {
+  if (!value) return "Sem data";
 
-const formatarValorCausa = (valor?: string) => {
-  if (!valor) return "—";
+  const parsed = new Date(value.length <= 10 ? `${value}T00:00:00` : value);
+  if (Number.isNaN(parsed.getTime())) return value;
 
-  const parsed = Number.parseFloat(valor);
-  if (!Number.isFinite(parsed)) return valor;
-
-  return `R$ ${parsed.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
-};
-
-const poloParteLabel = (polo?: string) => {
-  switch ((polo ?? "").toUpperCase()) {
-    case "ATIVO":
-      return "Polo ativo";
-    case "PASSIVO":
-      return "Polo passivo";
-    case "TERCEIRO":
-      return "Terceiro";
-    case "OUTRO":
-      return "Outro";
-    default:
-      return polo || "Nao informado";
-  }
-};
-
-const tipoParteLabel = (tipo?: string) => {
-  switch ((tipo ?? "").toUpperCase()) {
-    case "PESSOA_FISICA":
-      return "Pessoa fisica";
-    case "PESSOA_JURIDICA":
-      return "Pessoa juridica";
-    case "NAO_IDENTIFICADO":
-      return "Nao identificado";
-    default:
-      return tipo || "Nao informado";
-  }
-};
-
-const categoriaDocumentoLabel: Record<string, string> = {
-  peticao: "Peticao",
-  contrato: "Contrato",
-  procuracao: "Procuracao",
-  sentenca: "Sentenca",
-  recurso: "Recurso",
-  comprovante: "Comprovante",
-  outros: "Outros",
-};
-
-const isDocumentoLocal = (doc: Documento) => doc.id.startsWith("local:");
-
-const formatarDataDocumento = (dataUpload?: string) => {
-  if (!dataUpload) return "Data nao informada";
-
-  const parsed = new Date(dataUpload);
-  if (Number.isNaN(parsed.getTime())) return dataUpload;
-
-  return parsed.toLocaleString("pt-BR", {
+  return parsed.toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
   });
-};
+}
 
-function ProcessoDrawer({
-  processo,
-  documentos,
-  loadingDocumentos,
-  onUploadDocumento,
-  onDownloadDocumento,
-  onClose,
-  onEditar,
-}: {
-  processo: Processo;
-  documentos: Documento[];
-  loadingDocumentos: boolean;
-  onUploadDocumento: () => void;
-  onDownloadDocumento: (doc: Documento) => void;
-  onClose: () => void;
-  onEditar: () => void;
-}) {
-  const status = statusConfig[processo.status] ?? statusConfig.EM_ANDAMENTO;
-  const StatusIcon = status.icon;
+function formatRelativeDate(value?: string | null) {
+  if (!value) return "Sem movimentacao";
 
-  return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative flex h-full w-full max-w-xl animate-in flex-col border-l border-border bg-card shadow-2xl slide-in-from-right duration-300">
-        <div className="flex items-center justify-between border-b border-border px-6 py-5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent">
-              <Scale className="h-4 w-4 text-primary" />
-            </div>
-            <div>
-              <p className="font-mono text-xs text-muted-foreground">{processo.numero}</p>
-              <p className="text-sm font-semibold text-foreground">{processo.clienteNome}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className={cn("gap-1 text-xs", status.class)}>
-              <StatusIcon className="h-3 w-3" />
-              {status.label}
-            </Badge>
-            <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+  const parsed = new Date(value.length <= 10 ? `${value}T00:00:00` : value);
+  if (Number.isNaN(parsed.getTime())) return "Data invalida";
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="space-y-4 p-6">
-            <h3 className="font-heading text-base font-semibold text-foreground">Dados do Processo</h3>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { label: "Tipo", value: processo.tipo },
-                { label: "Tribunal", value: processo.tribunal || "—" },
-                { label: "Vara / Juizo", value: processo.vara || "—" },
-                {
-                  label: "Distribuicao",
-                  value: processo.dataDistribuicao
-                    ? new Date(`${processo.dataDistribuicao}T00:00:00`).toLocaleDateString("pt-BR")
-                    : "—",
-                },
-                { label: "Valor da Causa", value: formatarValorCausa(processo.valorCausa) },
-              ].map(({ label, value }) => (
-                <div key={label} className="rounded-lg bg-muted/40 px-3 py-2.5">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
-                  <p className="mt-0.5 text-sm font-medium leading-tight text-foreground">{value}</p>
-                </div>
-              ))}
-            </div>
+  const diffMs = parsed.getTime() - Date.now();
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+  const rtf = new Intl.RelativeTimeFormat("pt-BR", { numeric: "auto" });
 
-            <div className="rounded-lg bg-muted/40 px-3 py-2.5">
-              <p className="mb-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-                Advogados Responsaveis
-              </p>
-              {processo.advogados && processo.advogados.length > 0 ? (
-                <div className="flex flex-wrap gap-1.5">
-                  {processo.advogados.map((advogado) => (
-                    <span
-                      key={advogado.id}
-                      className="inline-flex items-center rounded-full border border-primary/20 bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary"
-                    >
-                      {advogado.nome}
-                    </span>
-                  ))}
-                </div>
-              ) : processo.advogadoNome ? (
-                <span className="inline-flex items-center rounded-full border border-primary/20 bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary">
-                  {processo.advogadoNome}
-                </span>
-              ) : (
-                <p className="text-sm text-muted-foreground">—</p>
-              )}
-            </div>
+  if (Math.abs(diffDays) < 1) {
+    return "Hoje";
+  }
 
-            {processo.descricao && (
-              <div className="rounded-lg bg-muted/40 px-3 py-2.5">
-                <p className="mb-1 text-[10px] uppercase tracking-wider text-muted-foreground">Descricao</p>
-                <p className="text-sm text-foreground">{processo.descricao}</p>
-              </div>
-            )}
+  return rtf.format(diffDays, "day");
+}
 
-            {processo.etiquetas && processo.etiquetas.length > 0 && (
-              <div className="rounded-lg bg-muted/40 px-3 py-2.5">
-                <p className="mb-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">Etiquetas</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {processo.etiquetas.map((etiqueta) => (
-                    <span
-                      key={etiqueta}
-                      className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
-                    >
-                      <Tag className="h-3 w-3" />
-                      {etiqueta}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
+function formatTipoProcesso(tipo?: string | null) {
+  switch ((tipo ?? "").toUpperCase()) {
+    case "CIVEL":
+      return "Processo Civel";
+    case "TRABALHISTA":
+      return "Acao Trabalhista";
+    case "CRIMINAL":
+      return "Processo Criminal";
+    case "FAMILIA":
+      return "Processo de Familia";
+    case "TRIBUTARIO":
+      return "Execucao Tributaria";
+    case "EMPRESARIAL":
+      return "Processo Empresarial";
+    case "PREVIDENCIARIO":
+      return "Acao Previdenciaria";
+    case "ADMINISTRATIVO":
+      return "Procedimento Administrativo";
+    default:
+      return tipo || "Tipo nao informado";
+  }
+}
 
-            {processo.partes && processo.partes.length > 0 && (
-              <div className="rounded-lg bg-muted/40 px-3 py-2.5">
-                <p className="mb-2 text-[10px] uppercase tracking-wider text-muted-foreground">
-                  Partes e Representantes
-                </p>
-                <div className="space-y-3">
-                  {processo.partes.map((parte) => (
-                    <div key={parte.id} className="rounded-lg border border-border/60 bg-background/70 px-3 py-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-semibold text-foreground">{parte.nome}</p>
-                        <span className="rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground">
-                          {poloParteLabel(parte.polo)}
-                        </span>
-                        <span className="rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground">
-                          {tipoParteLabel(parte.tipo)}
-                        </span>
-                        {parte.principal && (
-                          <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-                            Principal
-                          </span>
-                        )}
-                      </div>
+function resolveProcessoRecencyTimestamp(processo: Processo) {
+  const candidates = [processo.ultimaMovimentacao, processo.dataDistribuicao]
+    .filter(Boolean)
+    .map((value) => {
+      const parsed = new Date(String(value).length <= 10 ? `${String(value)}T00:00:00` : String(value));
+      return Number.isNaN(parsed.getTime()) ? Number.NEGATIVE_INFINITY : parsed.getTime();
+    });
 
-                      {parte.documento && (
-                        <p className="mt-1 text-xs text-muted-foreground">Documento: {parte.documento}</p>
-                      )}
+  return candidates.length > 0 ? Math.max(...candidates) : Number.NEGATIVE_INFINITY;
+}
 
-                      {parte.observacao && (
-                        <p className="mt-1 text-xs text-muted-foreground">{parte.observacao}</p>
-                      )}
+function compareProcessosByRecency(a: Processo, b: Processo) {
+  const diff = resolveProcessoRecencyTimestamp(b) - resolveProcessoRecencyTimestamp(a);
+  if (diff !== 0) return diff;
 
-                      {parte.representantes && parte.representantes.length > 0 && (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {parte.representantes.map((representante) => (
-                            <div
-                              key={representante.id}
-                              className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs text-primary"
-                            >
-                              <span className="font-medium">{representante.nome}</span>
-                              {representante.oab ? ` • ${representante.oab}` : ""}
-                              {representante.usuarioInternoNome ? ` • interno: ${representante.usuarioInternoNome}` : ""}
-                              {representante.principal ? " • principal" : ""}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+  return 0;
+}
 
-            {processo.proximoPrazo && (
-              <div className="flex items-center gap-3 rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3">
-                <CalendarClock className="h-4 w-4 shrink-0 text-destructive" />
-                <div>
-                  <p className="text-xs font-semibold text-destructive">Proximo Prazo</p>
-                  <p className="text-sm text-foreground">
-                    {new Date(`${processo.proximoPrazo}T00:00:00`).toLocaleDateString("pt-BR")}
-                  </p>
-                </div>
-              </div>
-            )}
+function buildProcessoTitulo(processo: Processo) {
+  const partes = processo.partes ?? [];
+  const partesAtivas = partes.filter((parte) => (parte.polo ?? "").toUpperCase() === "ATIVO");
+  const partesPassivas = partes.filter((parte) => (parte.polo ?? "").toUpperCase() === "PASSIVO");
 
-            <div className="rounded-lg bg-muted/40 px-3 py-3">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Documentos</p>
-                  <p className="text-sm font-semibold text-foreground">
-                    {documentos.length} {documentos.length === 1 ? "documento" : "documentos"} vinculados ao processo
-                  </p>
-                </div>
-                <Button size="sm" className="gap-2" onClick={onUploadDocumento}>
-                  <Upload className="h-3.5 w-3.5" />
-                  Upload
-                </Button>
-              </div>
+  const autor = partesAtivas[0]?.nome || processo.clienteNome || "Parte autora";
+  const reu = partesPassivas[0]?.nome || "Parte passiva";
+  const complemento = partesPassivas.length > 1 ? ` +${partesPassivas.length - 1}` : "";
 
-              {loadingDocumentos ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                </div>
-              ) : documentos.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-border bg-background/60 px-4 py-6 text-center">
-                  <FileText className="mx-auto h-6 w-6 text-muted-foreground/40" />
-                  <p className="mt-2 text-sm text-muted-foreground">Nenhum documento vinculado a este processo.</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {documentos.map((documento) => (
-                    <div
-                      key={documento.id}
-                      className="flex items-center gap-3 rounded-lg border border-border/60 bg-background/70 px-3 py-3"
-                    >
-                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                        <FileText className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-foreground">{documento.nome}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {(categoriaDocumentoLabel[documento.categoria] ?? documento.categoria)} · {documento.tamanho}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground">{formatarDataDocumento(documento.dataUpload)}</p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => onDownloadDocumento(documento)}
-                        className="h-8 w-8"
-                      >
-                        <Download className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+  return `${autor} x ${reu}${complemento}`;
+}
 
-          {processo.movimentacoes && processo.movimentacoes.length > 0 && (
-            <div className="px-6 pb-6">
-              <h3 className="mb-3 font-heading text-base font-semibold text-foreground">Movimentações</h3>
-              <div className="relative space-y-0">
-                {processo.movimentacoes.map((mov, i) => (
-                  <div key={mov.id} className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                      <div className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-primary" />
-                      {i < (processo.movimentacoes?.length ?? 0) - 1 && (
-                        <div className="my-1 min-h-[24px] w-px flex-1 bg-border" />
-                      )}
-                    </div>
-                    <div className="pb-4">
-                      <p className="text-[10px] text-muted-foreground">
-                        {formatarDataMovimentacao(mov.data, mov.dataHora)} · {tipoMovimentacaoLabel(mov.tipo)}
-                      </p>
-                      <p className="mt-0.5 text-sm text-foreground">{mov.descricao}</p>
-                      {mov.orgaoJulgador && (
-                        <p className="mt-1 text-xs text-muted-foreground">{mov.orgaoJulgador}</p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+function buildAdvogadoResumo(processo: Processo) {
+  const advogados =
+    processo.advogados && processo.advogados.length > 0
+      ? processo.advogados
+      : processo.advogadoNome
+        ? [{ id: processo.advogadoId ?? "", nome: processo.advogadoNome }]
+        : [];
 
-        <div className="flex gap-2 border-t border-border px-6 py-4">
-          <Button className="flex-1 gap-2" onClick={onEditar}>
-            <Pencil className="h-4 w-4" /> Editar / Gerenciar
-          </Button>
-          <Button variant="outline" onClick={onClose}>
-            Fechar
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
+  if (advogados.length === 0) return "Sem advogado definido";
+  if (advogados.length === 1) return advogados[0].nome;
+
+  return `${advogados[0].nome} +${advogados.length - 1}`;
 }
 
 export const ProcessosView = () => {
@@ -471,15 +193,11 @@ export const ProcessosView = () => {
   const [filtroStatus, setFiltroStatus] = useState<StatusProcesso | "Todos">("Todos");
   const [filtroTipo, setFiltroTipo] = useState<TipoProcesso | "Todos">("Todos");
   const [filtroEtiqueta, setFiltroEtiqueta] = useState("Todas");
-  const [processoSelecionado, setProcessoSelecionado] = useState<Processo | null>(null);
-  const [editando, setEditando] = useState(false);
   const [processos, setProcessos] = useState<Processo[]>([]);
-  const [documentosProcesso, setDocumentosProcesso] = useState<Documento[]>([]);
+  const [processoSelecionadoId, setProcessoSelecionadoId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [loadingDocumentosProcesso, setLoadingDocumentosProcesso] = useState(false);
   const [syncingDatajud, setSyncingDatajud] = useState(false);
   const [modalAberto, setModalAberto] = useState(false);
-  const [uploadDocumentoAberto, setUploadDocumentoAberto] = useState(false);
 
   const isSecretaria = user?.papel?.toUpperCase() === "SECRETARIA";
 
@@ -502,14 +220,14 @@ export const ProcessosView = () => {
     }
 
     processosApi
-      .listar(Object.keys(params).length ? params : undefined)
+      .listar(params)
       .then((data) => {
         const items = data.content ?? data;
         setProcessos(Array.isArray(items) ? items : []);
       })
-      .catch((err) => {
-        console.error("Erro ao carregar processos:", err);
-        toast.error("Erro ao carregar processos");
+      .catch((error) => {
+        console.error("Erro ao carregar processos:", error);
+        toast.error("Erro ao carregar processos.");
         setProcessos([]);
       })
       .finally(() => setLoading(false));
@@ -518,112 +236,6 @@ export const ProcessosView = () => {
   useEffect(() => {
     carregarProcessos();
   }, [carregarProcessos]);
-
-  const carregarDocumentosDoProcesso = useCallback(async (processoId: string) => {
-    setLoadingDocumentosProcesso(true);
-
-    try {
-      const response = await documentosApi.listarPorProcesso(processoId, { size: 1000 });
-      const items = response?.content ?? response;
-      setDocumentosProcesso(Array.isArray(items) ? items : []);
-    } catch {
-      toast.error("Erro ao carregar documentos do processo.");
-      setDocumentosProcesso([]);
-    } finally {
-      setLoadingDocumentosProcesso(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!processoSelecionado) {
-      setDocumentosProcesso([]);
-      setLoadingDocumentosProcesso(false);
-      return;
-    }
-
-    void carregarDocumentosDoProcesso(processoSelecionado.id);
-  }, [carregarDocumentosDoProcesso, processoSelecionado]);
-
-  const todoStatus: Array<StatusProcesso | "Todos"> = [
-    "Todos",
-    "EM_ANDAMENTO",
-    "URGENTE",
-    "AGUARDANDO",
-    "SUSPENSO",
-    "CONCLUIDO",
-    "ARQUIVADO",
-  ];
-
-  const etiquetasDisponiveis = Array.from(
-    new Set(processos.flatMap((processo) => processo.etiquetas ?? [])),
-  ).sort((a, b) => a.localeCompare(b, "pt-BR"));
-  const opcoesEtiqueta =
-    filtroEtiqueta !== "Todas" && !etiquetasDisponiveis.includes(filtroEtiqueta)
-      ? [filtroEtiqueta, ...etiquetasDisponiveis]
-      : etiquetasDisponiveis;
-
-  const processosFiltrados = processos.filter((processo) => {
-    const matchStatus = filtroStatus === "Todos" || processo.status === filtroStatus;
-    const matchTipo = filtroTipo === "Todos" || processo.tipo === filtroTipo;
-    return matchStatus && matchTipo;
-  });
-
-  const handleClickProcesso = async (processo: Processo) => {
-    try {
-      const completo = await processosApi.buscar(processo.id);
-      setProcessoSelecionado(completo);
-    } catch {
-      setProcessoSelecionado(processo);
-    }
-  };
-
-  const handleDownloadDocumento = async (doc: Documento) => {
-    try {
-      if (isDocumentoLocal(doc)) {
-        const storageKey = doc.id.slice("local:".length);
-        const apiPath = `/documentos/stream/${storageKey.replaceAll("/", "__")}`;
-        const res = await api.get(apiPath, { responseType: "blob" });
-        const blobUrl = URL.createObjectURL(res.data);
-        const anchor = document.createElement("a");
-        anchor.href = blobUrl;
-        anchor.download = doc.nome;
-        document.body.appendChild(anchor);
-        anchor.click();
-        document.body.removeChild(anchor);
-        URL.revokeObjectURL(blobUrl);
-        return;
-      }
-
-      const result = await documentosApi.downloadUrl(doc.id);
-      const url = typeof result === "string" ? result : result.url;
-      const nome = typeof result === "string" ? doc.nome : (result.nome || doc.nome);
-
-      if (url.startsWith("/")) {
-        const apiPath = url.startsWith("/api") ? url.slice(4) : url;
-        const res = await api.get(apiPath, { responseType: "blob" });
-        const blobUrl = URL.createObjectURL(res.data);
-        const anchor = document.createElement("a");
-        anchor.href = blobUrl;
-        anchor.download = nome;
-        document.body.appendChild(anchor);
-        anchor.click();
-        document.body.removeChild(anchor);
-        URL.revokeObjectURL(blobUrl);
-        return;
-      }
-
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = nome;
-      anchor.target = "_blank";
-      anchor.rel = "noopener noreferrer";
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-    } catch {
-      toast.error("Erro ao obter link de download.");
-    }
-  };
 
   const sincronizarMovimentacoes = async () => {
     setSyncingDatajud(true);
@@ -641,289 +253,247 @@ export const ProcessosView = () => {
     }
   };
 
+  const todoStatus: Array<StatusProcesso | "Todos"> = [
+    "Todos",
+    "EM_ANDAMENTO",
+    "URGENTE",
+    "AGUARDANDO",
+    "SUSPENSO",
+    "CONCLUIDO",
+    "ARQUIVADO",
+  ];
+
+  const etiquetasDisponiveis = Array.from(new Set(processos.flatMap((processo) => processo.etiquetas ?? []))).sort((a, b) =>
+    a.localeCompare(b, "pt-BR"),
+  );
+  const opcoesEtiqueta =
+    filtroEtiqueta !== "Todas" && !etiquetasDisponiveis.includes(filtroEtiqueta)
+      ? [filtroEtiqueta, ...etiquetasDisponiveis]
+      : etiquetasDisponiveis;
+
+  const processosFiltrados = processos
+    .filter((processo) => {
+      const matchStatus = filtroStatus === "Todos" || processo.status === filtroStatus;
+      const matchTipo = filtroTipo === "Todos" || processo.tipo === filtroTipo;
+      return matchStatus && matchTipo;
+    })
+    .sort(compareProcessosByRecency);
+
   return (
     <div className="space-y-6 p-6 md:p-8">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative max-w-sm min-w-[200px] flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por numero ou cliente..."
-            className="border-none bg-secondary pl-9"
-            value={busca}
-            onChange={(event) => setBusca(event.target.value)}
-          />
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/70">Contencioso</p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">Processos e casos</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+            Entre no modulo ja com leitura executiva do processo: titulo consolidado, cliente, acao ou foro e a data da
+            ultima movimentacao.
+          </p>
         </div>
 
-        <select
-          value={filtroStatus}
-          onChange={(event) => setFiltroStatus(event.target.value as StatusProcesso | "Todos")}
-          className="h-10 cursor-pointer rounded-md border-none bg-secondary px-3 text-sm text-foreground outline-none"
-        >
-          {todoStatus.map((status) => (
-            <option key={status} value={status}>
-              {status === "Todos" ? "Todos os status" : statusConfig[status as StatusProcesso]?.label || status}
-            </option>
-          ))}
-        </select>
-
-        <select
-          value={filtroTipo}
-          onChange={(event) => setFiltroTipo(event.target.value as TipoProcesso | "Todos")}
-          className="h-10 cursor-pointer rounded-md border-none bg-secondary px-3 text-sm text-foreground outline-none"
-        >
-          <option value="Todos">Todos os tipos</option>
-          {tiposProcesso.map((tipo) => (
-            <option key={tipo} value={tipo}>
-              {tipo}
-            </option>
-          ))}
-        </select>
-
-        <select
-          value={filtroEtiqueta}
-          onChange={(event) => setFiltroEtiqueta(event.target.value)}
-          className="h-10 cursor-pointer rounded-md border-none bg-secondary px-3 text-sm text-foreground outline-none"
-        >
-          <option value="Todas">Todas as etiquetas</option>
-          {opcoesEtiqueta.map((etiqueta) => (
-            <option key={etiqueta} value={etiqueta}>
-              {etiqueta}
-            </option>
-          ))}
-        </select>
-
         {!isSecretaria && (
-          <>
-            <Button
-              variant="outline"
-              className="ml-auto gap-2"
-              onClick={sincronizarMovimentacoes}
-              disabled={syncingDatajud}
-            >
-              {syncingDatajud ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCcw className="h-4 w-4" />
-              )}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" className="gap-2" onClick={sincronizarMovimentacoes} disabled={syncingDatajud}>
+              {syncingDatajud ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
               Sincronizar movimentacoes
             </Button>
             <Button className="gap-2" onClick={() => setModalAberto(true)}>
-              <Plus className="h-4 w-4" /> Novo Processo
+              <Plus className="h-4 w-4" />
+              Novo Processo
             </Button>
-          </>
+          </div>
         )}
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {todoStatus.slice(0, 5).map((status) => {
-          const count = status === "Todos" ? processos.length : processos.filter((processo) => processo.status === status).length;
-          return (
-            <button
-              key={status}
-              onClick={() => setFiltroStatus(status)}
-              className={cn(
-                "rounded-full border px-3 py-1 text-xs font-medium transition-all",
-                filtroStatus === status
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-card text-muted-foreground hover:border-primary/40",
-              )}
-            >
-              {status === "Todos" ? status : statusConfig[status as StatusProcesso]?.label || status}{" "}
-              <span className="opacity-70">({count})</span>
-            </button>
-          );
-        })}
-      </div>
+      <Card className="border-border/70 bg-card/95">
+        <CardContent className="space-y-4 p-4 md:p-5">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+            <div className="relative min-w-[240px] flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por numero ou cliente..."
+                className="border-border/60 bg-background/60 pl-9"
+                value={busca}
+                onChange={(event) => setBusca(event.target.value)}
+              />
+            </div>
 
-      {loading && (
+            <div className="flex flex-1 flex-wrap gap-3">
+              <select
+                value={filtroStatus}
+                onChange={(event) => setFiltroStatus(event.target.value as StatusProcesso | "Todos")}
+                className="h-10 min-w-[190px] cursor-pointer rounded-md border border-border/60 bg-background/60 px-3 text-sm text-foreground outline-none"
+              >
+                {todoStatus.map((status) => (
+                  <option key={status} value={status}>
+                    {status === "Todos" ? "Todos os status" : statusConfig[status as StatusProcesso]?.label || status}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={filtroTipo}
+                onChange={(event) => setFiltroTipo(event.target.value as TipoProcesso | "Todos")}
+                className="h-10 min-w-[190px] cursor-pointer rounded-md border border-border/60 bg-background/60 px-3 text-sm text-foreground outline-none"
+              >
+                <option value="Todos">Todos os tipos</option>
+                {tiposProcesso.map((tipo) => (
+                  <option key={tipo} value={tipo}>
+                    {tipo}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={filtroEtiqueta}
+                onChange={(event) => setFiltroEtiqueta(event.target.value)}
+                className="h-10 min-w-[190px] cursor-pointer rounded-md border border-border/60 bg-background/60 px-3 text-sm text-foreground outline-none"
+              >
+                <option value="Todas">Todas as etiquetas</option>
+                {opcoesEtiqueta.map((etiqueta) => (
+                  <option key={etiqueta} value={etiqueta}>
+                    {etiqueta}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap gap-2">
+              {todoStatus.map((status) => {
+                const count =
+                  status === "Todos" ? processos.length : processos.filter((processo) => processo.status === status).length;
+
+                return (
+                  <button
+                    key={status}
+                    onClick={() => setFiltroStatus(status)}
+                    className={cn(
+                      "rounded-full border px-3 py-1 text-xs font-medium transition-all",
+                      filtroStatus === status
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-card text-muted-foreground hover:border-primary/40",
+                    )}
+                  >
+                    {status === "Todos" ? status : statusConfig[status as StatusProcesso]?.label || status}{" "}
+                    <span className="opacity-70">({count})</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {!loading && (
+              <p className="text-right text-xs text-muted-foreground">
+                {processosFiltrados.length} de {processos.length} processos
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {loading ? (
         <div className="flex items-center justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
         </div>
-      )}
-
-      {!loading && (
-        <div className="overflow-hidden rounded-xl border border-border bg-card">
+      ) : (
+        <div className="overflow-hidden rounded-[1.6rem] border border-border/70 bg-card/95 shadow-[0_24px_60px_-38px_rgba(15,23,42,0.36)]">
           {processosFiltrados.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 py-16 text-muted-foreground">
               <Filter className="h-8 w-8 opacity-30" />
               <p className="text-sm">Nenhum processo encontrado.</p>
             </div>
           ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/30">
-                  <th className="px-5 py-3 text-left text-xs font-medium tracking-wide text-muted-foreground">
-                    N° do Processo
-                  </th>
-                  <th className="px-5 py-3 text-left text-xs font-medium tracking-wide text-muted-foreground">
-                    Cliente
-                  </th>
-                  <th className="hidden px-5 py-3 text-left text-xs font-medium tracking-wide text-muted-foreground md:table-cell">
-                    Tipo
-                  </th>
-                  <th className="hidden px-5 py-3 text-left text-xs font-medium tracking-wide text-muted-foreground lg:table-cell">
-                    Advogado
-                  </th>
-                  <th className="px-5 py-3 text-left text-xs font-medium tracking-wide text-muted-foreground">
-                    Status
-                  </th>
-                  <th className="px-3 py-3" />
-                </tr>
-              </thead>
-              <tbody>
+            <>
+              <div className="hidden grid-cols-[minmax(0,2.4fr)_minmax(0,1.2fr)_minmax(0,1.5fr)_160px] gap-5 border-b border-border/70 bg-muted/20 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground md:grid">
+                <span>Titulo</span>
+                <span>Cliente / Pasta</span>
+                <span>Acao / Foro</span>
+                <span className="text-right">Ult. mov.</span>
+              </div>
+
+              <div className="divide-y divide-border/60">
                 {processosFiltrados.map((processo) => {
                   const conf =
                     statusConfig[processo.status] ??
-                    { class: "bg-muted text-foreground border-border", icon: AlertCircle, label: processo.status };
-                  const Icon = conf.icon;
+                    { className: "bg-muted text-foreground border-border", icon: AlertCircle, label: processo.status };
+                  const titulo = buildProcessoTitulo(processo);
+                  const foro = [processo.vara, processo.tribunal].filter(Boolean).join(" / ") || processo.unidadeNome || "Foro nao informado";
 
                   return (
-                    <tr
+                    <button
                       key={processo.id}
-                      onClick={() => handleClickProcesso(processo)}
-                      className="group cursor-pointer border-b border-border/50 transition-colors last:border-0 hover:bg-muted/30"
+                      type="button"
+                      onClick={() => setProcessoSelecionadoId(processo.id)}
+                      className="group w-full text-left transition-colors hover:bg-muted/25"
                     >
-                      <td className="px-5 py-4">
-                        <div className="flex flex-col gap-1">
-                          <span className="font-mono text-xs text-primary">
-                            {processo.numero.length > 16 ? `${processo.numero.slice(0, 16)}...` : processo.numero}
-                          </span>
-                          <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
-                            <MapPin className="h-2.5 w-2.5" />
-                            {processo.unidadeNome ?? "—"}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="flex items-start gap-2">
-                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-semibold text-primary">
-                            {processo.clienteNome
-                              .split(" ")
-                              .slice(0, 2)
-                              .map((nome) => nome[0])
-                              .join("")}
+                      <div className="grid gap-4 px-5 py-5 md:grid-cols-[minmax(0,2.4fr)_minmax(0,1.2fr)_minmax(0,1.5fr)_160px]">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge className={cn("border text-[11px]", conf.className)}>{conf.label}</Badge>
+                            {processo.etiquetas?.slice(0, 2).map((etiqueta) => (
+                              <Badge
+                                key={etiqueta}
+                                variant="outline"
+                                className="border-primary/20 bg-primary/10 text-[11px] text-primary"
+                              >
+                                {etiqueta}
+                              </Badge>
+                            ))}
                           </div>
-                          <div className="min-w-0">
-                            <span className="font-medium text-foreground">{processo.clienteNome}</span>
-                            {processo.etiquetas && processo.etiquetas.length > 0 && (
-                              <div className="mt-1 flex flex-wrap gap-1">
-                                {processo.etiquetas.slice(0, 2).map((etiqueta) => (
-                                  <span
-                                    key={etiqueta}
-                                    className="inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary"
-                                  >
-                                    {etiqueta}
-                                  </span>
-                                ))}
-                                {processo.etiquetas.length > 2 && (
-                                  <span className="inline-flex items-center rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground">
-                                    +{processo.etiquetas.length - 2}
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="hidden px-5 py-4 text-muted-foreground md:table-cell">{processo.tipo}</td>
-                      <td className="hidden px-5 py-4 text-sm text-muted-foreground lg:table-cell">
-                        {(() => {
-                          const advogados =
-                            processo.advogados && processo.advogados.length > 0
-                              ? processo.advogados
-                              : processo.advogadoNome
-                                ? [{ id: processo.advogadoId ?? "", nome: processo.advogadoNome }]
-                                : [];
 
-                          if (advogados.length === 0) {
-                            return <span className="text-muted-foreground/50">—</span>;
-                          }
+                          <p className="mt-3 truncate text-base font-semibold text-foreground">{titulo}</p>
 
-                          return (
-                            <span className="flex items-center gap-1">
-                              {advogados[0].nome}
-                              {advogados.length > 1 && (
-                                <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full border border-primary/20 bg-primary/15 px-1 text-[9px] font-bold text-primary">
-                                  +{advogados.length - 1}
-                                </span>
-                              )}
+                          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                            <span className="font-mono text-primary/90">{maskNpu(processo.numero)}</span>
+                            <span className="inline-flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              {processo.unidadeNome ?? "Sem unidade"}
                             </span>
-                          );
-                        })()}
-                      </td>
-                      <td className="px-5 py-4">
-                        <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium", conf.class)}>
-                          <Icon className="h-3 w-3" />
-                          {conf.label}
-                        </span>
-                      </td>
-                      <td className="px-3 py-4">
-                        <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-                      </td>
-                    </tr>
+                          </div>
+                        </div>
+
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-foreground">{processo.clienteNome}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">{processo.unidadeNome || "Pasta nao informada"}</p>
+                          <p className="mt-3 truncate text-xs text-muted-foreground">{buildAdvogadoResumo(processo)}</p>
+                        </div>
+
+                        <div className="min-w-0">
+                          <p className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
+                            <Scale className="h-3.5 w-3.5 text-primary" />
+                            {formatTipoProcesso(processo.tipo)}
+                          </p>
+                          <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">{foro}</p>
+                        </div>
+
+                        <div className="flex items-start justify-between gap-3 md:justify-end">
+                          <div className="md:text-right">
+                            <p className="text-sm font-medium text-foreground">
+                              {formatDate(processo.ultimaMovimentacao || processo.dataDistribuicao)}
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {formatRelativeDate(processo.ultimaMovimentacao || processo.dataDistribuicao)}
+                            </p>
+                          </div>
+                          <ChevronRight className="mt-0.5 h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                        </div>
+                      </div>
+                    </button>
                   );
                 })}
-              </tbody>
-            </table>
+              </div>
+            </>
           )}
         </div>
       )}
 
-      {!loading && (
-        <p className="text-right text-xs text-muted-foreground">
-          {processosFiltrados.length} de {processos.length} processos
-        </p>
-      )}
-
-      {processoSelecionado && !editando && (
-        <ProcessoDrawer
-          processo={processoSelecionado}
-          documentos={documentosProcesso}
-          loadingDocumentos={loadingDocumentosProcesso}
-          onUploadDocumento={() => setUploadDocumentoAberto(true)}
-          onDownloadDocumento={(doc) => void handleDownloadDocumento(doc)}
-          onClose={() => {
-            setProcessoSelecionado(null);
-            setUploadDocumentoAberto(false);
-          }}
-          onEditar={() => setEditando(true)}
-        />
-      )}
-
-      {uploadDocumentoAberto && processoSelecionado && (
-        <DocumentoUploadModal
-          onClose={() => setUploadDocumentoAberto(false)}
-          onSaved={() => {
-            toast.success("Documento vinculado ao processo.");
-            void carregarDocumentosDoProcesso(processoSelecionado.id);
-          }}
-          clientesList={[{ id: processoSelecionado.clienteId, nome: processoSelecionado.clienteNome }]}
-          processosList={[processoSelecionado]}
-          pastasInternas={[]}
-          initialDestino="cliente"
-          initialClienteId={processoSelecionado.clienteId}
-          initialProcessoId={processoSelecionado.id}
-          allowDestinoSwitch={false}
-          lockClienteId={processoSelecionado.clienteId}
-          lockProcessoId={processoSelecionado.id}
-          title="Upload para o processo"
-        />
-      )}
-
-      {processoSelecionado && editando && (
-        <EditarProcessoModal
-          processo={processoSelecionado}
-          onClose={() => {
-            setEditando(false);
-            setProcessoSelecionado(null);
-          }}
-          onSaved={() => {
-            setEditando(false);
-            setProcessoSelecionado(null);
-            carregarProcessos();
-          }}
-        />
-      )}
+      <ProcessoDossieModal
+        open={Boolean(processoSelecionadoId)}
+        processoId={processoSelecionadoId}
+        onClose={() => setProcessoSelecionadoId(null)}
+        onAtualizado={carregarProcessos}
+      />
 
       {modalAberto && <NovoProcessoModal onClose={() => setModalAberto(false)} onSaved={carregarProcessos} />}
     </div>

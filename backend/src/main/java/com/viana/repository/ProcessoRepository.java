@@ -24,6 +24,16 @@ public interface ProcessoRepository extends JpaRepository<Processo, UUID> {
 
     Optional<Processo> findByNumero(String numero);
 
+    @Query("""
+        SELECT DISTINCT p
+        FROM Processo p
+        LEFT JOIN FETCH p.cliente
+        LEFT JOIN FETCH p.unidade
+        LEFT JOIN FETCH p.partes partes
+        WHERE p.id = :id
+    """)
+    Optional<Processo> findDetalheById(@Param("id") UUID id);
+
     long countByClienteId(UUID clienteId);
 
     long countByStatusIn(List<StatusProcesso> statuses);
@@ -62,6 +72,10 @@ public interface ProcessoRepository extends JpaRepository<Processo, UUID> {
             OR LOWER(c.nome) LIKE LOWER(CONCAT('%', :busca, '%'))
         )
         GROUP BY p.id
+        ORDER BY
+            COALESCE(p.ultima_movimentacao, p.data_distribuicao, CAST(p.atualizado_em AS date), CAST(p.criado_em AS date)) DESC,
+            p.atualizado_em DESC,
+            p.criado_em DESC
         """, countQuery = """
         SELECT COUNT(DISTINCT p.id) FROM processos p
         JOIN clientes c ON p.cliente_id = c.id

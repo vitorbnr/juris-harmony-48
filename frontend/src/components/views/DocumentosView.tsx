@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   CheckCircle2,
+  Clock3,
   ChevronRight,
   Download,
+  ExternalLink,
   FileText,
   Files,
   FolderClosed,
@@ -12,6 +14,7 @@ import {
   MapPin,
   Pencil,
   Plus,
+  RotateCcw,
   Search,
   Trash2,
   Upload,
@@ -25,7 +28,10 @@ import { Label } from "@/components/ui/label";
 import { clientes as clientesMock, documentos as documentosMock, processos as processosMock } from "@/data/mockData";
 import {
   applyDocumentoVirtualState,
+  listDocumentoVirtualTrashed,
   markDocumentoVirtualDeleted,
+  purgeDocumentoVirtual,
+  restoreDocumentoVirtual,
   saveDocumentoVirtualOverride,
 } from "@/lib/documentos-virtual-state";
 import { cn } from "@/lib/utils";
@@ -36,6 +42,7 @@ import type {
   AcervoCidadeDocumento,
   AcervoClienteDocumento,
   Cliente,
+  DocumentoAtividade,
   Documento,
   PastaInternaNode,
   Processo,
@@ -101,6 +108,7 @@ type ClienteAcervoSource = Pick<Cliente, "id" | "nome" | "initials" | "cidade" |
 
 type DocumentSelection =
   | { type: "overview" }
+  | { type: "trash" }
   | { type: "cidade"; cidade: AcervoCidadeDocumento }
   | { type: "cliente"; cidadeChave: string; cidadeLabel: string; cliente: AcervoClienteDocumento }
   | { type: "interna"; pastaId: string; nome: string; path: string[] };
@@ -109,6 +117,26 @@ interface PastaOption {
   id: string;
   label: string;
 }
+
+interface ExplorerFolderItem {
+  kind: "folder";
+  id: string;
+  nome: string;
+  subtitle: string;
+  tipoLabel: string;
+  contextoLabel: string;
+  tamanhoLabel: string;
+  onOpen: () => void;
+}
+
+interface BreadcrumbItem {
+  label: string;
+  current?: boolean;
+  onClick?: () => void;
+}
+
+type PreviewTab = "preview" | "info" | "activities";
+type PreviewKind = "pdf" | "image" | "video" | "text" | "unsupported";
 
 const SHOULD_MERGE_DEMO_DOCUMENTS = import.meta.env.DEV || import.meta.env.MODE === "test";
 
@@ -258,10 +286,86 @@ function mergeDocumentos(primary: Documento[], fallback: Documento[]) {
   return Array.from(merged.values());
 }
 
+function mergeDocumentosById(primary: Documento[], secondary: Documento[]) {
+  const merged = new Map<string, Documento>();
+
+  secondary.forEach((doc) => {
+    merged.set(doc.id, doc);
+  });
+
+  primary.forEach((doc) => {
+    merged.set(doc.id, doc);
+  });
+
+  return Array.from(merged.values());
+}
+
 function formatBytes(bytes: number) {
   if (bytes < 1024) return bytes + " B";
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
   return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+}
+
+function formatDateLabel(value?: string | null) {
+  if (!value) return "-";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+function formatDateTimeLabel(value?: string | null) {
+  if (!value) return "-";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function resolvePreviewKind(documento: Documento | null): PreviewKind {
+  if (!documento) return "unsupported";
+
+  const tipo = documento.tipo?.toLowerCase?.() ?? "";
+  if (tipo === "pdf") return "pdf";
+  if (["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg"].includes(tipo)) return "image";
+  if (["mp4", "mov", "mpeg", "avi", "webm"].includes(tipo)) return "video";
+  if (["txt"].includes(tipo)) return "text";
+  return "unsupported";
+}
+
+function formatTipoAcao(acao?: string | null) {
+  switch ((acao ?? "").toUpperCase()) {
+    case "FEZ_UPLOAD":
+      return "Upload";
+    case "BAIXOU":
+      return "Download";
+    case "EDITOU":
+      return "Edicao";
+    case "EXCLUIU":
+      return "Exclusao";
+    case "RESTAUROU":
+      return "Restauracao";
+    case "VISUALIZOU":
+      return "Visualizacao";
+    default:
+      return acao ?? "Atividade";
+  }
 }
 
 function FileIcon({ tipo, size = "md" }: { tipo: string; size?: "sm" | "md" | "lg" }) {
@@ -667,8 +771,10 @@ export const DocumentosView = () => {
   const [modo, setModo] = useState<"grid" | "lista">("lista");
   const [uploadAberto, setUploadAberto] = useState(false);
   const [documentoEditando, setDocumentoEditando] = useState<Documento | null>(null);
+  const [documentoSelecionado, setDocumentoSelecionado] = useState<Documento | null>(null);
   const [novaPastaAberta, setNovaPastaAberta] = useState(false);
   const [documentos, setDocumentos] = useState<Documento[]>([]);
+  const [documentosBase, setDocumentosBase] = useState<Documento[]>([]);
   const [todosClientes, setTodosClientes] = useState<ClienteAcervoSource[]>([]);
   const [todosProcessos, setTodosProcessos] = useState<Processo[]>([]);
   const [acervoClientes, setAcervoClientes] = useState<AcervoCidadeDocumento[]>([]);
@@ -681,8 +787,21 @@ export const DocumentosView = () => {
   const [loadingDocumentos, setLoadingDocumentos] = useState(true);
   const [ordenacao, setOrdenacao] = useState<OrdenacaoDocumentos>("recentes");
   const [categoriaFiltro, setCategoriaFiltro] = useState("todas");
+  const [previewTab, setPreviewTab] = useState<PreviewTab>("preview");
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewErro, setPreviewErro] = useState<string | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [atividades, setAtividades] = useState<DocumentoAtividade[]>([]);
+  const [loadingAtividades, setLoadingAtividades] = useState(false);
+  const previewObjectUrlRef = useRef<string | null>(null);
 
   const hidratarDocumentos = useCallback((docs: Documento[]) => applyDocumentoVirtualState(docs), []);
+  const limparPreviewObjectUrl = useCallback(() => {
+    if (previewObjectUrlRef.current) {
+      URL.revokeObjectURL(previewObjectUrlRef.current);
+      previewObjectUrlRef.current = null;
+    }
+  }, []);
 
   const selecionarPasta = useCallback((pastaId: string, nodes: PastaInternaNode[]) => {
     const pasta = findPastaNode(nodes, pastaId);
@@ -752,6 +871,7 @@ export const DocumentosView = () => {
 
   const carregarDocumentos = useCallback(async () => {
     if (selecao.type === "cidade") {
+      setDocumentosBase([]);
       setDocumentos([]);
       setLoadingDocumentos(false);
       return;
@@ -760,12 +880,35 @@ export const DocumentosView = () => {
     setLoadingDocumentos(true);
 
     try {
+      if (selecao.type === "trash") {
+        const [responseLixeira, responseTodos] = await Promise.all([
+          documentosApi.listarLixeira({ size: 1000 }),
+          documentosApi.listar({ size: 1000 }).catch(() => ({ content: [] })),
+        ]);
+
+        const itensLixeira = responseLixeira?.content ?? responseLixeira;
+        const itensTodos = responseTodos?.content ?? responseTodos;
+
+        const docsLixeira = Array.isArray(itensLixeira)
+          ? itensLixeira.map((doc) => normalizeDocumento(doc as Documento & { uploadadoPor?: string }))
+          : [];
+        const docsAtivos = Array.isArray(itensTodos)
+          ? itensTodos.map((doc) => normalizeDocumento(doc as Documento & { uploadadoPor?: string }))
+          : [];
+        const baseAtiva = SHOULD_MERGE_DEMO_DOCUMENTS ? mergeDocumentos(docsAtivos, documentosMockNormalizados) : docsAtivos;
+
+        setDocumentosBase(baseAtiva);
+        setDocumentos(docsLixeira);
+        return;
+      }
+
       if (selecao.type === "cliente") {
         const response = await documentosApi.listarPorCliente(selecao.cliente.id, { size: 1000 });
         const items = response?.content ?? response;
         const docsApi = Array.isArray(items)
           ? items.map((doc) => normalizeDocumento(doc as Documento & { uploadadoPor?: string }))
           : [];
+        setDocumentosBase(docsApi);
         setDocumentos(hidratarDocumentos(docsApi));
         return;
       }
@@ -776,6 +919,7 @@ export const DocumentosView = () => {
         const docsApi = Array.isArray(items)
           ? items.map((doc) => normalizeDocumento(doc as Documento & { uploadadoPor?: string }))
           : [];
+        setDocumentosBase(docsApi);
         setDocumentos(hidratarDocumentos(docsApi));
         return;
       }
@@ -785,14 +929,16 @@ export const DocumentosView = () => {
       const docsApi = Array.isArray(items)
         ? items.map((doc) => normalizeDocumento(doc as Documento & { uploadadoPor?: string }))
         : [];
+      const docsBase = SHOULD_MERGE_DEMO_DOCUMENTS ? mergeDocumentos(docsApi, documentosMockNormalizados) : docsApi;
 
-      setDocumentos(hidratarDocumentos(
-        SHOULD_MERGE_DEMO_DOCUMENTS ? mergeDocumentos(docsApi, documentosMockNormalizados) : docsApi,
-      ));
+      setDocumentosBase(docsBase);
+      setDocumentos(hidratarDocumentos(docsBase));
     } catch {
-      setDocumentos(hidratarDocumentos(
-        SHOULD_MERGE_DEMO_DOCUMENTS && selecao.type === "overview" ? documentosMockNormalizados : [],
-      ));
+      const fallback = SHOULD_MERGE_DEMO_DOCUMENTS && (selecao.type === "overview" || selecao.type === "trash")
+        ? documentosMockNormalizados
+        : [];
+      setDocumentosBase(fallback);
+      setDocumentos(hidratarDocumentos(selecao.type === "trash" ? [] : fallback));
     } finally {
       setLoadingDocumentos(false);
     }
@@ -805,6 +951,15 @@ export const DocumentosView = () => {
   useEffect(() => {
     void carregarDocumentos();
   }, [carregarDocumentos]);
+
+  useEffect(() => {
+    setDocumentoSelecionado(null);
+    setPreviewTab("preview");
+    setAtividades([]);
+    setPreviewErro(null);
+    setPreviewUrl(null);
+    limparPreviewObjectUrl();
+  }, [selecao, limparPreviewObjectUrl]);
 
   const clientesAcervoBase = SHOULD_MERGE_DEMO_DOCUMENTS
     ? (() => {
@@ -830,6 +985,21 @@ export const DocumentosView = () => {
       return next;
     });
   }, [acervoAgrupado]);
+
+  const selecionarCidade = useCallback((cidade: AcervoCidadeDocumento) => {
+    setExpandedCities((prev) => ({ ...prev, [cidade.chave]: true }));
+    setSelecao({ type: "cidade", cidade });
+  }, []);
+
+  const selecionarCliente = useCallback((cidade: AcervoCidadeDocumento, cliente: AcervoClienteDocumento) => {
+    setExpandedCities((prev) => ({ ...prev, [cidade.chave]: true }));
+    setSelecao({
+      type: "cliente",
+      cidadeChave: cidade.chave,
+      cidadeLabel: cidade.label,
+      cliente,
+    });
+  }, []);
 
   const handleDownload = async (doc: Documento) => {
     try {
@@ -890,7 +1060,7 @@ export const DocumentosView = () => {
     }
 
     if (isDocumentoLocal(doc)) {
-      await documentosApi.excluirStorageKey(doc.id.slice("local:".length));
+      markDocumentoVirtualDeleted(doc.id);
       return;
     }
 
@@ -898,14 +1068,55 @@ export const DocumentosView = () => {
   }, []);
 
   const handleExcluir = async (doc: Documento) => {
-    if (!confirm(`Excluir "${doc.nome}"? Esta acao e irreversivel.`)) return;
+    if (!confirm(`Enviar "${doc.nome}" para a lixeira?`)) return;
 
     try {
       await excluirDocumentoPersistido(doc);
-      toast.success("Documento excluido.");
+      if (documentoSelecionado?.id === doc.id) {
+        setDocumentoSelecionado(null);
+      }
+      toast.success("Documento enviado para a lixeira.");
       void carregarDocumentos();
     } catch {
       toast.error("Erro ao excluir documento.");
+    }
+  };
+
+  const handleRestaurarDocumento = async (doc: Documento) => {
+    try {
+      if (isDocumentoVirtual(doc)) {
+        restoreDocumentoVirtual(doc.id);
+      } else {
+        await documentosApi.restaurar(doc.id);
+      }
+
+      if (documentoSelecionado?.id === doc.id) {
+        setDocumentoSelecionado(null);
+      }
+      toast.success("Documento restaurado.");
+      void carregarDocumentos();
+    } catch {
+      toast.error("Erro ao restaurar documento.");
+    }
+  };
+
+  const handleExcluirPermanentemente = async (doc: Documento) => {
+    if (!confirm(`Excluir "${doc.nome}" permanentemente? Esta acao nao pode ser desfeita.`)) return;
+
+    try {
+      if (isDocumentoVirtual(doc)) {
+        purgeDocumentoVirtual(doc.id);
+      } else {
+        await documentosApi.excluirPermanentemente(doc.id);
+      }
+
+      if (documentoSelecionado?.id === doc.id) {
+        setDocumentoSelecionado(null);
+      }
+      toast.success("Documento removido permanentemente.");
+      void carregarDocumentos();
+    } catch {
+      toast.error("Erro ao remover documento.");
     }
   };
 
@@ -970,7 +1181,20 @@ export const DocumentosView = () => {
     }
   });
 
-  const docsFiltrados = documentos
+  const documentosLixeiraVirtuais =
+    selecao.type === "trash"
+      ? listDocumentoVirtualTrashed(documentosBase).map((documento) => ({
+          ...documento,
+          deletedAt: documento.deletedAt ?? documento.dataUpload,
+          deletedPor: documento.deletedPor ?? "Acervo local",
+        }))
+      : [];
+  const documentosDaSelecao =
+    selecao.type === "trash"
+      ? mergeDocumentosById(documentos, documentosLixeiraVirtuais)
+      : documentos;
+
+  const docsFiltrados = documentosDaSelecao
     .filter((doc) => {
       if (categoriaFiltro !== "todas" && doc.categoria?.toLowerCase() !== categoriaFiltro) {
         return false;
@@ -985,6 +1209,7 @@ export const DocumentosView = () => {
         doc.processoNumero,
         categoriaLabel[doc.categoria],
         cidadeCliente,
+        doc.deletedPor,
       ]
         .map((value) => normalizeText(value))
         .join(" ");
@@ -1008,8 +1233,10 @@ export const DocumentosView = () => {
       return false;
     })
     .sort((a, b) => {
-      const dataA = Date.parse(a.dataUpload ?? "");
-      const dataB = Date.parse(b.dataUpload ?? "");
+      const referenciaA = selecao.type === "trash" ? a.deletedAt ?? a.dataUpload : a.dataUpload;
+      const referenciaB = selecao.type === "trash" ? b.deletedAt ?? b.dataUpload : b.dataUpload;
+      const dataA = Date.parse(referenciaA ?? "");
+      const dataB = Date.parse(referenciaB ?? "");
       const safeDataA = Number.isNaN(dataA) ? 0 : dataA;
       const safeDataB = Number.isNaN(dataB) ? 0 : dataB;
 
@@ -1031,6 +1258,125 @@ export const DocumentosView = () => {
           return safeDataB - safeDataA;
       }
     });
+
+  useEffect(() => {
+    if (!documentoSelecionado) {
+      return;
+    }
+
+    const atualizado = docsFiltrados.find((doc) => doc.id === documentoSelecionado.id);
+    if (!atualizado) {
+      setDocumentoSelecionado(null);
+      return;
+    }
+
+    if (atualizado !== documentoSelecionado) {
+      setDocumentoSelecionado(atualizado);
+    }
+  }, [documentoSelecionado, docsFiltrados]);
+
+  useEffect(() => {
+    let ativo = true;
+
+    const carregarAtividades = async () => {
+      if (!documentoSelecionado || isDocumentoVirtual(documentoSelecionado)) {
+        setAtividades([]);
+        setLoadingAtividades(false);
+        return;
+      }
+
+      setLoadingAtividades(true);
+      try {
+        const response = await documentosApi.atividades(documentoSelecionado.id);
+        if (!ativo) return;
+        setAtividades(Array.isArray(response) ? response : []);
+      } catch {
+        if (!ativo) return;
+        setAtividades([]);
+      } finally {
+        if (ativo) {
+          setLoadingAtividades(false);
+        }
+      }
+    };
+
+    void carregarAtividades();
+
+    return () => {
+      ativo = false;
+    };
+  }, [documentoSelecionado]);
+
+  useEffect(() => {
+    let ativo = true;
+
+    const carregarPreview = async () => {
+      limparPreviewObjectUrl();
+      setPreviewUrl(null);
+      setPreviewErro(null);
+
+      if (!documentoSelecionado) {
+        setLoadingPreview(false);
+        return;
+      }
+
+      if (isDocumentoDemo(documentoSelecionado)) {
+        setPreviewErro("Preview indisponivel para documentos da massa de testes.");
+        setLoadingPreview(false);
+        return;
+      }
+
+      const previewKind = resolvePreviewKind(documentoSelecionado);
+      if (previewKind === "unsupported") {
+        setPreviewErro("Este formato nao possui preview nativo nesta fase.");
+        setLoadingPreview(false);
+        return;
+      }
+
+      setLoadingPreview(true);
+
+      try {
+        if (isDocumentoLocal(documentoSelecionado)) {
+          const storageKey = documentoSelecionado.id.slice("local:".length);
+          const res = await api.get(`/documentos/preview/${storageKey.replaceAll("/", "__")}`, { responseType: "blob" });
+          if (!ativo) return;
+          const blobUrl = URL.createObjectURL(res.data);
+          previewObjectUrlRef.current = blobUrl;
+          setPreviewUrl(blobUrl);
+          return;
+        }
+
+        const preview = await documentosApi.previewUrl(documentoSelecionado.id);
+        if (!ativo) return;
+
+        if (preview.url.startsWith("/")) {
+          const apiPath = preview.url.startsWith("/api") ? preview.url.slice(4) : preview.url;
+          const res = await api.get(apiPath, { responseType: "blob" });
+          if (!ativo) return;
+          const blobUrl = URL.createObjectURL(res.data);
+          previewObjectUrlRef.current = blobUrl;
+          setPreviewUrl(blobUrl);
+          return;
+        }
+
+        setPreviewUrl(preview.url);
+      } catch {
+        if (!ativo) return;
+        setPreviewErro("Nao foi possivel carregar o preview deste documento.");
+      } finally {
+        if (ativo) {
+          setLoadingPreview(false);
+        }
+      }
+    };
+
+    void carregarPreview();
+
+    return () => {
+      ativo = false;
+      limparPreviewObjectUrl();
+    };
+  }, [documentoSelecionado, limparPreviewObjectUrl]);
 
   const acervoFiltrado = acervoAgrupado
     .map((cidade) => {
@@ -1066,19 +1412,141 @@ export const DocumentosView = () => {
         )
       : [];
 
-  const breadcrumbItems =
+  const pastaAtual = selecao.type === "interna" ? findPastaNode(pastasInternas, selecao.pastaId) : null;
+  const subpastasDaSelecao =
+    selecao.type === "interna"
+      ? (pastaAtual?.children ?? []).filter(
+          (pasta) => !buscaNormalizada || normalizeText(pasta.nome).includes(buscaNormalizada),
+        )
+      : [];
+
+  const explorerFolders: ExplorerFolderItem[] =
+    selecao.type === "cidade"
+      ? clientesDaCidade.map((cliente) => ({
+          kind: "folder",
+          id: cliente.id,
+          nome: cliente.nome,
+          subtitle: selecao.cidade.label,
+          tipoLabel: "Pasta de cliente",
+          contextoLabel: "Acervo de clientes",
+          tamanhoLabel: "Cliente",
+          onOpen: () => selecionarCliente(selecao.cidade, cliente),
+        }))
+      : selecao.type === "interna"
+        ? subpastasDaSelecao.map((pasta) => ({
+            kind: "folder",
+            id: pasta.id,
+            nome: pasta.nome,
+            subtitle: `Dentro de ${selecao.nome}`,
+            tipoLabel: "Pasta interna",
+            contextoLabel: selecao.path.join(" / "),
+            tamanhoLabel:
+              pasta.children.length > 0
+                ? `${pasta.children.length} ${pasta.children.length === 1 ? "subpasta" : "subpastas"}`
+                : "Pasta",
+            onOpen: () => selecionarPasta(pasta.id, pastasInternas),
+          }))
+        : [];
+
+  const breadcrumbItems: BreadcrumbItem[] =
     selecao.type === "overview"
-      ? ["Todos os documentos"]
+      ? [{ label: "Todos os documentos", current: true }]
+      : selecao.type === "trash"
+        ? [{ label: "Lixeira", current: true }]
       : selecao.type === "cidade"
-        ? ["Acervo de clientes", selecao.cidade.label]
+        ? [
+            { label: "Acervo de clientes" },
+            { label: selecao.cidade.label, current: true },
+          ]
         : selecao.type === "cliente"
-          ? ["Acervo de clientes", selecao.cidadeLabel, selecao.cliente.nome]
-          : ["Pastas", ...selecao.path];
+          ? [
+              { label: "Acervo de clientes" },
+              {
+                label: selecao.cidadeLabel,
+                onClick: () => {
+                  const cidade = acervoAgrupado.find((item) => item.chave === selecao.cidadeChave);
+                  if (cidade) selecionarCidade(cidade);
+                },
+              },
+              { label: selecao.cliente.nome, current: true },
+            ]
+          : (() => {
+              const pathIds = findPastaPathIds(pastasInternas, selecao.pastaId) ?? [];
+              return [
+                { label: "Pastas internas" },
+                ...selecao.path.map((item, index) => ({
+                  label: item,
+                  current: index === selecao.path.length - 1,
+                  onClick:
+                    index === selecao.path.length - 1 || !pathIds[index]
+                      ? undefined
+                      : () => selecionarPasta(pathIds[index], pastasInternas),
+                })),
+              ];
+            })();
 
   const subtituloSelecao =
     selecao.type === "cidade"
       ? `${clientesDaCidade.length} ${clientesDaCidade.length === 1 ? "cliente" : "clientes"}`
-      : `${docsFiltrados.length} ${docsFiltrados.length === 1 ? "documento" : "documentos"}`;
+      : selecao.type === "trash"
+        ? `${docsFiltrados.length} ${docsFiltrados.length === 1 ? "item" : "itens"}`
+      : explorerFolders.length > 0 && docsFiltrados.length > 0
+        ? `${explorerFolders.length} ${explorerFolders.length === 1 ? "pasta" : "pastas"} • ${docsFiltrados.length} ${docsFiltrados.length === 1 ? "documento" : "documentos"}`
+        : explorerFolders.length > 0
+          ? `${explorerFolders.length} ${explorerFolders.length === 1 ? "pasta" : "pastas"}`
+          : `${docsFiltrados.length} ${docsFiltrados.length === 1 ? "documento" : "documentos"}`;
+
+  const totalItensVisiveis = explorerFolders.length + docsFiltrados.length;
+  const contextEyebrow =
+    selecao.type === "overview"
+      ? "Visao geral"
+      : selecao.type === "trash"
+        ? "Lixeira"
+      : selecao.type === "cidade"
+        ? "Cidade"
+        : selecao.type === "cliente"
+          ? "Cliente"
+          : "Pasta interna";
+  const contextTitle =
+    selecao.type === "overview"
+      ? "Todos os documentos"
+      : selecao.type === "trash"
+        ? "Lixeira"
+      : selecao.type === "cidade"
+        ? selecao.cidade.label
+        : selecao.type === "cliente"
+          ? selecao.cliente.nome
+          : selecao.nome;
+  const contextDescription =
+    selecao.type === "overview"
+      ? "Visao consolidada do acervo com filtros, recentes e categorias."
+      : selecao.type === "trash"
+        ? "Itens removidos podem ser restaurados ao local original ou excluidos permanentemente."
+      : selecao.type === "cidade"
+        ? "Clientes da cidade selecionada para navegar como pastas."
+        : selecao.type === "cliente"
+          ? `Documentos vinculados a ${selecao.cliente.nome}.`
+          : "Conteudo da pasta atual com subpastas imediatas e documentos.";
+  const emptyStateTitle =
+    selecao.type === "cidade"
+      ? "Nenhum cliente encontrado nesta cidade."
+      : selecao.type === "trash"
+        ? "A lixeira esta vazia."
+      : buscaNormalizada
+        ? "Nenhum item encontrado para esta busca."
+        : selecao.type === "interna"
+          ? "Esta pasta ainda nao possui itens."
+          : "Nenhum documento encontrado.";
+  const emptyStateDescription =
+    selecao.type === "cidade"
+      ? "Ajuste a busca ou selecione outra cidade do acervo."
+      : selecao.type === "trash"
+        ? "Quando remover documentos, eles aparecerao aqui para restauracao."
+      : buscaNormalizada
+        ? "Tente outro termo ou revise os filtros ativos."
+        : selecao.type === "interna"
+          ? "Crie uma subpasta ou envie arquivos para comecar a organizar este espaco."
+          : "Envie arquivos ou revise os filtros para preencher esta visualizacao.";
 
   const initialUploadDestino: DocumentoDestino = selecao.type === "interna" ? "interno" : "cliente";
   const initialClienteId = selecao.type === "cliente" ? selecao.cliente.id : undefined;
@@ -1168,6 +1636,452 @@ export const DocumentosView = () => {
       return [row];
     });
 
+  const renderFolderGridCard = (folder: ExplorerFolderItem) => (
+    <button
+      key={`folder:${folder.id}`}
+      type="button"
+      onClick={folder.onOpen}
+      aria-label={`Abrir pasta ${folder.nome}`}
+      className="rounded-xl border border-border bg-card p-4 text-left hover:border-primary/40 hover:shadow-sm transition-all"
+    >
+      <div className="flex items-start gap-3">
+        <div className="w-12 h-12 rounded-xl bg-yellow-500/10 flex items-center justify-center shrink-0">
+          <FolderClosed className="h-5 w-5 text-yellow-500" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-foreground truncate">{folder.nome}</p>
+          <p className="text-xs text-muted-foreground mt-1">{folder.tipoLabel}</p>
+          <p className="text-xs text-muted-foreground truncate mt-2">{folder.subtitle}</p>
+        </div>
+      </div>
+    </button>
+  );
+
+  const renderDocumentoAcoes = (doc: Documento) => {
+    if (selecao.type === "trash") {
+      return (
+        <>
+          <button
+            onClick={(event) => {
+              event.stopPropagation();
+              void handleRestaurarDocumento(doc);
+            }}
+            title="Restaurar"
+            className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-all"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={(event) => {
+              event.stopPropagation();
+              void handleExcluirPermanentemente(doc);
+            }}
+            title="Excluir permanentemente"
+            className="p-1.5 rounded-md hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-all"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </>
+      );
+    }
+
+    return (
+      <>
+        <button
+          onClick={(event) => {
+            event.stopPropagation();
+            setDocumentoEditando(doc);
+          }}
+          title="Editar"
+          className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-all"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </button>
+        <button
+          onClick={(event) => {
+            event.stopPropagation();
+            void handleDownload(doc);
+          }}
+          title="Baixar"
+          className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-all"
+        >
+          <Download className="h-3.5 w-3.5" />
+        </button>
+        <button
+          onClick={(event) => {
+            event.stopPropagation();
+            void handleExcluir(doc);
+          }}
+          title="Excluir"
+          className="p-1.5 rounded-md hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-all"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      </>
+    );
+  };
+
+  const renderDocumentoGridCard = (doc: Documento) => (
+    <div
+      key={doc.id}
+      onClick={() => setDocumentoSelecionado(doc)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          setDocumentoSelecionado(doc);
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      className={cn(
+        "rounded-xl border bg-card p-4 flex flex-col items-center gap-3 hover:border-primary/40 hover:shadow-sm transition-all group text-left",
+        documentoSelecionado?.id === doc.id ? "border-primary shadow-sm" : "border-border",
+      )}
+    >
+      <FileIcon tipo={doc.tipo} size="lg" />
+      <div className="text-center w-full">
+        <p className="text-xs font-medium text-foreground truncate w-full group-hover:text-primary transition-colors">
+          {doc.nome}
+        </p>
+        <p className="text-[10px] text-muted-foreground mt-1 truncate">
+          {selecao.type === "trash"
+            ? `Excluido ${formatDateLabel(doc.deletedAt ?? doc.dataUpload)}`
+            : doc.clienteNome || categoriaLabel[doc.categoria] || "Documento"}
+        </p>
+        <p className="text-[10px] text-muted-foreground mt-0.5">{doc.tamanho}</p>
+      </div>
+      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        {renderDocumentoAcoes(doc)}
+      </div>
+    </div>
+  );
+
+  const renderExplorerGrid = () => (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+      {explorerFolders.map(renderFolderGridCard)}
+      {docsFiltrados.map(renderDocumentoGridCard)}
+    </div>
+  );
+
+  const renderExplorerTable = () => (
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-border bg-muted/30">
+            <th className="text-left px-4 py-3 text-muted-foreground font-medium text-xs">Nome</th>
+            <th className="text-left px-4 py-3 text-muted-foreground font-medium text-xs hidden md:table-cell">Tipo</th>
+            <th className="text-left px-4 py-3 text-muted-foreground font-medium text-xs hidden lg:table-cell">Vinculo</th>
+            <th className="text-left px-4 py-3 text-muted-foreground font-medium text-xs hidden xl:table-cell">Processo</th>
+            <th className="text-left px-4 py-3 text-muted-foreground font-medium text-xs hidden lg:table-cell">Modificado</th>
+            <th className="text-left px-4 py-3 text-muted-foreground font-medium text-xs">Tamanho</th>
+            <th className="px-3 py-3" />
+          </tr>
+        </thead>
+        <tbody>
+          {explorerFolders.map((folder) => (
+            <tr key={`folder:${folder.id}`} className="border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors group">
+              <td className="px-4 py-3">
+                <button
+                  type="button"
+                  onClick={folder.onOpen}
+                  className="flex items-center gap-2.5 text-left"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-yellow-500/10 flex items-center justify-center shrink-0">
+                    <FolderClosed className="h-4 w-4 text-yellow-500" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="block font-medium text-foreground truncate group-hover:text-primary transition-colors">
+                      {folder.nome}
+                    </span>
+                    <span className="block text-[11px] text-muted-foreground truncate">{folder.subtitle}</span>
+                  </div>
+                </button>
+              </td>
+              <td className="px-4 py-3 text-muted-foreground hidden md:table-cell text-xs">{folder.tipoLabel}</td>
+              <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell text-xs">{folder.contextoLabel}</td>
+              <td className="px-4 py-3 text-muted-foreground hidden xl:table-cell text-xs">-</td>
+              <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell text-xs">-</td>
+              <td className="px-4 py-3 text-muted-foreground text-xs">{folder.tamanhoLabel}</td>
+              <td className="px-3 py-3 text-right">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2 text-xs"
+                  onClick={folder.onOpen}
+                >
+                  Abrir
+                </Button>
+              </td>
+            </tr>
+          ))}
+
+          {docsFiltrados.map((doc) => (
+            <tr
+              key={doc.id}
+              className={cn(
+                "border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors group",
+                documentoSelecionado?.id === doc.id && "bg-primary/5",
+              )}
+            >
+              <td className="px-4 py-3">
+                <button
+                  type="button"
+                  onClick={() => setDocumentoSelecionado(doc)}
+                  className="flex items-center gap-2.5 text-left"
+                >
+                  <FileIcon tipo={doc.tipo} size="sm" />
+                  <span className="font-medium text-foreground group-hover:text-primary transition-colors">{doc.nome}</span>
+                </button>
+              </td>
+              <td className="px-4 py-3 text-muted-foreground hidden md:table-cell text-xs">
+                {categoriaLabel[doc.categoria] ?? doc.categoria}
+              </td>
+              <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell text-xs">
+                {selecao.type === "trash"
+                  ? (doc.deletedPor || "Sistema")
+                  : doc.clienteNome || (selecao.type === "cliente" ? selecao.cliente.nome : "-")}
+              </td>
+              <td className="px-4 py-3 text-muted-foreground hidden xl:table-cell text-xs">{doc.processoNumero || "-"}</td>
+              <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell text-xs">
+                {formatDateLabel(selecao.type === "trash" ? doc.deletedAt ?? doc.dataUpload : doc.dataUpload)}
+              </td>
+              <td className="px-4 py-3 text-muted-foreground text-xs">{doc.tamanho}</td>
+              <td className="px-3 py-3 text-right">
+                <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {renderDocumentoAcoes(doc)}
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  const renderPreviewConteudo = () => {
+    if (!documentoSelecionado) {
+      return (
+        <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
+          Selecione um documento para visualizar preview, informacoes e atividades.
+        </div>
+      );
+    }
+
+    if (loadingPreview) {
+      return (
+        <div className="flex h-full items-center justify-center">
+          <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-primary" />
+        </div>
+      );
+    }
+
+    if (previewErro || !previewUrl) {
+      return (
+        <div className="space-y-3 px-5 py-6 text-sm text-muted-foreground">
+          <p>{previewErro ?? "Preview indisponivel."}</p>
+          {["doc", "docx", "xls", "xlsx", "ppt", "pptx"].includes(documentoSelecionado.tipo?.toLowerCase?.() ?? "") && (
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => void handleDownload(documentoSelecionado)}>
+              <ExternalLink className="h-3.5 w-3.5" />
+              Abrir externamente
+            </Button>
+          )}
+        </div>
+      );
+    }
+
+    const previewKind = resolvePreviewKind(documentoSelecionado);
+    if (previewKind === "image") {
+      return <img src={previewUrl} alt={documentoSelecionado.nome} className="max-h-full w-full object-contain" />;
+    }
+
+    if (previewKind === "video") {
+      return <video src={previewUrl} controls className="max-h-full w-full rounded-xl bg-black" />;
+    }
+
+    return <iframe title={`Preview de ${documentoSelecionado.nome}`} src={previewUrl} className="h-full w-full border-0" />;
+  };
+
+  const renderPainelDetalhes = () => (
+    <aside className="hidden xl:flex w-[360px] shrink-0 border-l border-border bg-card/60 flex-col">
+      <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">Detalhes</p>
+          <p className="mt-1 text-sm font-medium text-foreground truncate max-w-[240px]">
+            {documentoSelecionado?.nome ?? "Nenhum item selecionado"}
+          </p>
+        </div>
+        {documentoSelecionado && (
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setDocumentoSelecionado(null)}>
+            <X className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
+
+      <div className="flex items-center gap-1 border-b border-border px-3 py-2">
+        <button
+          type="button"
+          onClick={() => setPreviewTab("preview")}
+          className={cn("rounded-md px-3 py-1.5 text-xs font-medium transition-colors", previewTab === "preview" ? "bg-background text-foreground" : "text-muted-foreground hover:text-foreground")}
+        >
+          Preview
+        </button>
+        <button
+          type="button"
+          onClick={() => setPreviewTab("info")}
+          className={cn("rounded-md px-3 py-1.5 text-xs font-medium transition-colors", previewTab === "info" ? "bg-background text-foreground" : "text-muted-foreground hover:text-foreground")}
+        >
+          Informacoes
+        </button>
+        <button
+          type="button"
+          onClick={() => setPreviewTab("activities")}
+          className={cn("rounded-md px-3 py-1.5 text-xs font-medium transition-colors", previewTab === "activities" ? "bg-background text-foreground" : "text-muted-foreground hover:text-foreground")}
+        >
+          Atividades
+        </button>
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        {previewTab === "preview" && (
+          <div className="h-full p-3">
+            <div className="h-full rounded-2xl border border-border bg-background/70 overflow-hidden">
+              {renderPreviewConteudo()}
+            </div>
+          </div>
+        )}
+
+        {previewTab === "info" && (
+          <div className="space-y-4 p-4">
+            {documentoSelecionado ? (
+              <>
+                <div className="rounded-2xl border border-border bg-background/60 p-4">
+                  <div className="flex items-center gap-3">
+                    <FileIcon tipo={documentoSelecionado.tipo} size="md" />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-foreground">{documentoSelecionado.nome}</p>
+                      <p className="text-xs text-muted-foreground">{tipoConfig[documentoSelecionado.tipo]?.label ?? documentoSelecionado.tipo?.toUpperCase?.() ?? "Arquivo"}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="rounded-xl border border-border bg-background/60 p-3">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Categoria</p>
+                    <p className="mt-2 text-foreground">{categoriaLabel[documentoSelecionado.categoria] ?? documentoSelecionado.categoria}</p>
+                  </div>
+                  <div className="rounded-xl border border-border bg-background/60 p-3">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Tamanho</p>
+                    <p className="mt-2 text-foreground">{documentoSelecionado.tamanho}</p>
+                  </div>
+                  <div className="rounded-xl border border-border bg-background/60 p-3">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Enviado em</p>
+                    <p className="mt-2 text-foreground">{formatDateTimeLabel(documentoSelecionado.dataUpload)}</p>
+                  </div>
+                  <div className="rounded-xl border border-border bg-background/60 p-3">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Enviado por</p>
+                    <p className="mt-2 text-foreground">{documentoSelecionado.uploadedPor || "-"}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-3 rounded-2xl border border-border bg-background/60 p-4 text-sm">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Cliente</p>
+                    <p className="mt-1 text-foreground">{documentoSelecionado.clienteNome || "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Processo</p>
+                    <p className="mt-1 text-foreground">{documentoSelecionado.processoNumero || "-"}</p>
+                  </div>
+                  {selecao.type === "trash" && (
+                    <>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Excluido em</p>
+                        <p className="mt-1 text-foreground">{formatDateTimeLabel(documentoSelecionado.deletedAt)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Excluido por</p>
+                        <p className="mt-1 text-foreground">{documentoSelecionado.deletedPor || "-"}</p>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {selecao.type === "trash" ? (
+                    <>
+                      <Button variant="outline" size="sm" className="gap-2" onClick={() => void handleRestaurarDocumento(documentoSelecionado)}>
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        Restaurar
+                      </Button>
+                      <Button variant="destructive" size="sm" className="gap-2" onClick={() => void handleExcluirPermanentemente(documentoSelecionado)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Excluir permanente
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button variant="outline" size="sm" className="gap-2" onClick={() => void handleDownload(documentoSelecionado)}>
+                        <Download className="h-3.5 w-3.5" />
+                        Baixar
+                      </Button>
+                      {!isDocumentoVirtual(documentoSelecionado) && (
+                        <Button variant="outline" size="sm" className="gap-2" onClick={() => setDocumentoEditando(documentoSelecionado)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                          Editar
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="flex min-h-[240px] items-center justify-center text-center text-sm text-muted-foreground">
+                Selecione um documento para ver informacoes.
+              </div>
+            )}
+          </div>
+        )}
+
+        {previewTab === "activities" && (
+          <div className="p-4">
+            {!documentoSelecionado ? (
+              <div className="flex min-h-[240px] items-center justify-center text-center text-sm text-muted-foreground">
+                Selecione um documento para acompanhar as atividades.
+              </div>
+            ) : loadingAtividades ? (
+              <div className="flex min-h-[240px] items-center justify-center">
+                <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-primary" />
+              </div>
+            ) : atividades.length === 0 ? (
+              <div className="space-y-2 rounded-2xl border border-dashed border-border bg-background/50 px-4 py-10 text-center text-sm text-muted-foreground">
+                <Clock3 className="mx-auto h-8 w-8 opacity-40" />
+                <p>Nenhuma atividade detalhada disponivel para este documento.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {atividades.map((atividade) => (
+                  <div key={atividade.id} className="rounded-2xl border border-border bg-background/60 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{formatTipoAcao(atividade.acao)}</p>
+                        <p className="mt-1 text-sm text-muted-foreground">{atividade.descricao}</p>
+                      </div>
+                      <Clock3 className="h-4 w-4 text-muted-foreground shrink-0" />
+                    </div>
+                    <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                      <span>{atividade.usuarioNome}</span>
+                      <span>{formatDateTimeLabel(atividade.dataHora)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </aside>
+  );
+
   return (
     <div className="flex h-full min-h-0">
       <aside className="w-72 shrink-0 border-r border-border bg-card/50 flex flex-col">
@@ -1187,6 +2101,19 @@ export const DocumentosView = () => {
           >
             <Files className="h-4 w-4 shrink-0" />
             <span className="truncate">Todos os documentos</span>
+          </button>
+
+          <button
+            onClick={() => setSelecao({ type: "trash" })}
+            className={cn(
+              "w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium transition-all rounded-none",
+              selecao.type === "trash"
+                ? "bg-primary/10 text-primary border-r-2 border-primary"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/40",
+            )}
+          >
+            <Trash2 className="h-4 w-4 shrink-0" />
+            <span className="truncate">Lixeira</span>
           </button>
 
           <div className="px-4 pt-4 pb-2 flex items-center justify-between gap-2">
@@ -1248,10 +2175,7 @@ export const DocumentosView = () => {
 
                     <button
                       type="button"
-                      onClick={() => {
-                        setExpandedCities((prev) => ({ ...prev, [cidade.chave]: true }));
-                        setSelecao({ type: "cidade", cidade });
-                      }}
+                      onClick={() => selecionarCidade(cidade)}
                       className={cn(
                         "flex-1 flex items-center gap-2 px-3 py-2 text-sm transition-all text-left",
                         cidadeAtiva
@@ -1276,15 +2200,7 @@ export const DocumentosView = () => {
                         <button
                           key={cliente.id}
                           type="button"
-                          onClick={() => {
-                            setExpandedCities((prev) => ({ ...prev, [cidade.chave]: true }));
-                            setSelecao({
-                              type: "cliente",
-                              cidadeChave: cidade.chave,
-                              cidadeLabel: cidade.label,
-                              cliente,
-                            });
-                          }}
+                          onClick={() => selecionarCliente(cidade, cliente)}
                           className={cn(
                             "w-full flex items-center gap-2 px-4 py-2 text-sm transition-all text-left",
                             ativo
@@ -1337,8 +2253,9 @@ export const DocumentosView = () => {
           </div>
         </nav>
       </aside>
-      <div className="flex-1 min-w-0 flex flex-col">
-        <div className="flex flex-wrap items-center gap-3 px-6 py-4 border-b border-border bg-card/30">
+      <div className="flex-1 min-w-0 flex">
+        <div className="flex-1 min-w-0 flex flex-col">
+          <div className="flex flex-wrap items-center gap-3 px-6 py-4 border-b border-border bg-card/30">
           <div className="relative flex-1 max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -1399,201 +2316,104 @@ export const DocumentosView = () => {
             </button>
           </div>
 
-          <Button variant="outline" className="gap-2" onClick={() => setNovaPastaAberta(true)}>
-            <Plus className="h-4 w-4" />
-            Nova pasta
-          </Button>
-
-          <Button className="gap-2 ml-auto" onClick={() => setUploadAberto(true)}>
-            <Upload className="h-4 w-4" />
-            Upload
-          </Button>
-        </div>
-
-        <div className="flex items-center gap-2 px-6 py-3 border-b border-border/50">
-          <FolderOpen className="h-4 w-4 text-yellow-500" />
-          <div className="flex items-center gap-1 text-sm flex-wrap">
-            {breadcrumbItems.map((item, index) => (
-              <div key={`${item}-${index}`} className="flex items-center gap-1">
-                {index > 0 && <span className="text-muted-foreground">/</span>}
-                <span className={cn(index === breadcrumbItems.length - 1 ? "text-foreground font-medium" : "text-muted-foreground")}>
-                  {item}
-                </span>
-              </div>
-            ))}
-          </div>
-          <span className="ml-auto text-xs text-muted-foreground">{subtituloSelecao}</span>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-6">
-          {loadingEstruturas || loadingDocumentos ? (
-            <div className="flex items-center justify-center py-20">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-            </div>
-          ) : selecao.type === "cidade" ? (
-            clientesDaCidade.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground">
-                <FolderClosed className="h-10 w-10 opacity-20" />
-                <p className="text-sm">Nenhum cliente encontrado nesta cidade.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {clientesDaCidade.map((cliente) => (
-                  <button
-                    key={cliente.id}
-                    type="button"
-                    onClick={() =>
-                      setSelecao({
-                        type: "cliente",
-                        cidadeChave: selecao.cidade.chave,
-                        cidadeLabel: selecao.cidade.label,
-                        cliente,
-                      })
-                    }
-                    className="rounded-xl border border-border bg-card p-4 text-left hover:border-primary/40 hover:shadow-sm transition-all"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="w-10 h-10 rounded-full bg-primary/10 text-primary text-sm font-semibold flex items-center justify-center shrink-0">
-                        {cliente.initials}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-foreground truncate">{cliente.nome}</p>
-                        <p className="text-xs text-muted-foreground">{selecao.cidade.label}</p>
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )
-          ) : docsFiltrados.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground">
-              <FileText className="h-10 w-10 opacity-20" />
-              <p className="text-sm">Nenhum documento encontrado.</p>
-              <Button variant="outline" size="sm" className="gap-2" onClick={() => setUploadAberto(true)}>
-                <Upload className="h-3.5 w-3.5" />
-                Fazer upload
+          {selecao.type !== "trash" && (
+            <>
+              <Button variant="outline" className="gap-2" onClick={() => setNovaPastaAberta(true)}>
+                <Plus className="h-4 w-4" />
+                Nova pasta
               </Button>
-            </div>
-          ) : modo === "grid" ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-              {docsFiltrados.map((doc) => (
-                <div
-                  key={doc.id}
-                  className="rounded-xl border border-border bg-card p-4 flex flex-col items-center gap-3 hover:border-primary/40 hover:shadow-sm transition-all group"
-                >
-                  <FileIcon tipo={doc.tipo} size="lg" />
-                  <div className="text-center w-full">
-                    <p className="text-xs font-medium text-foreground truncate w-full group-hover:text-primary transition-colors">
-                      {doc.nome}
-                    </p>
-                    {doc.processoNumero && (
-                      <p className="text-[10px] text-muted-foreground mt-1 truncate">{doc.processoNumero}</p>
-                    )}
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{doc.tamanho}</p>
-                  </div>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+
+              <Button className="gap-2 ml-auto" onClick={() => setUploadAberto(true)}>
+                <Upload className="h-4 w-4" />
+                Upload
+              </Button>
+            </>
+          )}
+          </div>
+
+          <div className="flex items-center gap-2 px-6 py-3 border-b border-border/50">
+            <FolderOpen className="h-4 w-4 text-yellow-500" />
+            <div className="flex items-center gap-1 text-sm flex-wrap">
+              {breadcrumbItems.map((item, index) => (
+                <div key={`${item.label}-${index}`} className="flex items-center gap-1">
+                  {index > 0 && <span className="text-muted-foreground">/</span>}
+                  {item.onClick ? (
                     <button
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setDocumentoEditando(doc);
-                      }}
-                      title="Editar"
-                      className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-all"
+                      type="button"
+                      onClick={item.onClick}
+                      className="text-muted-foreground transition-colors hover:text-foreground"
                     >
-                      <Pencil className="h-3.5 w-3.5" />
+                      {item.label}
                     </button>
-                    <button
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        void handleDownload(doc);
-                      }}
-                      title="Baixar"
-                      className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-all"
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        void handleExcluir(doc);
-                      }}
-                      title="Excluir"
-                      className="p-1.5 rounded-md hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-all"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
+                  ) : (
+                    <span className={cn(item.current ? "text-foreground font-medium" : "text-muted-foreground")}>
+                      {item.label}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
-          ) : (
-            <div className="rounded-xl border border-border bg-card overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-muted/30">
-                    <th className="text-left px-4 py-3 text-muted-foreground font-medium text-xs">Nome</th>
-                    <th className="text-left px-4 py-3 text-muted-foreground font-medium text-xs hidden md:table-cell">
-                      Cliente
-                    </th>
-                    <th className="text-left px-4 py-3 text-muted-foreground font-medium text-xs hidden lg:table-cell">
-                      Categoria
-                    </th>
-                    <th className="text-left px-4 py-3 text-muted-foreground font-medium text-xs hidden xl:table-cell">
-                      Processo
-                    </th>
-                    <th className="text-left px-4 py-3 text-muted-foreground font-medium text-xs">Tamanho</th>
-                    <th className="px-3 py-3" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {docsFiltrados.map((doc) => (
-                    <tr key={doc.id} className="border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors group">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2.5">
-                          <FileIcon tipo={doc.tipo} size="sm" />
-                          <span className="font-medium text-foreground group-hover:text-primary transition-colors">{doc.nome}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground hidden md:table-cell text-xs">{doc.clienteNome || "-"}</td>
-                      <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell text-xs">
-                        {categoriaLabel[doc.categoria] ?? doc.categoria}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground hidden xl:table-cell text-xs">
-                        {doc.processoNumero || "-"}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground text-xs">{doc.tamanho}</td>
-                      <td className="px-3 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => setDocumentoEditando(doc)}
-                            title="Editar"
-                            className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-all"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={() => void handleDownload(doc)}
-                            title="Baixar"
-                            className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-all"
-                          >
-                            <Download className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={() => void handleExcluir(doc)}
-                            title="Excluir"
-                            className="p-1.5 rounded-md hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-all"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+            <span className="ml-auto text-xs text-muted-foreground">{subtituloSelecao}</span>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-6">
+            {loadingEstruturas || loadingDocumentos ? (
+              <div className="flex items-center justify-center py-20">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+              </div>
+            ) : (
+              <div className="space-y-5">
+                <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card/60 p-5 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="space-y-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+                      {contextEyebrow}
+                    </p>
+                    <div>
+                      <h2 className="text-xl font-semibold text-foreground">{contextTitle}</h2>
+                      <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{contextDescription}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-xl border border-border bg-background/70 px-4 py-3">
+                      <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Itens visiveis</p>
+                      <p className="mt-2 text-2xl font-semibold text-foreground">{totalItensVisiveis}</p>
+                    </div>
+                    <div className="rounded-xl border border-border bg-background/70 px-4 py-3">
+                      <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Resumo</p>
+                      <p className="mt-2 text-sm font-medium text-foreground">{subtituloSelecao}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {totalItensVisiveis === 0 ? (
+                  <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/30 py-20 text-center text-muted-foreground">
+                    <FileText className="h-10 w-10 opacity-20" />
+                    <p className="mt-4 text-sm font-medium text-foreground">{emptyStateTitle}</p>
+                    <p className="mt-1 max-w-md text-sm text-muted-foreground">{emptyStateDescription}</p>
+                    {selecao.type !== "cidade" && selecao.type !== "trash" && (
+                      <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                        <Button variant="outline" size="sm" className="gap-2" onClick={() => setUploadAberto(true)}>
+                          <Upload className="h-3.5 w-3.5" />
+                          Fazer upload
+                        </Button>
+                        <Button variant="outline" size="sm" className="gap-2" onClick={() => setNovaPastaAberta(true)}>
+                          <Plus className="h-3.5 w-3.5" />
+                          Nova pasta
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ) : modo === "grid" ? (
+                  renderExplorerGrid()
+                ) : (
+                  renderExplorerTable()
+                )}
+              </div>
+            )}
+          </div>
         </div>
+
+        {renderPainelDetalhes()}
       </div>
 
       {uploadAberto && (

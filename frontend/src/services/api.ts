@@ -1,5 +1,14 @@
 import api from "@/lib/api";
-import type { Atendimento, DashboardMetricas, NotaPessoal, Prazo, PrazoComentario, PrazoDetalhe } from "@/types";
+import type {
+  Atendimento,
+  DashboardMetricas,
+  DocumentoAtividade,
+  NotaPessoal,
+  Prazo,
+  PrazoComentario,
+  PrazoDetalhe,
+  ProcessoDetalhe,
+} from "@/types";
 
 type ApiParams = Record<string, unknown>;
 
@@ -238,7 +247,7 @@ export const processosApi = {
     sort?: string;
   }) => api.get("/processos", { params: cleanParams(params) }).then(r => r.data),
 
-  buscar: (id: string) => api.get(`/processos/${id}`).then(r => r.data),
+  buscar: (id: string) => api.get(`/processos/${id}`).then(r => r.data as ProcessoDetalhe),
 
   consultarCapaDatajud: (numero: string) =>
     api.get(`/processos/consulta-datajud/${numero}`).then(r => r.data as DatajudCapaResponse),
@@ -404,6 +413,13 @@ export const documentosApi = {
   downloadUrl: (id: string) =>
     api.get(`/documentos/${id}/download`).then(r => ({ url: r.data.url as string, nome: r.data.nome as string })),
 
+  previewUrl: (id: string) =>
+    api.get(`/documentos/${id}/preview`).then(r => ({
+      url: r.data.url as string,
+      nome: r.data.nome as string,
+      tipo: r.data.tipo as string,
+    })),
+
   atualizar: (id: string, data: { nome?: string; categoria?: string }) =>
     api.put(`/documentos/${id}`, data).then(r => r.data),
 
@@ -413,7 +429,17 @@ export const documentosApi = {
   listarAcervoClientes: () =>
     api.get("/documentos/acervo-clientes").then(r => r.data),
 
+  listarLixeira: (params?: { page?: number; size?: number }) =>
+    api.get("/documentos/lixeira", { params: cleanParams(params) }).then(r => r.data),
+
+  atividades: (id: string) =>
+    api.get(`/documentos/${id}/atividades`).then(r => r.data as DocumentoAtividade[]),
+
   excluir: (id: string) => api.delete(`/documentos/${id}`),
+
+  restaurar: (id: string) => api.post(`/documentos/${id}/restaurar`).then(r => r.data),
+
+  excluirPermanentemente: (id: string) => api.delete(`/documentos/${id}/permanente`),
 
   excluirStorageKey: (storageKey: string) =>
     api.delete(`/documentos/storage/${storageKey.replaceAll("/", "__")}`),

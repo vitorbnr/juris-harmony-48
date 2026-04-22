@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { ProcessosView } from "./ProcessosView";
 import { useUnidade } from "@/context/UnidadeContext";
-import { documentosApi, processosApi } from "@/services/api";
+import { processosApi } from "@/services/api";
 import { useAuth } from "@/context/AuthContext";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 
@@ -19,10 +19,6 @@ vi.mock("@/services/api", () => ({
     buscar: vi.fn(),
     sincronizarDatajudEmLote: vi.fn(),
   },
-  documentosApi: {
-    listarPorProcesso: vi.fn(),
-    downloadUrl: vi.fn(),
-  },
 }));
 
 vi.mock("@/components/modals/NovoProcessoModal", () => ({
@@ -33,10 +29,29 @@ vi.mock("@/components/modals/NovoProcessoModal", () => ({
   ),
 }));
 
+vi.mock("@/components/modals/ProcessoDossieModal", () => ({
+  ProcessoDossieModal: ({
+    open,
+    processoId,
+    onClose,
+  }: {
+    open: boolean;
+    processoId: string | null;
+    onClose: () => void;
+  }) =>
+    open ? (
+      <div data-testid="processo-dossie-modal">
+        <span>Dossie aberto: {processoId}</span>
+        <button onClick={onClose}>Fechar dossie</button>
+      </div>
+    ) : null,
+}));
+
 describe("ProcessosView", () => {
   const mockProcessos = [
     {
       id: "p1",
+      clienteId: "c1",
       numero: "1234567-89.2024.8.26.0100",
       clienteNome: "Joao Silva",
       tipo: "CIVEL",
@@ -45,6 +60,11 @@ describe("ProcessosView", () => {
       unidadeId: "u1",
       unidadeNome: "Sede",
       dataDistribuicao: "2024-01-01",
+      ultimaMovimentacao: "2024-04-15",
+      partes: [
+        { id: "parte-1", nome: "Joao Silva", polo: "ATIVO" },
+        { id: "parte-2", nome: "Banco XPTO", polo: "PASSIVO" },
+      ],
     },
   ];
 
@@ -53,14 +73,12 @@ describe("ProcessosView", () => {
     (useUnidade as any).mockReturnValue({ unidadeSelecionada: "todas" });
     (useAuth as any).mockReturnValue({ user: { papel: "ADMINISTRADOR" } });
     (processosApi.listar as any).mockResolvedValue({ content: mockProcessos });
-    (processosApi.buscar as any).mockResolvedValue(mockProcessos[0]);
-    (documentosApi.listarPorProcesso as any).mockResolvedValue({ content: [] });
   });
 
   it("deve carregar e exibir a lista de processos", async () => {
     render(<ProcessosView />);
 
-    expect(await screen.findByText(/Joao Silva/i)).toBeDefined();
+    expect(await screen.findByText(/Joao Silva x Banco XPTO/i)).toBeDefined();
     expect(screen.getByText(/1234567/i)).toBeDefined();
   });
 
@@ -84,36 +102,12 @@ describe("ProcessosView", () => {
     });
   });
 
-  it("deve exibir o drawer de detalhes ao clicar em um processo", async () => {
+  it("deve abrir o dossie do processo ao clicar em um processo", async () => {
     render(<ProcessosView />);
 
-    fireEvent.click(await screen.findByText(/Joao Silva/i));
+    fireEvent.click(await screen.findByText(/Joao Silva x Banco XPTO/i));
 
-    expect(await screen.findByText(/Dados do Processo/i)).toBeDefined();
-    expect(await screen.findByText(/1234567-89.2024.8.26.0100/i)).toBeDefined();
-  });
-
-  it("deve carregar documentos do processo ao abrir o drawer", async () => {
-    (documentosApi.listarPorProcesso as any).mockResolvedValue({
-      content: [
-        {
-          id: "d1",
-          nome: "Peticao Inicial.pdf",
-          tipo: "pdf",
-          categoria: "peticao",
-          tamanho: "245 KB",
-          dataUpload: "2026-04-14T10:00:00",
-          processoId: "p1",
-          processoNumero: "1234567-89.2024.8.26.0100",
-        },
-      ],
-    });
-
-    render(<ProcessosView />);
-
-    fireEvent.click(await screen.findByText(/Joao Silva/i));
-
-    expect(await screen.findByText(/Peticao Inicial.pdf/i)).toBeDefined();
-    expect(documentosApi.listarPorProcesso).toHaveBeenCalledWith("p1", { size: 1000 });
+    expect(await screen.findByTestId("processo-dossie-modal")).toBeDefined();
+    expect(screen.getByText(/Dossie aberto: p1/i)).toBeDefined();
   });
 });

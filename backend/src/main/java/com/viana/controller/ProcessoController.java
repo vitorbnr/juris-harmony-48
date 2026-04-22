@@ -4,6 +4,7 @@ import com.viana.dto.request.AtualizarProcessoRequest;
 import com.viana.dto.request.CriarMovimentacaoRequest;
 import com.viana.dto.request.CriarProcessoRequest;
 import com.viana.dto.response.DatajudCapaResponse;
+import com.viana.dto.response.ProcessoDetalheResponse;
 import com.viana.dto.response.ProcessoResponse;
 import com.viana.exception.BusinessException;
 import com.viana.service.DatajudClientService;
@@ -12,7 +13,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -38,12 +38,12 @@ public class ProcessoController {
             @RequestParam(required = false) String tipo,
             @RequestParam(required = false) String busca,
             @RequestParam(required = false) String etiqueta,
-            @PageableDefault(size = 20, sort = "criado_em", direction = Sort.Direction.DESC) Pageable pageable) {
+            @PageableDefault(size = 20) Pageable pageable) {
         return ResponseEntity.ok(processoService.listar(unidadeId, clienteId, status, tipo, busca, etiqueta, pageable));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ProcessoResponse> buscar(@PathVariable UUID id) {
+    public ResponseEntity<ProcessoDetalheResponse> buscar(@PathVariable UUID id) {
         return ResponseEntity.ok(processoService.buscarPorId(id));
     }
 

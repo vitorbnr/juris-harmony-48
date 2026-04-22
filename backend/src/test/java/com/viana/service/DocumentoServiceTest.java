@@ -204,7 +204,7 @@ class DocumentoServiceTest {
         Pageable pageable = PageRequest.of(0, 10);
         Page<Documento> page = new PageImpl<>(List.of(documento));
 
-        when(documentoRepository.findByProcessoId(processo.getId(), Pageable.unpaged())).thenReturn(page);
+        when(documentoRepository.findByProcessoIdAndDeletedAtIsNull(processo.getId(), Pageable.unpaged())).thenReturn(page);
 
         Page<DocumentoResponse> resultado = documentoService.listarPorProcesso(processo.getId(), pageable);
 
@@ -264,7 +264,8 @@ class DocumentoServiceTest {
                 uuid,
                 new AtualizarDocumentoRequest("Contrato revisado.pdf", "CONTRATO"),
                 usuario.getUnidade().getId(),
-                false
+                false,
+                usuario.getId()
         );
 
         assertEquals("Contrato revisado.pdf", documento.getNome());

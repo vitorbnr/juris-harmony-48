@@ -54,7 +54,7 @@ class PastaServiceTest {
 
         when(pastaRepository.findByIdAndUnidadeId(pastaId, unidadeId)).thenReturn(Optional.of(pasta));
         when(pastaRepository.existsByParentId(pastaId)).thenReturn(false);
-        when(documentoRepository.existsByPastaId(pastaId)).thenReturn(false);
+        when(documentoRepository.existsByPastaIdAndDeletedAtIsNull(pastaId)).thenReturn(false);
 
         pastaService.excluirInterna(pastaId, unidadeId, false);
 
@@ -78,7 +78,7 @@ class PastaServiceTest {
 
         when(pastaRepository.findByIdAndUnidadeId(pastaId, unidadeId)).thenReturn(Optional.of(pasta));
         when(pastaRepository.existsByParentId(pastaId)).thenReturn(false);
-        when(documentoRepository.existsByPastaId(pastaId)).thenReturn(true);
+        when(documentoRepository.existsByPastaIdAndDeletedAtIsNull(pastaId)).thenReturn(true);
 
         BusinessException exception = assertThrows(BusinessException.class,
                 () -> pastaService.excluirInterna(pastaId, unidadeId, false));

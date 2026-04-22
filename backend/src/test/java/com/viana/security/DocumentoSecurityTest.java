@@ -25,6 +25,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -90,7 +92,7 @@ class DocumentoSecurityTest {
         ResponseEntity<Void> response = controller.excluir(docId, auth);
 
         assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
-        verify(documentoService, times(1)).excluir(docId, unidadeId, false);
+        verify(documentoService, times(1)).excluir(eq(docId), eq(unidadeId), eq(false), any());
     }
 
     @Test
@@ -103,6 +105,6 @@ class DocumentoSecurityTest {
         ResponseEntity<Void> response = controller.excluir(docId, auth);
 
         assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
-        verify(documentoService, times(1)).excluir(docId, unidadeId, true);
+        verify(documentoService, times(1)).excluir(eq(docId), eq(unidadeId), eq(true), any());
     }
 }

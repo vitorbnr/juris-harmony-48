@@ -2,6 +2,7 @@ package com.viana.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.viana.dto.request.CriarProcessoRequest;
+import com.viana.dto.response.ProcessoDetalheResponse;
 import com.viana.dto.response.ProcessoResponse;
 import com.viana.service.DatajudClientService;
 import com.viana.service.ProcessoService;
@@ -24,6 +25,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -72,6 +74,27 @@ class ProcessoControllerTest {
         mockMvc.perform(get("/api/processos?page=0&size=10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].numero").value("0001234"));
+    }
+
+    @Test
+    @WithMockUser(username = "advogado@viana.com.br", roles = {"ADVOGADO"})
+    @DisplayName("Deve retornar o dossie consolidado do processo")
+    void buscarDetalhe_Autenticado() throws Exception {
+        UUID processoId = UUID.randomUUID();
+        ProcessoDetalheResponse response = ProcessoDetalheResponse.builder()
+                .id(processoId.toString())
+                .npu("00012345620248060001")
+                .titulo("Joao Silva x Banco do Brasil")
+                .tipoAcao("Acao Trabalhista")
+                .foro("Vara do Trabalho")
+                .build();
+
+        when(processoService.buscarPorId(eq(processoId))).thenReturn(response);
+
+        mockMvc.perform(get("/api/processos/" + processoId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.npu").value("00012345620248060001"))
+                .andExpect(jsonPath("$.titulo").value("Joao Silva x Banco do Brasil"));
     }
 
     @Test

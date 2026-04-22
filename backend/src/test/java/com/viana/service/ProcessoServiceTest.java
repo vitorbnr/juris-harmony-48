@@ -1,8 +1,9 @@
 package com.viana.service;
 
+import com.viana.dto.request.AtualizarProcessoRequest;
 import com.viana.dto.request.CriarMovimentacaoRequest;
 import com.viana.dto.request.CriarProcessoRequest;
-import com.viana.dto.request.AtualizarProcessoRequest;
+import com.viana.dto.response.ProcessoDetalheResponse;
 import com.viana.dto.response.ProcessoResponse;
 import com.viana.exception.BusinessException;
 import com.viana.exception.ResourceNotFoundException;
@@ -16,6 +17,7 @@ import com.viana.model.enums.TipoMovimentacao;
 import com.viana.model.enums.TipoProcesso;
 import com.viana.repository.ClienteRepository;
 import com.viana.repository.MovimentacaoRepository;
+import com.viana.repository.PrazoRepository;
 import com.viana.repository.ProcessoRepository;
 import com.viana.repository.UnidadeRepository;
 import com.viana.repository.UsuarioRepository;
@@ -64,6 +66,9 @@ class ProcessoServiceTest {
     private MovimentacaoRepository movimentacaoRepository;
 
     @Mock
+    private PrazoRepository prazoRepository;
+
+    @Mock
     private LogAuditoriaService logAuditoriaService;
 
     @InjectMocks
@@ -85,7 +90,7 @@ class ProcessoServiceTest {
         advogadoDefault = Usuario.builder().id(UUID.randomUUID()).nome("Dr. Pedro").build();
 
         requestValida = new CriarProcessoRequest();
-        requestValida.setNumero("1234567-89.2024.8.26.0000");
+        requestValida.setNumero("PROC-123456");
         requestValida.setClienteId(clienteDefault.getId());
         requestValida.setAdvogadoIds(List.of(advogadoDefault.getId()));
         requestValida.setUnidadeId(unidadeDefault.getId());
@@ -131,7 +136,7 @@ class ProcessoServiceTest {
 
         BusinessException exception = assertThrows(BusinessException.class, () -> processoService.criar(requestValida));
 
-        assertEquals("Pelo menos um advogado responsÃ¡vel Ã© obrigatÃ³rio", exception.getMessage());
+        assertEquals("Pelo menos um advogado responsável é obrigatório", exception.getMessage());
         verify(processoRepository, never()).save(any(Processo.class));
     }
 
@@ -150,19 +155,21 @@ class ProcessoServiceTest {
     @Test
     @DisplayName("Deve buscar processo por ID e retornar DTO")
     void buscarPorId_ComSucesso() {
-        when(processoRepository.findById(processoId)).thenReturn(Optional.of(processoSalvo));
+        when(processoRepository.findDetalheById(processoId)).thenReturn(Optional.of(processoSalvo));
         when(movimentacaoRepository.findTimelineByProcessoId(processoId)).thenReturn(Collections.emptyList());
+        when(prazoRepository.findByProcessoIdOrderByDossie(processoId)).thenReturn(Collections.emptyList());
 
-        ProcessoResponse response = processoService.buscarPorId(processoId);
+        ProcessoDetalheResponse response = processoService.buscarPorId(processoId);
 
         assertNotNull(response);
         assertEquals(processoId.toString(), response.getId());
+        assertEquals("PROC-123456", response.getNpu());
     }
 
     @Test
     @DisplayName("Deve lancar ResourceNotFoundException ao buscar processo inexistente")
     void buscarPorId_NaoEncontrado() {
-        when(processoRepository.findById(processoId)).thenReturn(Optional.empty());
+        when(processoRepository.findDetalheById(processoId)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> processoService.buscarPorId(processoId));
     }
@@ -189,7 +196,7 @@ class ProcessoServiceTest {
 
         BusinessException exception = assertThrows(BusinessException.class, () -> processoService.atualizar(processoId, request));
 
-        assertEquals("Pelo menos um advogado responsÃ¡vel Ã© obrigatÃ³rio", exception.getMessage());
+        assertEquals("Pelo menos um advogado responsável é obrigatório", exception.getMessage());
         verify(processoRepository, never()).save(any(Processo.class));
     }
 

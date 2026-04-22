@@ -166,6 +166,28 @@ public class StorageService {
         return s3Presigner.presignGetObject(presignRequest).url().toString();
     }
 
+    public String generatePreviewUrl(String storageKey) {
+        if (localMode) {
+            return "/api/documentos/preview/" + storageKey.replace("/", "__");
+        }
+
+        String mimeType = tika.detect(getOriginalFilename(storageKey));
+
+        GetObjectRequest getRequest = GetObjectRequest.builder()
+                .bucket(bucket)
+                .key(storageKey)
+                .responseContentDisposition("inline")
+                .responseContentType(mimeType)
+                .build();
+
+        GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
+                .getObjectRequest(getRequest)
+                .signatureDuration(Duration.ofMinutes(15))
+                .build();
+
+        return s3Presigner.presignGetObject(presignRequest).url().toString();
+    }
+
     /**
      * Abre stream do arquivo para download direto (modo local).
      */
@@ -186,6 +208,25 @@ public class StorageService {
 
         if (!Files.exists(filePath)) throw new BusinessException("Arquivo não encontrado: " + realKey);
         return Files.newInputStream(filePath);
+    }
+
+    public String getLocalContentType(String storageKey) throws IOException {
+        if (!localMode) throw new BusinessException("Preview local indisponivel no modo producao.");
+
+        Path baseDir = Paths.get(localPath).toAbsolutePath().normalize();
+        Path filePath = baseDir.resolve(storageKey.replace("__", "/")).normalize();
+        if (!filePath.startsWith(baseDir)) {
+            throw new BusinessException("Acesso negado: caminho de arquivo invalido.");
+        }
+        if (!Files.exists(filePath)) {
+            throw new BusinessException("Arquivo nao encontrado: " + storageKey);
+        }
+
+        String mimeType = Files.probeContentType(filePath);
+        if (mimeType == null || mimeType.isBlank()) {
+            mimeType = tika.detect(filePath);
+        }
+        return mimeType != null && !mimeType.isBlank() ? mimeType : "application/octet-stream";
     }
 
     /**

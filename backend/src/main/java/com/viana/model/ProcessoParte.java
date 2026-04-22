@@ -21,6 +21,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.BatchSize;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -66,6 +67,7 @@ public class ProcessoParte {
     private String observacao;
 
     @OneToMany(mappedBy = "parte", cascade = CascadeType.ALL, orphanRemoval = true)
+    @BatchSize(size = 50)
     @Builder.Default
     private List<ProcessoParteRepresentante> representantes = new ArrayList<>();
 

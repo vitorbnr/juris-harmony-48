@@ -48,6 +48,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class DocumentoService {
 
+    private static final String REFERENCIA_DOCUMENTO = "DOCUMENTO";
+
     private record StorageDocumentContext(
             UUID unidadeId,
             UUID clienteId,
@@ -110,14 +112,17 @@ public class DocumentoService {
                 .uploadedPor(uploadedPor)
                 .build();
 
-        DocumentoResponse response = toResponse(documentoRepository.save(doc));
+        Documento salvo = documentoRepository.save(doc);
+        DocumentoResponse response = toResponse(salvo);
 
         try {
             logAuditoriaService.registrar(
                     uploadedPorId,
                     TipoAcao.FEZ_UPLOAD,
                     ModuloLog.DOCUMENTOS,
-                    "Upload: " + filename + " (" + formatarTamanho(file.getSize()) + ")"
+                    "Upload: " + filename + " (" + formatarTamanho(file.getSize()) + ")",
+                    REFERENCIA_DOCUMENTO,
+                    salvo.getId()
             );
         } catch (Exception ignored) {
         }
@@ -136,6 +141,12 @@ public class DocumentoService {
     public String getDownloadUrl(UUID id, UUID unidadeId, boolean isAdmin) {
         Documento doc = findDocumentoAutorizado(id, unidadeId, isAdmin);
         return storageService.generatePresignedUrl(doc.getStorageKey());
+    }
+
+    @Transactional(readOnly = true)
+    public String getPreviewUrl(UUID id, UUID unidadeId, boolean isAdmin) {
+        Documento doc = findDocumentoAutorizado(id, unidadeId, isAdmin);
+        return storageService.generatePreviewUrl(doc.getStorageKey());
     }
 
     @Transactional(readOnly = true)
@@ -167,7 +178,7 @@ public class DocumentoService {
 
     @Transactional(readOnly = true)
     public Page<DocumentoResponse> listarPorPasta(UUID pastaId, Pageable pageable) {
-        List<Documento> documentosDb = documentoRepository.findByPastaId(pastaId, Pageable.unpaged()).getContent();
+        List<Documento> documentosDb = documentoRepository.findByPastaIdAndDeletedAtIsNull(pastaId, Pageable.unpaged()).getContent();
         return combinarComStorageLocal(documentosDb, pageable, null, true, null, null, pastaId, null);
     }
 
@@ -182,7 +193,7 @@ public class DocumentoService {
 
     @Transactional(readOnly = true)
     public Page<DocumentoResponse> listarPorCliente(UUID clienteId, Pageable pageable) {
-        List<Documento> documentosDb = documentoRepository.findByClienteId(clienteId, Pageable.unpaged()).getContent();
+        List<Documento> documentosDb = documentoRepository.findByClienteIdAndDeletedAtIsNull(clienteId, Pageable.unpaged()).getContent();
         return combinarComStorageLocal(documentosDb, pageable, null, true, clienteId, null, null, null);
     }
 
@@ -197,7 +208,7 @@ public class DocumentoService {
 
     @Transactional(readOnly = true)
     public Page<DocumentoResponse> listarPorProcesso(UUID processoId, Pageable pageable) {
-        List<Documento> documentosDb = documentoRepository.findByProcessoId(processoId, Pageable.unpaged()).getContent();
+        List<Documento> documentosDb = documentoRepository.findByProcessoIdAndDeletedAtIsNull(processoId, Pageable.unpaged()).getContent();
         return combinarComStorageLocal(documentosDb, pageable, null, true, null, processoId, null, null);
     }
 
@@ -211,22 +222,47 @@ public class DocumentoService {
     }
 
     @Transactional
-    public DocumentoResponse atualizar(UUID id, AtualizarDocumentoRequest request, UUID unidadeId, boolean isAdmin) {
+    public DocumentoResponse atualizar(UUID id, AtualizarDocumentoRequest request, UUID unidadeId, boolean isAdmin, UUID usuarioId) {
         Documento documento = findDocumentoAutorizado(id, unidadeId, isAdmin);
+        List<String> alteracoes = new ArrayList<>();
 
         if (request.getNome() != null && !request.getNome().isBlank()) {
-            documento.setNome(request.getNome().trim());
+            String nomeAtualizado = request.getNome().trim();
+            if (!nomeAtualizado.equals(documento.getNome())) {
+                alteracoes.add("nome: " + documento.getNome() + " -> " + nomeAtualizado);
+                documento.setNome(nomeAtualizado);
+            }
         }
 
         if (request.getCategoria() != null && !request.getCategoria().isBlank()) {
+            CategoriaDocumento categoriaAnterior = documento.getCategoria();
             try {
                 documento.setCategoria(CategoriaDocumento.valueOf(request.getCategoria().trim().toUpperCase(Locale.ROOT)));
             } catch (IllegalArgumentException ignored) {
                 documento.setCategoria(CategoriaDocumento.OUTROS);
             }
+            if (categoriaAnterior != documento.getCategoria()) {
+                alteracoes.add("categoria: " + categoriaAnterior.name() + " -> " + documento.getCategoria().name());
+            }
         }
 
-        return toResponse(documentoRepository.save(documento));
+        Documento salvo = documentoRepository.save(documento);
+
+        if (!alteracoes.isEmpty()) {
+            try {
+                logAuditoriaService.registrar(
+                        usuarioId,
+                        TipoAcao.EDITOU,
+                        ModuloLog.DOCUMENTOS,
+                        "Atualizou documento: " + salvo.getNome() + " (" + String.join("; ", alteracoes) + ")",
+                        REFERENCIA_DOCUMENTO,
+                        salvo.getId()
+                );
+            } catch (Exception ignored) {
+            }
+        }
+
+        return toResponse(salvo);
     }
 
     @Transactional
@@ -238,8 +274,70 @@ public class DocumentoService {
     }
 
     @Transactional
-    public void excluir(UUID id, UUID unidadeId, boolean isAdmin) {
+    public void excluir(UUID id, UUID unidadeId, boolean isAdmin, UUID usuarioId) {
         Documento documento = findDocumentoAutorizado(id, unidadeId, isAdmin);
+        if (documento.getDeletedAt() != null) {
+            return;
+        }
+
+        Usuario usuario = usuarioRepository.findById(usuarioId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+
+        documento.setDeletedAt(LocalDateTime.now());
+        documento.setDeletedBy(usuario);
+        documentoRepository.save(documento);
+
+        try {
+            logAuditoriaService.registrar(
+                    usuarioId,
+                    TipoAcao.EXCLUIU,
+                    ModuloLog.DOCUMENTOS,
+                    "Enviou para a lixeira: " + documento.getNome(),
+                    REFERENCIA_DOCUMENTO,
+                    documento.getId()
+            );
+        } catch (Exception ignored) {
+        }
+    }
+
+    @Transactional
+    public DocumentoResponse restaurar(UUID id, UUID unidadeId, boolean isAdmin, UUID usuarioId) {
+        Documento documento = findDocumentoAutorizado(id, unidadeId, isAdmin);
+        documento.setDeletedAt(null);
+        documento.setDeletedBy(null);
+        Documento salvo = documentoRepository.save(documento);
+
+        try {
+            logAuditoriaService.registrar(
+                    usuarioId,
+                    TipoAcao.RESTAUROU,
+                    ModuloLog.DOCUMENTOS,
+                    "Restaurou da lixeira: " + salvo.getNome(),
+                    REFERENCIA_DOCUMENTO,
+                    salvo.getId()
+            );
+        } catch (Exception ignored) {
+        }
+
+        return toResponse(salvo);
+    }
+
+    @Transactional
+    public void excluirPermanentemente(UUID id, UUID unidadeId, boolean isAdmin, UUID usuarioId) {
+        Documento documento = findDocumentoAutorizado(id, unidadeId, isAdmin);
+
+        try {
+            logAuditoriaService.registrar(
+                    usuarioId,
+                    TipoAcao.EXCLUIU,
+                    ModuloLog.DOCUMENTOS,
+                    "Excluiu permanentemente: " + documento.getNome(),
+                    REFERENCIA_DOCUMENTO,
+                    documento.getId()
+            );
+        } catch (Exception ignored) {
+        }
+
         storageService.delete(documento.getStorageKey());
         documentoRepository.delete(documento);
     }
@@ -260,6 +358,12 @@ public class DocumentoService {
     @Transactional(readOnly = true)
     public List<Map<String, String>> listarClientesComDocumentos(UUID unidadeId, boolean isAdmin) {
         return documentoRepository.findDistinctClientes(isAdmin ? null : unidadeId);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<DocumentoResponse> listarLixeira(Pageable pageable, UUID unidadeId, boolean isAdmin) {
+        Page<Documento> documentos = documentoRepository.findDeletedWithScope(isAdmin ? null : unidadeId, pageable);
+        return documentos.map(this::toResponse);
     }
 
     @Transactional(readOnly = true)
@@ -302,6 +406,12 @@ public class DocumentoService {
     }
 
     @Transactional(readOnly = true)
+    public List<LogAuditoriaService.LogAuditoriaResponse> listarAtividades(UUID id, UUID unidadeId, boolean isAdmin) {
+        Documento documento = findDocumentoAutorizado(id, unidadeId, isAdmin);
+        return logAuditoriaService.listarPorReferencia(REFERENCIA_DOCUMENTO, documento.getId());
+    }
+
+    @Transactional(readOnly = true)
     public Documento findDocumentoAutorizadoPorStorageKey(String storageKey, UUID unidadeId, boolean isAdmin) {
         Documento documento = documentoRepository.findByStorageKey(storageKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Documento nao encontrado"));
@@ -335,6 +445,8 @@ public class DocumentoService {
                 .pastaId(d.getPasta() != null ? d.getPasta().getId().toString() : null)
                 .dataUpload(d.getDataUpload().toString())
                 .uploadedPor(d.getUploadedPor().getNome())
+                .deletedAt(d.getDeletedAt() != null ? d.getDeletedAt().toString() : null)
+                .deletedPor(d.getDeletedBy() != null ? d.getDeletedBy().getNome() : null)
                 .build();
     }
 
@@ -354,10 +466,7 @@ public class DocumentoService {
             return paginar(respostas, pageable);
         }
 
-        Set<String> storageKeysExistentes = new HashSet<>();
-        for (Documento documento : documentosDb) {
-            storageKeysExistentes.add(documento.getStorageKey());
-        }
+        Set<String> storageKeysExistentes = new HashSet<>(documentoRepository.findAllStorageKeys());
 
         Map<UUID, Optional<Cliente>> clientesCache = new HashMap<>();
         Map<UUID, Optional<Processo>> processosCache = new HashMap<>();

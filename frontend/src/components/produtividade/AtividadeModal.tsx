@@ -61,6 +61,7 @@ type AtividadeModalProps = {
   initialData?: Prazo | null;
   initialTipo?: TipoPrazo;
   dataInicial?: string;
+  initialProcessoId?: string;
   onClose: () => void;
   onSaved?: (atividade: Prazo) => void;
 };
@@ -164,10 +165,18 @@ function sanitizeIntegerInput(value: string) {
   return value.replace(/\D+/g, "");
 }
 
-function buildInitialDraft(initialData?: Prazo | null, initialTipo?: TipoPrazo, dataInicial?: string): AtividadeDraft {
+function buildInitialDraft(
+  initialData?: Prazo | null,
+  initialTipo?: TipoPrazo,
+  dataInicial?: string,
+  initialProcessoId?: string,
+): AtividadeDraft {
   const tipo = initialData?.tipo ?? initialTipo ?? "tarefa_interna";
-  const vinculoTipo = initialData?.vinculoTipo ?? (initialData?.processoId ? "processo" : "");
-  const vinculoReferenciaId = initialData?.vinculoReferenciaId ?? initialData?.processoId ?? "";
+  const processoInicial = initialData?.processoId ?? initialProcessoId ?? "";
+  const vinculoTipo =
+    initialData?.vinculoTipo ??
+    (tipo === "prazo_processual" || tipo === "audiencia" || processoInicial ? "processo" : "");
+  const vinculoReferenciaId = initialData?.vinculoReferenciaId ?? processoInicial;
 
   return {
     tipo,
@@ -180,7 +189,7 @@ function buildInitialDraft(initialData?: Prazo | null, initialTipo?: TipoPrazo, 
     diaInteiro: initialData?.diaInteiro ?? false,
     prioridade: initialData?.prioridade ?? PRIORIDADE_DEFAULT[tipo],
     etapa: initialData?.etapa ?? "a_fazer",
-    processoId: initialData?.processoId ?? "",
+    processoId: processoInicial,
     vinculoTipo,
     vinculoReferenciaId,
     vinculoBusca: "",
@@ -205,13 +214,16 @@ export function AtividadeModal({
   initialData,
   initialTipo,
   dataInicial,
+  initialProcessoId,
   onClose,
   onSaved,
 }: AtividadeModalProps) {
   const { user } = useAuth();
   const currentUserOption = useMemo(() => buildCurrentUserOption(user), [user]);
   const isAdmin = user?.papel?.toLowerCase() === "administrador";
-  const [form, setForm] = useState<AtividadeDraft>(() => buildInitialDraft(initialData, initialTipo, dataInicial));
+  const [form, setForm] = useState<AtividadeDraft>(() =>
+    buildInitialDraft(initialData, initialTipo, dataInicial, initialProcessoId),
+  );
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [processos, setProcessos] = useState<ProcessOption[]>([]);
   const [atendimentos, setAtendimentos] = useState<AtendimentoOption[]>([]);
@@ -220,8 +232,8 @@ export function AtividadeModal({
 
   useEffect(() => {
     if (!open) return;
-    setForm(buildInitialDraft(initialData, initialTipo, dataInicial));
-  }, [dataInicial, initialData, initialTipo, open]);
+    setForm(buildInitialDraft(initialData, initialTipo, dataInicial, initialProcessoId));
+  }, [dataInicial, initialData, initialProcessoId, initialTipo, open]);
 
   useEffect(() => {
     if (!open) return;

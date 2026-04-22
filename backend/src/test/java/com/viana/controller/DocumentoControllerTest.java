@@ -86,7 +86,7 @@ class DocumentoControllerTest {
         Usuario mockUser = Usuario.builder().id(UUID.randomUUID()).email("user@test.com").build();
 
         when(usuarioRepository.findByEmailIgnoreCase("user@test.com")).thenReturn(Optional.of(mockUser));
-        when(documentoService.atualizar(eq(docId), any(), any(), anyBoolean()))
+        when(documentoService.atualizar(eq(docId), any(), any(), anyBoolean(), any()))
                 .thenReturn(DocumentoResponse.builder()
                         .id(docId.toString())
                         .nome("Contrato Atualizado.pdf")

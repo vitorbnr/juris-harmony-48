@@ -89,7 +89,7 @@ public class PastaService {
             throw new BusinessException("A pasta possui subpastas internas. Exclua-as primeiro.");
         }
 
-        if (documentoRepository.existsByPastaId(pasta.getId())) {
+        if (documentoRepository.existsByPastaIdAndDeletedAtIsNull(pasta.getId())) {
             throw new BusinessException("A pasta possui documentos vinculados. Exclua ou mova os documentos primeiro.");
         }
 

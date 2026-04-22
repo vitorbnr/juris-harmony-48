@@ -5,6 +5,7 @@ public enum TipoAcao {
     CRIOU,
     EDITOU,
     EXCLUIU,
+    RESTAUROU,
     VISUALIZOU,
     FEZ_UPLOAD,
     BAIXOU

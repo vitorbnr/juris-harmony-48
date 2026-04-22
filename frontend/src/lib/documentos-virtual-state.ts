@@ -9,13 +9,15 @@ interface DocumentoVirtualOverride {
 
 interface DocumentoVirtualState {
   overrides: Record<string, DocumentoVirtualOverride>;
-  deletedIds: string[];
+  trashedIds: string[];
+  purgedIds: string[];
 }
 
 function getDefaultState(): DocumentoVirtualState {
   return {
     overrides: {},
-    deletedIds: [],
+    trashedIds: [],
+    purgedIds: [],
   };
 }
 
@@ -33,7 +35,12 @@ function readState(): DocumentoVirtualState {
     const parsed = JSON.parse(raw) as Partial<DocumentoVirtualState>;
     return {
       overrides: parsed.overrides ?? {},
-      deletedIds: Array.isArray(parsed.deletedIds) ? parsed.deletedIds : [],
+      trashedIds: Array.isArray(parsed.trashedIds)
+        ? parsed.trashedIds
+        : Array.isArray((parsed as { deletedIds?: string[] }).deletedIds)
+          ? (parsed as { deletedIds?: string[] }).deletedIds ?? []
+          : [],
+      purgedIds: Array.isArray(parsed.purgedIds) ? parsed.purgedIds : [],
     };
   } catch {
     return getDefaultState();
@@ -50,10 +57,10 @@ function writeState(state: DocumentoVirtualState) {
 
 export function applyDocumentoVirtualState(documentos: Documento[]) {
   const state = readState();
-  const deletedIds = new Set(state.deletedIds);
+  const hiddenIds = new Set([...state.trashedIds, ...state.purgedIds]);
 
   return documentos
-    .filter((documento) => !deletedIds.has(documento.id))
+    .filter((documento) => !hiddenIds.has(documento.id))
     .map((documento) => {
       const override = state.overrides[documento.id];
       if (!override) {
@@ -79,19 +86,63 @@ export function saveDocumentoVirtualOverride(id: string, override: DocumentoVirt
         ...override,
       },
     },
-    deletedIds: state.deletedIds.filter((storedId) => storedId !== id),
+    trashedIds: state.trashedIds.filter((storedId) => storedId !== id),
+    purgedIds: state.purgedIds.filter((storedId) => storedId !== id),
   });
 }
 
 export function markDocumentoVirtualDeleted(id: string) {
   const state = readState();
-  const deletedIds = state.deletedIds.includes(id) ? state.deletedIds : [...state.deletedIds, id];
+  const trashedIds = state.trashedIds.includes(id) ? state.trashedIds : [...state.trashedIds, id];
 
   const overrides = { ...state.overrides };
   delete overrides[id];
 
   writeState({
     overrides,
-    deletedIds,
+    trashedIds,
+    purgedIds: state.purgedIds.filter((storedId) => storedId !== id),
   });
+}
+
+export function restoreDocumentoVirtual(id: string) {
+  const state = readState();
+
+  writeState({
+    overrides: state.overrides,
+    trashedIds: state.trashedIds.filter((storedId) => storedId !== id),
+    purgedIds: state.purgedIds,
+  });
+}
+
+export function purgeDocumentoVirtual(id: string) {
+  const state = readState();
+  const overrides = { ...state.overrides };
+  delete overrides[id];
+
+  writeState({
+    overrides,
+    trashedIds: state.trashedIds.filter((storedId) => storedId !== id),
+    purgedIds: state.purgedIds.includes(id) ? state.purgedIds : [...state.purgedIds, id],
+  });
+}
+
+export function listDocumentoVirtualTrashed(documentos: Documento[]) {
+  const state = readState();
+  const trashedIds = new Set(state.trashedIds);
+
+  return documentos
+    .filter((documento) => trashedIds.has(documento.id))
+    .map((documento) => {
+      const override = state.overrides[documento.id];
+      if (!override) {
+        return documento;
+      }
+
+      return {
+        ...documento,
+        nome: override.nome ?? documento.nome,
+        categoria: override.categoria ?? documento.categoria,
+      };
+    });
 }

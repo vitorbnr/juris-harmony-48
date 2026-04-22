@@ -94,7 +94,7 @@ export const BlocoNotasDashboard = () => {
               <FileText className="h-4 w-4" />
             </div>
             <div>
-              <h3 className="font-heading text-lg font-semibold text-foreground">Bloco de Notas</h3>
+              <h3 className="font-heading text-lg font-semibold text-foreground">Bloco de notas</h3>
               <p className="text-xs text-muted-foreground">Notas pessoais com auto-save silencioso</p>
             </div>
           </div>

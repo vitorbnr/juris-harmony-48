@@ -170,6 +170,8 @@ export type StatusProcesso =
   | "SUSPENSO"
   | "ARQUIVADO";
 
+export type StatusProcessoDossie = "ATIVO" | "ARQUIVADO" | "SUSPENSO";
+
 export type TipoProcesso =
   | "CIVEL"
   | "TRABALHISTA"
@@ -204,6 +206,50 @@ export interface Processo {
   movimentacoes?: Movimentacao[];
   unidadeId: string;
   unidadeNome?: string;
+}
+
+export interface ProcessoDetalheParteEnvolvida {
+  id: string;
+  nome: string;
+  polo?: string;
+}
+
+export interface ProcessoDetalhePrazoVinculado {
+  id: string;
+  titulo: string;
+  dataFatal?: string | null;
+  statusKanban?: string | null;
+}
+
+export interface ProcessoDetalhe {
+  id: string;
+  npu: string;
+  numero: string;
+  clienteId?: string | null;
+  clienteNome?: string | null;
+  titulo: string;
+  tipo?: TipoProcesso | string | null;
+  tipoAcao?: string | null;
+  foro?: string | null;
+  vara?: string | null;
+  tribunal?: string | null;
+  status: StatusProcessoDossie;
+  statusOriginal?: StatusProcesso | null;
+  dataDistribuicao?: string | null;
+  dataUltimaMovimentacao?: string | null;
+  proximoPrazo?: string | null;
+  valorCausa?: number | string | null;
+  descricao?: string | null;
+  etiquetas?: string[];
+  advogados?: { id: string; nome: string }[];
+  advogadoId?: string | null;
+  advogadoNome?: string | null;
+  partesEnvolvidas?: ProcessoDetalheParteEnvolvida[];
+  prazosVinculados?: ProcessoDetalhePrazoVinculado[];
+  partes?: ProcessoParte[];
+  movimentacoes?: Movimentacao[];
+  unidadeId?: string | null;
+  unidadeNome?: string | null;
 }
 
 export interface ProcessoParte {
@@ -404,6 +450,8 @@ export interface Documento {
   pastaId?: string;
   dataUpload: string;
   uploadedPor?: string;
+  deletedAt?: string | null;
+  deletedPor?: string | null;
 }
 
 export interface Pasta {
@@ -509,7 +557,7 @@ export interface Notificacao {
 
 // ─── Logs de Auditoria ───────────────────────────────────────────────────────
 
-export type TipoAcao = "acessou" | "criou" | "editou" | "excluiu" | "visualizou" | "fez_upload" | "baixou";
+export type TipoAcao = "acessou" | "criou" | "editou" | "excluiu" | "restaurou" | "visualizou" | "fez_upload" | "baixou";
 export type ModuloLog = "atendimentos" | "processos" | "clientes" | "prazos" | "documentos" | "usuarios" | "sistema" | "financeiro";
 
 export interface LogAuditoria {
@@ -522,4 +570,15 @@ export interface LogAuditoria {
   data: string;
   hora: string;
   ip: string;
+}
+
+export interface DocumentoAtividade {
+  id: string;
+  usuarioNome: string;
+  acao: string;
+  modulo: string;
+  descricao: string;
+  dataHora: string;
+  referenciaTipo?: string | null;
+  referenciaId?: string | null;
 }

@@ -73,6 +73,14 @@ public interface PrazoRepository extends JpaRepository<Prazo, UUID> {
     boolean existsByEventoJuridicoIdAndTipo(UUID eventoJuridicoId, com.viana.model.enums.TipoPrazo tipo);
 
     @Query("""
+        SELECT p
+        FROM Prazo p
+        WHERE p.processo.id = :processoId
+        ORDER BY p.concluido ASC, p.data ASC, p.hora ASC, p.criadoEm DESC
+    """)
+    List<Prazo> findByProcessoIdOrderByDossie(@Param("processoId") UUID processoId);
+
+    @Query("""
         SELECT DISTINCT p FROM Prazo p
         LEFT JOIN FETCH p.participantes
         WHERE p.concluido = false

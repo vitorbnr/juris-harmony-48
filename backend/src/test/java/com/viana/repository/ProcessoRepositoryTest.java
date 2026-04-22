@@ -2,9 +2,12 @@ package com.viana.repository;
 
 import com.viana.model.Cliente;
 import com.viana.model.Processo;
+import com.viana.model.ProcessoParte;
 import com.viana.model.Unidade;
 import com.viana.model.Usuario;
+import com.viana.model.enums.PoloProcessual;
 import com.viana.model.enums.StatusProcesso;
+import com.viana.model.enums.TipoParteProcessual;
 import com.viana.model.enums.TipoCliente;
 import com.viana.model.enums.TipoProcesso;
 import com.viana.model.enums.UserRole;
@@ -19,6 +22,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 
@@ -43,6 +47,7 @@ class ProcessoRepositoryTest {
     private Unidade unidade;
     private Cliente cliente;
     private Usuario advogado;
+    private Processo processoComPartes;
 
     @BeforeEach
     void setUp() {
@@ -78,8 +83,18 @@ class ProcessoRepositoryTest {
                 .unidade(unidade)
                 .tipo(TipoProcesso.CIVEL)
                 .status(StatusProcesso.EM_ANDAMENTO)
+                .dataDistribuicao(LocalDate.of(2024, 1, 10))
+                .ultimaMovimentacao(LocalDate.of(2024, 4, 10))
                 .valorCausa(new BigDecimal("1000"))
                 .build();
+
+        p1.getPartes().add(ProcessoParte.builder()
+                .processo(p1)
+                .nome("Cliente Teste")
+                .tipo(TipoParteProcessual.PESSOA_FISICA)
+                .polo(PoloProcessual.ATIVO)
+                .principal(true)
+                .build());
 
         Processo p2 = Processo.builder()
                 .numero("0000002-00.2024.8.26.0000")
@@ -88,10 +103,16 @@ class ProcessoRepositoryTest {
                 .unidade(unidade)
                 .tipo(TipoProcesso.TRABALHISTA)
                 .status(StatusProcesso.CONCLUIDO)
+                .dataDistribuicao(LocalDate.of(2024, 1, 11))
+                .ultimaMovimentacao(LocalDate.of(2024, 4, 15))
                 .valorCausa(new BigDecimal("2000"))
                 .build();
 
-        processoRepository.saveAll(List.of(p1, p2));
+        List<Processo> salvos = processoRepository.saveAll(List.of(p1, p2));
+        processoComPartes = salvos.stream()
+                .filter(processo -> "0000001-00.2024.8.26.0000".equals(processo.getNumero()))
+                .findFirst()
+                .orElseThrow();
     }
 
     @Test
@@ -101,6 +122,8 @@ class ProcessoRepositoryTest {
         Page<Processo> resultTodos = processoRepository.findAllWithFilters(
                 unidade.getId(), null, null, null, null, "", "", PageRequest.of(0, 10));
         assertThat(resultTodos.getContent()).hasSize(2);
+        assertThat(resultTodos.getContent().get(0).getNumero()).isEqualTo("0000002-00.2024.8.26.0000");
+        assertThat(resultTodos.getContent().get(1).getNumero()).isEqualTo("0000001-00.2024.8.26.0000");
 
         // Filtro por STATUS = EM_ANDAMENTO
         Page<Processo> resultStatus = processoRepository.findAllWithFilters(
@@ -120,5 +143,15 @@ class ProcessoRepositoryTest {
     void countByClienteId() {
         long contagem = processoRepository.countByClienteId(cliente.getId());
         assertThat(contagem).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("Deve carregar o detalhe do processo com as partes em uma unica consulta")
+    void findDetalheById() {
+        Processo result = processoRepository.findDetalheById(processoComPartes.getId()).orElseThrow();
+
+        assertThat(result.getId()).isEqualTo(processoComPartes.getId());
+        assertThat(result.getPartes()).hasSize(1);
+        assertThat(result.getPartes().get(0).getNome()).isEqualTo("Cliente Teste");
     }
 }

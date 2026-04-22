@@ -23,4 +23,6 @@ public class DocumentoResponse {
     private String pastaId;
     private String dataUpload;
     private String uploadedPor;
+    private String deletedAt;
+    private String deletedPor;
 }

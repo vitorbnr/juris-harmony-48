@@ -53,4 +53,10 @@ public class Documento {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "uploaded_por", nullable = false)
     private Usuario uploadedPor;
+
+    private LocalDateTime deletedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "deleted_by")
+    private Usuario deletedBy;
 }
