@@ -105,7 +105,7 @@ export const BlocoNotasDashboard = () => {
       <Textarea
         value={conteudo}
         onChange={(event) => setConteudo(event.target.value)}
-        placeholder="Registe recados de ligacao, pontos de atencao e lembretes pessoais..."
+        placeholder="Registre recados de ligação, pontos de atenção e lembretes pessoais..."
         className="min-h-[260px] resize-none border-border/80 bg-background/55"
         disabled={carregando}
       />

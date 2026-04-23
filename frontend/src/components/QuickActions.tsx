@@ -331,7 +331,7 @@ export const QuickActions = () => {
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <Plus className="h-5 w-5" />
             </div>
-            <span className="text-center text-xs font-medium text-foreground">Novo Processo</span>
+            <span className="text-center text-xs font-medium text-foreground">Novo processo</span>
           </button>
 
           <button
@@ -341,7 +341,7 @@ export const QuickActions = () => {
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-chart-blue/15 text-chart-blue">
               <UserPlus className="h-5 w-5" />
             </div>
-            <span className="text-center text-xs font-medium text-foreground">Novo Cliente</span>
+            <span className="text-center text-xs font-medium text-foreground">Novo cliente</span>
           </button>
 
           <button
@@ -361,7 +361,7 @@ export const QuickActions = () => {
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
               <FileText className="h-5 w-5" />
             </div>
-            <span className="text-center text-xs font-medium text-foreground">Nota Rápida</span>
+            <span className="text-center text-xs font-medium text-foreground">Nota rápida</span>
           </button>
 
           <button
@@ -371,7 +371,7 @@ export const QuickActions = () => {
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/15 text-amber-700 dark:text-amber-300">
               <Upload className="h-5 w-5" />
             </div>
-            <span className="text-center text-xs font-medium text-foreground">Vincular Documento</span>
+            <span className="text-center text-xs font-medium text-foreground">Vincular documento</span>
           </button>
         </div>
       </div>
