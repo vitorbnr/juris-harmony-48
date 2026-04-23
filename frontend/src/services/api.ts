@@ -1,4 +1,5 @@
 import api from "@/lib/api";
+import type { Publicacao } from "@/types/publicacoes";
 import type {
   Atendimento,
   Caso,
@@ -569,6 +570,14 @@ export const eventosJuridicosApi = {
 
   registrarPublicacaoDjen: (data: CriarPublicacaoDjenRequest) =>
     api.post("/eventos-juridicos/publicacoes/djen", data).then(r => r.data as EventoJuridicoResponse),
+};
+
+export const publicacoesApi = {
+  listar: (params?: { status?: string }) =>
+    api.get("/publicacoes", { params: cleanParams(params) }).then(r => r.data as Publicacao[]),
+
+  atualizarStatus: (id: string, status: string) =>
+    api.put(`/publicacoes/${id}/status`, { status }).then(r => r.data as Publicacao),
 };
 
 export const integracoesApi = {
