@@ -233,12 +233,14 @@ public class ProcessoService {
     }
 
     @Transactional
-    public ProcessoResponse.MovimentacaoResponse adicionarMovimentacao(UUID processoId, CriarMovimentacaoRequest request) {
+    public ProcessoResponse.MovimentacaoResponse adicionarMovimentacao(UUID processoId, CriarMovimentacaoRequest request, UUID usuarioLogadoId) {
         Processo processo = findOrThrow(processoId);
         TipoMovimentacao tipoEnum = parseEnumRequired(TipoMovimentacao.class, request.getTipo(), "Tipo");
+        Usuario usuarioLogado = findUsuarioOrThrow(usuarioLogadoId);
 
         Movimentacao mov = Movimentacao.builder()
                 .processo(processo)
+                .criadoPor(usuarioLogado)
                 .data(request.getData())
                 .descricao(request.getDescricao())
                 .tipo(tipoEnum)
@@ -461,6 +463,11 @@ public class ProcessoService {
     private Processo findOrThrow(UUID id) {
         return processoRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Processo não encontrado"));
+    }
+
+    private Usuario findUsuarioOrThrow(UUID usuarioId) {
+        return usuarioRepository.findById(usuarioId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
     }
 
     private Processo findDetalheOrThrow(UUID id) {

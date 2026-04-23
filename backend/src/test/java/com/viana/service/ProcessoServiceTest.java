@@ -217,9 +217,10 @@ class ProcessoServiceTest {
                 .build();
 
         when(processoRepository.findById(processoId)).thenReturn(Optional.of(processoSalvo));
+        when(usuarioRepository.findById(advogadoDefault.getId())).thenReturn(Optional.of(advogadoDefault));
         when(movimentacaoRepository.save(any(Movimentacao.class))).thenReturn(movSalva);
 
-        processoService.adicionarMovimentacao(processoId, movRequest);
+        processoService.adicionarMovimentacao(processoId, movRequest, advogadoDefault.getId());
 
         assertEquals(movRequest.getData(), processoSalvo.getUltimaMovimentacao());
         verify(processoRepository, times(1)).save(processoSalvo);

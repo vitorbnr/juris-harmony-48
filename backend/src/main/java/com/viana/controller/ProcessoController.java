@@ -7,6 +7,9 @@ import com.viana.dto.response.DatajudCapaResponse;
 import com.viana.dto.response.ProcessoDetalheResponse;
 import com.viana.dto.response.ProcessoResponse;
 import com.viana.exception.BusinessException;
+import com.viana.exception.ResourceNotFoundException;
+import com.viana.model.Usuario;
+import com.viana.repository.UsuarioRepository;
 import com.viana.service.DatajudClientService;
 import com.viana.service.ProcessoService;
 import jakarta.validation.Valid;
@@ -17,6 +20,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -29,6 +33,7 @@ public class ProcessoController {
 
     private final DatajudClientService datajudClientService;
     private final ProcessoService processoService;
+    private final UsuarioRepository usuarioRepository;
 
     @GetMapping
     public ResponseEntity<Page<ProcessoResponse>> listar(
@@ -81,9 +86,13 @@ public class ProcessoController {
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO')")
     public ResponseEntity<ProcessoResponse.MovimentacaoResponse> adicionarMovimentacao(
             @PathVariable UUID id,
-            @Valid @RequestBody CriarMovimentacaoRequest request) {
+            @Valid @RequestBody CriarMovimentacaoRequest request,
+            Authentication authentication) {
+        Usuario usuario = usuarioRepository.findByEmailIgnoreCase(authentication.getName())
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(processoService.adicionarMovimentacao(id, request));
+                .body(processoService.adicionarMovimentacao(id, request, usuario.getId()));
     }
 
     @PostMapping("/{id}/sincronizar-datajud")

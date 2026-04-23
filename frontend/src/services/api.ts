@@ -3,11 +3,14 @@ import type {
   Atendimento,
   DashboardMetricas,
   DocumentoAtividade,
+  EvolucaoProdutividade,
+  IndicadorResponsavel,
   NotaPessoal,
   Prazo,
   PrazoComentario,
   PrazoDetalhe,
   ProcessoDetalhe,
+  TipoPeriodoIndicadoresEquipe,
 } from "@/types";
 
 type ApiParams = Record<string, unknown>;
@@ -231,6 +234,14 @@ function cleanParams<T extends ApiParams | undefined>(params: T): T {
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 export const dashboardApi = {
   get: () => api.get("/dashboard/metricas").then(r => r.data as DashboardResponse),
+};
+
+export const indicadoresEquipeApi = {
+  listar: (periodo: TipoPeriodoIndicadoresEquipe) =>
+    api.get("/indicadores/equipe", { params: cleanParams({ periodo }) }).then(r => r.data as IndicadorResponsavel[]),
+
+  evolucao: (usuarioId: string, periodo: TipoPeriodoIndicadoresEquipe) =>
+    api.get(`/indicadores/equipe/${usuarioId}/evolucao`, { params: cleanParams({ periodo }) }).then(r => r.data as EvolucaoProdutividade[]),
 };
 
 // ─── Processos ────────────────────────────────────────────────────────────────

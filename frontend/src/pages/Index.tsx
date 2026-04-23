@@ -20,6 +20,7 @@ import { DocumentosView } from "@/components/views/DocumentosView";
 import { PublicacoesView } from "@/components/views/PublicacoesView";
 import { IndicadoresView } from "@/components/views/IndicadoresView";
 import { ConfiguracoesView } from "@/components/views/ConfiguracoesView";
+import { useAuth } from "@/context/AuthContext";
 import { UnidadeProvider } from "@/context/UnidadeContext";
 import { normalizeSectionId, type AppSectionId } from "@/lib/navigation";
 import { dashboardApi } from "@/services/api";
@@ -117,7 +118,11 @@ const DashboardContent = ({ onNavigate }: { onNavigate: (id: string) => void }) 
   );
 };
 
-const renderContent = (activeItem: AppSectionId, onNavigate: (id: string) => void) => {
+const renderContent = (
+  activeItem: AppSectionId,
+  onNavigate: (id: string) => void,
+  canAccessIndicadores: boolean,
+) => {
   switch (activeItem) {
     case "inbox":
       return <InboxJuridicaView />;
@@ -136,7 +141,7 @@ const renderContent = (activeItem: AppSectionId, onNavigate: (id: string) => voi
     case "documentos":
       return <DocumentosView />;
     case "indicadores":
-      return <IndicadoresView />;
+      return canAccessIndicadores ? <IndicadoresView /> : <DashboardContent onNavigate={onNavigate} />;
     case "configuracoes":
       return <ConfiguracoesView />;
     default:
@@ -145,10 +150,13 @@ const renderContent = (activeItem: AppSectionId, onNavigate: (id: string) => voi
 };
 
 const Index = () => {
+  const { user } = useAuth();
   const [activeItem, setActiveItem] = useState<AppSectionId>("dashboard");
+  const canAccessIndicadores = user?.papel === "ADMINISTRADOR";
 
   const handleNavigate = (sectionId: string) => {
-    setActiveItem(normalizeSectionId(sectionId));
+    const nextSection = normalizeSectionId(sectionId);
+    setActiveItem(!canAccessIndicadores && nextSection === "indicadores" ? "dashboard" : nextSection);
   };
 
   return (
@@ -158,7 +166,7 @@ const Index = () => {
         <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
           <DashboardHeader activeItem={activeItem} onNavigate={handleNavigate} />
           <div className="relative z-10 flex-1 min-h-0 overflow-auto">
-            {renderContent(activeItem, handleNavigate)}
+            {renderContent(activeItem, handleNavigate, canAccessIndicadores)}
           </div>
         </main>
       </div>

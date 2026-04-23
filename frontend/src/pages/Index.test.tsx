@@ -4,7 +4,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import Index from "./Index";
 
 vi.mock("@/context/AuthContext", () => ({
-  useAuth: () => ({ user: { nome: "Admin" }, isAuthenticated: true, isLoading: false, logout: vi.fn() }),
+  useAuth: () => ({
+    user: { nome: "Admin", papel: "ADMINISTRADOR" },
+    isAuthenticated: true,
+    isLoading: false,
+    logout: vi.fn(),
+  }),
 }));
 
 vi.mock("@/components/DashboardHeader", () => ({

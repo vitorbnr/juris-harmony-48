@@ -120,4 +120,6 @@ public class Prazo {
     @Column(nullable = false, updatable = false)
     @Builder.Default
     private LocalDateTime criadoEm = LocalDateTime.now();
+
+    private LocalDateTime concluidoEm;
 }

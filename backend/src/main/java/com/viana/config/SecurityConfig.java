@@ -62,6 +62,7 @@ public class SecurityConfig {
 
                 // ── Admin only ──
                 .requestMatchers("/api/integracoes/**").hasRole("ADMINISTRADOR")
+                .requestMatchers("/api/indicadores/**").hasRole("ADMINISTRADOR")
                 .requestMatchers(HttpMethod.GET, "/api/usuarios", "/api/usuarios/*").authenticated()
                 .requestMatchers("/api/usuarios/**").hasRole("ADMINISTRADOR")
                 .requestMatchers("/api/logs/**").hasRole("ADMINISTRADOR")

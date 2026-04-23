@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight, Scale } from "lucide-react";
 import { useState } from "react";
 
+import { useAuth } from "@/context/AuthContext";
 import { appSections, configuracoesSection } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 
@@ -11,6 +12,9 @@ interface AppSidebarProps {
 
 export const AppSidebar = ({ activeItem, onNavigate }: AppSidebarProps) => {
   const [collapsed, setCollapsed] = useState(false);
+  const { user } = useAuth();
+  const isAdmin = user?.papel === "ADMINISTRADOR";
+  const visibleSections = appSections.filter((item) => isAdmin || item.id !== "indicadores");
 
   return (
     <aside
@@ -47,7 +51,7 @@ export const AppSidebar = ({ activeItem, onNavigate }: AppSidebarProps) => {
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-        {appSections.map((item) => (
+        {visibleSections.map((item) => (
           <button
             key={item.id}
             onClick={() => onNavigate(item.id)}

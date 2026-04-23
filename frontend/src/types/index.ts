@@ -160,6 +160,23 @@ export interface DashboardMetricas {
   processosParados: DashboardProcessoResumo[];
 }
 
+export type TipoPeriodoIndicadoresEquipe = "ESTE_MES" | "MES_PASSADO" | "ULTIMOS_90_DIAS";
+
+export interface IndicadorResponsavel {
+  usuarioId: string;
+  nomeUsuario: string;
+  processosSobResponsabilidade: number;
+  prazosPendentes: number;
+  prazosConcluidosNoPrazo: number;
+  prazosConcluidosAtrasados: number;
+  movimentacoesRegistadas: number;
+}
+
+export interface EvolucaoProdutividade {
+  data: string;
+  tarefasConcluidas: number;
+}
+
 // ─── Processos ───────────────────────────────────────────────────────────────
 
 export type StatusProcesso =

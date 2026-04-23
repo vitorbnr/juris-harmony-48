@@ -24,6 +24,10 @@ public class Movimentacao {
     @JoinColumn(name = "processo_id", nullable = false)
     private Processo processo;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "criado_por")
+    private Usuario criadoPor;
+
     @Column(nullable = false)
     private LocalDate data;
 
@@ -49,4 +53,8 @@ public class Movimentacao {
     private String orgaoJulgador;
 
     private LocalDateTime dataHoraOriginal;
+
+    @Column(nullable = false, updatable = false)
+    @Builder.Default
+    private LocalDateTime criadoEm = LocalDateTime.now();
 }

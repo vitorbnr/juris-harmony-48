@@ -1,6 +1,8 @@
 package com.viana.repository;
 
 import com.viana.model.Prazo;
+import com.viana.repository.projection.EvolucaoProdutividadeProjection;
+import com.viana.repository.projection.TotalPorUsuarioProjection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -9,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -88,4 +91,64 @@ public interface PrazoRepository extends JpaRepository<Prazo, UUID> {
           AND p.data <= :data
     """)
     List<Prazo> findAlertaveis(@Param("data") LocalDate data);
+
+    @Query(value = """
+        SELECT
+            p.advogado_id AS usuarioId,
+            COUNT(*) AS total
+        FROM prazos p
+        WHERE p.advogado_id IS NOT NULL
+          AND p.concluido = FALSE
+        GROUP BY p.advogado_id
+    """, nativeQuery = true)
+    List<TotalPorUsuarioProjection> countPrazosPendentesPorResponsavel();
+
+    @Query(value = """
+        SELECT
+            p.advogado_id AS usuarioId,
+            COUNT(*) AS total
+        FROM prazos p
+        WHERE p.advogado_id IS NOT NULL
+          AND p.concluido_em >= :inicio
+          AND p.concluido_em < :fim
+          AND CAST(p.concluido_em AS DATE) <= COALESCE(p.data_fim, p.data)
+        GROUP BY p.advogado_id
+    """, nativeQuery = true)
+    List<TotalPorUsuarioProjection> countPrazosConcluidosNoPrazoPorResponsavel(
+            @Param("inicio") LocalDateTime inicio,
+            @Param("fim") LocalDateTime fim
+    );
+
+    @Query(value = """
+        SELECT
+            p.advogado_id AS usuarioId,
+            COUNT(*) AS total
+        FROM prazos p
+        WHERE p.advogado_id IS NOT NULL
+          AND p.concluido_em >= :inicio
+          AND p.concluido_em < :fim
+          AND CAST(p.concluido_em AS DATE) > COALESCE(p.data_fim, p.data)
+        GROUP BY p.advogado_id
+    """, nativeQuery = true)
+    List<TotalPorUsuarioProjection> countPrazosConcluidosAtrasadosPorResponsavel(
+            @Param("inicio") LocalDateTime inicio,
+            @Param("fim") LocalDateTime fim
+    );
+
+    @Query(value = """
+        SELECT
+            CAST(DATE_TRUNC('week', p.concluido_em) AS DATE) AS periodo,
+            COUNT(*) AS tarefasConcluidas
+        FROM prazos p
+        WHERE p.advogado_id = :usuarioId
+          AND p.concluido_em >= :inicio
+          AND p.concluido_em < :fim
+        GROUP BY DATE_TRUNC('week', p.concluido_em)
+        ORDER BY DATE_TRUNC('week', p.concluido_em)
+    """, nativeQuery = true)
+    List<EvolucaoProdutividadeProjection> countConclusoesSemanaisByResponsavel(
+            @Param("usuarioId") UUID usuarioId,
+            @Param("inicio") LocalDateTime inicio,
+            @Param("fim") LocalDateTime fim
+    );
 }

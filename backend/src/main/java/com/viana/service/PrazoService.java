@@ -40,6 +40,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
@@ -360,6 +361,7 @@ public class PrazoService {
         }
 
         normalizarPeriodo(prazo);
+        atualizarMarcoConclusao(prazo);
         validarConfiguracaoAtividade(prazo);
 
         Prazo salvo = prazoRepository.save(prazo);
@@ -391,6 +393,7 @@ public class PrazoService {
 
         prazo.setConcluido(!prazo.getConcluido());
         prazo.setEtapa(prazo.getConcluido() ? EtapaPrazo.CONCLUIDO : EtapaPrazo.A_FAZER);
+        atualizarMarcoConclusao(prazo);
         Prazo salvo = prazoRepository.save(prazo);
         atualizarProximoPrazoProcesso(salvo.getProcesso());
 
@@ -425,6 +428,7 @@ public class PrazoService {
         EtapaPrazo etapaPrazo = parseEnumRequired(EtapaPrazo.class, etapa, "Etapa");
         prazo.setEtapa(etapaPrazo);
         prazo.setConcluido(etapaPrazo == EtapaPrazo.CONCLUIDO);
+        atualizarMarcoConclusao(prazo);
 
         Prazo salvo = prazoRepository.save(prazo);
         atualizarProximoPrazoProcesso(salvo.getProcesso());
@@ -673,6 +677,7 @@ public class PrazoService {
         }
 
         normalizarPeriodo(prazo);
+        atualizarMarcoConclusao(prazo);
         validarConfiguracaoAtividade(prazo);
 
         Prazo salvo = prazoRepository.save(prazo);
@@ -839,6 +844,23 @@ public class PrazoService {
 
         if (prazo.getDataFim() == null) {
             prazo.setDataFim(prazo.getData());
+        }
+    }
+
+    private void atualizarMarcoConclusao(Prazo prazo) {
+        if (Boolean.TRUE.equals(prazo.getConcluido())) {
+            if (prazo.getEtapa() != EtapaPrazo.CONCLUIDO) {
+                prazo.setEtapa(EtapaPrazo.CONCLUIDO);
+            }
+            if (prazo.getConcluidoEm() == null) {
+                prazo.setConcluidoEm(LocalDateTime.now());
+            }
+            return;
+        }
+
+        prazo.setConcluidoEm(null);
+        if (prazo.getEtapa() == EtapaPrazo.CONCLUIDO) {
+            prazo.setEtapa(EtapaPrazo.A_FAZER);
         }
     }
 
