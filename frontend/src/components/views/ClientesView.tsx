@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useDeferredValue } from "react";
 import {
   Users,
   Plus,
@@ -46,6 +46,18 @@ interface ClienteData {
   detalhesObito?: string;
   processos?: number;
 }
+
+interface PageResponse<T> {
+  content: T[];
+  number: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  first: boolean;
+  last: boolean;
+}
+
+const PAGE_SIZE = 40;
 
 function getInitials(nome: string) {
   return nome
@@ -182,12 +194,23 @@ export const ClientesView = () => {
   const [modo, setModo] = useState<"grid" | "lista">("grid");
   const [clienteSelecionado, setClienteSelecionado] = useState<ClienteData | null>(null);
   const [clientes, setClientes] = useState<ClienteData[]>([]);
+  const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [modalAberto, setModalAberto] = useState(false);
   const [modalProcessoAberto, setModalProcessoAberto] = useState(false);
   const [processoClienteId, setProcessoClienteId] = useState<string>("");
   const [clienteEditando, setClienteEditando] = useState<ClienteData | null>(null);
+  const [resultado, setResultado] = useState<PageResponse<ClienteData>>({
+    content: [],
+    number: 0,
+    size: PAGE_SIZE,
+    totalElements: 0,
+    totalPages: 0,
+    first: true,
+    last: true,
+  });
   const { unidadeSelecionada } = useUnidade();
+  const buscaDeferred = useDeferredValue(busca);
 
   useEffect(() => {
     const handlerNovoProcesso = (e: Event) => {
@@ -213,27 +236,53 @@ export const ClientesView = () => {
   const carregarClientes = useCallback(() => {
     setLoading(true);
 
-    const buscaNorm = busca.trim();
-    const params: { unidadeId?: string; busca?: string; size?: number } = { size: 1000 };
+    const buscaNorm = buscaDeferred.trim();
+    const params: { unidadeId?: string; busca?: string; page: number; size: number } = {
+      page,
+      size: PAGE_SIZE,
+    };
     if (unidadeSelecionada && unidadeSelecionada !== "todas") params.unidadeId = unidadeSelecionada;
     if (buscaNorm) params.busca = buscaNorm;
 
-    clientesApi.listar(Object.keys(params).length ? params : undefined)
-      .then((data) => {
-        const items = data.content ?? data;
-        setClientes(Array.isArray(items) ? items : []);
+    clientesApi.listar(params)
+      .then((data: PageResponse<ClienteData> | ClienteData[]) => {
+        const items = Array.isArray(data) ? data : data.content ?? [];
+        const content = Array.isArray(items) ? items : [];
+        setClientes(content);
+        setResultado({
+          content,
+          number: Array.isArray(data) ? page : data.number ?? page,
+          size: Array.isArray(data) ? PAGE_SIZE : data.size ?? PAGE_SIZE,
+          totalElements: Array.isArray(data) ? content.length : data.totalElements ?? content.length,
+          totalPages: Array.isArray(data) ? (content.length > 0 ? 1 : 0) : data.totalPages ?? 0,
+          first: Array.isArray(data) ? page === 0 : data.first ?? page === 0,
+          last: Array.isArray(data) ? true : data.last ?? true,
+        });
       })
       .catch((err) => {
         console.error("Erro ao carregar clientes:", err);
         toast.error("Erro ao carregar clientes");
         setClientes([]);
+        setResultado({
+          content: [],
+          number: 0,
+          size: PAGE_SIZE,
+          totalElements: 0,
+          totalPages: 0,
+          first: true,
+          last: true,
+        });
       })
       .finally(() => setLoading(false));
-  }, [busca, unidadeSelecionada]);
+  }, [buscaDeferred, page, unidadeSelecionada]);
 
   useEffect(() => {
     carregarClientes();
   }, [carregarClientes]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [buscaDeferred, unidadeSelecionada]);
 
   const clientesFiltrados = clientes;
 
@@ -421,7 +470,33 @@ export const ClientesView = () => {
         </div>
       )}
 
-      <p className="text-right text-xs text-muted-foreground">{clientesFiltrados.length} clientes</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs text-muted-foreground">
+          {resultado.totalElements} clientes
+        </p>
+
+        <div className="flex items-center gap-2">
+          <p className="text-xs text-muted-foreground">
+            Pagina {resultado.totalPages === 0 ? 0 : resultado.number + 1} de {resultado.totalPages}
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={resultado.first || loading}
+            onClick={() => setPage((current) => Math.max(0, current - 1))}
+          >
+            Anterior
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={resultado.last || loading || resultado.totalPages === 0}
+            onClick={() => setPage((current) => current + 1)}
+          >
+            Proxima
+          </Button>
+        </div>
+      </div>
 
       {clienteSelecionado && (
         <ClienteDrawer

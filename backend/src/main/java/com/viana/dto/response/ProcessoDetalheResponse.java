@@ -22,6 +22,8 @@ public class ProcessoDetalheResponse {
     private String numero;
     private String clienteId;
     private String clienteNome;
+    private String casoId;
+    private String casoTitulo;
     private String titulo;
     private String tipo;
     private String tipoAcao;

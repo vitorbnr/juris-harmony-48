@@ -105,6 +105,32 @@ export interface Atendimento {
   dataAtualizacao: string;
 }
 
+export type AcessoCaso = "PUBLICO" | "PRIVADO" | "EQUIPE";
+
+export interface CasoEnvolvido {
+  id: string;
+  nome: string;
+  qualificacao?: string | null;
+}
+
+export interface Caso {
+  id: string;
+  clienteId: string;
+  clienteNome: string;
+  unidadeId: string;
+  unidadeNome: string;
+  responsavelId: string;
+  responsavelNome: string;
+  titulo: string;
+  descricao?: string | null;
+  observacoes?: string | null;
+  etiquetas: string[];
+  acesso: AcessoCaso;
+  envolvidos: CasoEnvolvido[];
+  dataCriacao?: string | null;
+  dataAtualizacao?: string | null;
+}
+
 export interface DashboardPrazoResumo {
   id: string;
   titulo: string;
@@ -204,6 +230,8 @@ export interface Processo {
   numero: string;
   clienteId: string;
   clienteNome: string;
+  casoId?: string;
+  casoTitulo?: string;
   tipo: TipoProcesso;
   vara: string;
   tribunal: string;
@@ -244,6 +272,8 @@ export interface ProcessoDetalhe {
   numero: string;
   clienteId?: string | null;
   clienteNome?: string | null;
+  casoId?: string | null;
+  casoTitulo?: string | null;
   titulo: string;
   tipo?: TipoProcesso | string | null;
   tipoAcao?: string | null;

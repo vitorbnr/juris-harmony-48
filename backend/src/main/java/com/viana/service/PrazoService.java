@@ -8,6 +8,7 @@ import com.viana.dto.response.PrazoResponse;
 import com.viana.exception.BusinessException;
 import com.viana.exception.ResourceNotFoundException;
 import com.viana.model.Atendimento;
+import com.viana.model.Caso;
 import com.viana.model.EventoJuridico;
 import com.viana.model.Prazo;
 import com.viana.model.PrazoComentario;
@@ -27,6 +28,7 @@ import com.viana.model.enums.TipoUnidadeAlertaPrazo;
 import com.viana.model.enums.TipoVinculoPrazo;
 import com.viana.model.enums.UserRole;
 import com.viana.repository.AtendimentoRepository;
+import com.viana.repository.CasoRepository;
 import com.viana.repository.EventoJuridicoRepository;
 import com.viana.repository.PrazoComentarioRepository;
 import com.viana.repository.PrazoRepository;
@@ -57,6 +59,7 @@ public class PrazoService {
     private final PrazoRepository prazoRepository;
     private final ProcessoRepository processoRepository;
     private final AtendimentoRepository atendimentoRepository;
+    private final CasoRepository casoRepository;
     private final EventoJuridicoRepository eventoJuridicoRepository;
     private final PrazoComentarioRepository prazoComentarioRepository;
     private final UsuarioRepository usuarioRepository;
@@ -813,11 +816,18 @@ public class PrazoService {
         if (tipo == null && vinculoReferenciaId == null) {
             prazo.setVinculoTipo(null);
             prazo.setVinculoReferenciaId(null);
+            if (prazo.getEventoJuridico() == null) {
+                prazo.setProcesso(null);
+            }
             return;
         }
 
         if (tipo == null || vinculoReferenciaId == null) {
             throw new BusinessException("Tipo de vinculo e referencia devem ser informados em conjunto.");
+        }
+
+        if (tipo != TipoVinculoPrazo.PROCESSO && prazo.getEventoJuridico() == null) {
+            prazo.setProcesso(null);
         }
 
         if (tipo == TipoVinculoPrazo.PROCESSO) {
@@ -829,6 +839,12 @@ public class PrazoService {
                     .orElseThrow(() -> new ResourceNotFoundException("Atendimento vinculado nao encontrado"));
             if (prazo.getProcesso() == null && atendimento.getProcesso() != null) {
                 prazo.setProcesso(atendimento.getProcesso());
+            }
+        } else if (tipo == TipoVinculoPrazo.CASO) {
+            Caso caso = casoRepository.findById(vinculoReferenciaId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Caso vinculado nao encontrado"));
+            if (prazo.getUnidade() == null && caso.getUnidade() != null) {
+                prazo.setUnidade(caso.getUnidade());
             }
         }
 

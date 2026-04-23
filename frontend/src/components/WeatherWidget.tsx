@@ -136,7 +136,7 @@ export const WeatherWidget = () => {
 
   return (
     <div
-      className="flex h-9 items-center gap-2 rounded-xl border border-primary/20 bg-card/80 px-3 text-sm font-semibold text-primary shadow-[0_12px_24px_-18px_rgba(15,23,42,0.35)] backdrop-blur-sm"
+      className="flex h-9 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-semibold text-primary shadow-sm"
       title={`Clima atual em ${location.label}`}
     >
       <WeatherIcon className="h-4 w-4" />

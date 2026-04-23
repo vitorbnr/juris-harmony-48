@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Loader2, Search, UserPlus, X } from "lucide-react";
+import { Loader2, Plus, Search, UserPlus, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 
 import { useAuth } from "@/context/AuthContext";
+import { NovoCasoModal } from "@/components/modals/NovoCasoModal";
 import { Button } from "@/components/ui/button";
 import { EtiquetasEditor } from "@/components/EtiquetasEditor";
 import { PartesProcessoEditor, sanitizeProcessoPartesForApi } from "@/components/PartesProcessoEditor";
@@ -10,8 +11,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { maskCurrency, maskProcesso, parseCurrency } from "@/lib/masks";
-import { clientesApi, processosApi, unidadesApi, usuariosApi } from "@/services/api";
-import type { ProcessoParteFormValue } from "@/types";
+import { casosApi, clientesApi, processosApi, unidadesApi, usuariosApi } from "@/services/api";
+import type { Caso, ProcessoParteFormValue } from "@/types";
 import { toast } from "sonner";
 
 interface Props {
@@ -23,6 +24,7 @@ interface Props {
 type ProcessoFormValues = {
   numero: string;
   clienteId: string;
+  casoId: string;
   tipo: string;
   vara: string;
   tribunal: string;
@@ -44,6 +46,8 @@ type UnidadeOption = {
   id: string;
   nome: string;
 };
+
+type CasoOption = Caso;
 
 type UsuarioOption = {
   id: string;
@@ -117,6 +121,9 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
   const [isSearching, setIsSearching] = useState(false);
   const [clientes, setClientes] = useState<ClienteOption[]>([]);
   const [unidades, setUnidades] = useState<UnidadeOption[]>([]);
+  const [casos, setCasos] = useState<CasoOption[]>([]);
+  const [loadingCasos, setLoadingCasos] = useState(false);
+  const [modalCasoAberto, setModalCasoAberto] = useState(false);
   const [advogados, setAdvogados] = useState<{ id: string; nome: string }[]>([]);
   const [advogadosSelecionados, setAdvogadosSelecionados] = useState<{ id: string; nome: string }[]>([]);
   const [advogadoSelecionarId, setAdvogadoSelecionarId] = useState("");
@@ -128,6 +135,7 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
     defaultValues: {
       numero: "",
       clienteId: initialClienteId || "",
+      casoId: "",
       tipo: "CIVEL",
       vara: "",
       tribunal: "",
@@ -138,6 +146,8 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
       unidadeId: user?.unidadeId ?? "",
     },
   });
+  const clienteIdSelecionado = form.watch("clienteId");
+  const unidadeIdSelecionada = form.watch("unidadeId");
 
   useEffect(() => {
     clientesApi.listar({ size: 1000 }).then(data => {
@@ -150,8 +160,10 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
       setUnidades(Array.isArray(items) ? items as UnidadeOption[] : []);
     }).catch(() => {});
 
-    usuariosApi.listar().then((data: UsuarioOption[]) => {
-      setAdvogados(data.filter(u => u.papel === "ADVOGADO" || u.papel === "ADMINISTRADOR"));
+    usuariosApi.listar().then((data: UsuarioOption[] | { content?: UsuarioOption[] }) => {
+      const items = (data as { content?: UsuarioOption[] }).content ?? data;
+      const lista = Array.isArray(items) ? items as UsuarioOption[] : [];
+      setAdvogados(lista.filter(u => u.papel === "ADVOGADO" || u.papel === "ADMINISTRADOR"));
     }).catch(() => {});
   }, []);
 
@@ -160,6 +172,33 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
       form.setValue("clienteId", initialClienteId, { shouldValidate: true });
     }
   }, [form, initialClienteId]);
+
+  useEffect(() => {
+    if (!clienteIdSelecionado) {
+      setCasos([]);
+      form.setValue("casoId", "");
+      return;
+    }
+
+    setLoadingCasos(true);
+    casosApi.listar({
+      clienteId: clienteIdSelecionado,
+      unidadeId: unidadeIdSelecionada || undefined,
+      size: 100,
+    }).then((data) => {
+      const items = data.content ?? data;
+      const lista = Array.isArray(items) ? items as CasoOption[] : [];
+      setCasos(lista);
+
+      const casoAtual = form.getValues("casoId");
+      if (casoAtual && !lista.some((caso) => caso.id === casoAtual)) {
+        form.setValue("casoId", "");
+      }
+    }).catch(() => {
+      setCasos([]);
+      form.setValue("casoId", "");
+    }).finally(() => setLoadingCasos(false));
+  }, [clienteIdSelecionado, form, unidadeIdSelecionada]);
 
   useEffect(() => {
     if (user?.unidadeId && !form.getValues("unidadeId")) {
@@ -258,6 +297,7 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
     try {
       await processosApi.criar({
         ...values,
+        casoId: values.casoId || null,
         advogadoIds: advogadosSelecionados.map(item => item.id),
         etiquetas,
         partes: sanitizeProcessoPartesForApi(partes),
@@ -279,11 +319,22 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
     !advogadosSelecionados.some(selecionado => selecionado.id === item.id),
   );
 
+  const handleCasoSalvo = (caso: Caso) => {
+    setCasos((prev) => {
+      const next = [caso, ...prev.filter((item) => item.id !== caso.id)];
+      return next.sort((left, right) => left.titulo.localeCompare(right.titulo, "pt-BR"));
+    });
+
+    form.setValue("clienteId", caso.clienteId, { shouldValidate: true, shouldDirty: true });
+    form.setValue("unidadeId", caso.unidadeId, { shouldValidate: true, shouldDirty: true });
+    form.setValue("casoId", caso.id, { shouldValidate: true, shouldDirty: true });
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative bg-card rounded-2xl border border-border shadow-2xl w-full max-w-lg mx-4 animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+      <div className="relative bg-card rounded-2xl border border-border shadow-2xl w-full max-w-xl mx-4 animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-5 border-b border-border">
           <h2 className="font-heading text-lg font-semibold text-foreground">Novo Processo</h2>
           <Button type="button" variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
@@ -347,6 +398,46 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
                       ))}
                     </select>
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+                )}
+              />
+
+            <FormField
+              control={form.control}
+              name="casoId"
+              render={({ field }) => (
+                <FormItem className="space-y-1.5">
+                  <FormLabel>Caso</FormLabel>
+                  <div className="flex gap-2">
+                    <FormControl>
+                      <select
+                        {...field}
+                        disabled={!clienteIdSelecionado || loadingCasos}
+                        className="w-full h-10 px-3 rounded-md bg-secondary text-foreground text-sm border-none outline-none disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        <option value="">Sem caso vinculado</option>
+                        {casos.map((caso) => (
+                          <option key={caso.id} value={caso.id}>
+                            {caso.titulo}
+                          </option>
+                        ))}
+                      </select>
+                    </FormControl>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-10 w-10 shrink-0"
+                      onClick={() => setModalCasoAberto(true)}
+                      aria-label="Criar novo caso"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Opcional. Vincule o processo a um caso para manter contexto, envolvidos e organizacao do escritorio.
+                  </p>
                   <FormMessage />
                 </FormItem>
               )}
@@ -568,6 +659,19 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
           </Button>
         </div>
       </div>
+
+      {modalCasoAberto && (
+        <NovoCasoModal
+          onClose={() => setModalCasoAberto(false)}
+          onSaved={handleCasoSalvo}
+          initialClienteId={clienteIdSelecionado || undefined}
+          initialUnidadeId={unidadeIdSelecionada || undefined}
+          initialResponsavelId={user?.id}
+          lockClienteId={clienteIdSelecionado || undefined}
+          title="Novo Caso para o Processo"
+          description="Crie o caso e volte ao cadastro do processo com o vinculo ja selecionado."
+        />
+      )}
     </div>
   );
 }

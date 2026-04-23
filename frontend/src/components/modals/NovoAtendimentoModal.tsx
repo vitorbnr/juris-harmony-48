@@ -24,9 +24,9 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
-import { atendimentosApi, clientesApi, processosApi } from "@/services/api";
+import { atendimentosApi, casosApi, clientesApi, processosApi } from "@/services/api";
 import { toast } from "sonner";
-import type { Atendimento, Cliente, Processo } from "@/types";
+import type { Atendimento, Caso, Cliente, Processo } from "@/types";
 
 interface NovoAtendimentoModalProps {
   onClose: () => void;
@@ -50,6 +50,7 @@ type AtendimentoFormState = {
   assunto: string;
   descricao: string;
   processoId: string;
+  casoId: string;
   relacionamento: TipoRelacionamento;
 };
 
@@ -58,6 +59,7 @@ const buildInitialForm = (initialData: Atendimento | null): AtendimentoFormState
   assunto: initialData?.assunto ?? "",
   descricao: initialData?.descricao ?? "",
   processoId: initialData?.processoId ?? "",
+  casoId: initialData?.vinculoTipo === "CASO" ? initialData?.vinculoReferenciaId ?? "" : "",
   relacionamento:
     initialData?.processoId || initialData?.vinculoTipo === "PROCESSO"
       ? "PROCESSO"
@@ -76,10 +78,13 @@ export function NovoAtendimentoModal({
 
   const [loading, setLoading] = useState(false);
   const [carregandoProcessos, setCarregandoProcessos] = useState(false);
+  const [carregandoCasos, setCarregandoCasos] = useState(false);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [processos, setProcessos] = useState<Processo[]>([]);
+  const [casos, setCasos] = useState<Caso[]>([]);
   const [clienteOpen, setClienteOpen] = useState(false);
   const [processoOpen, setProcessoOpen] = useState(false);
+  const [casoOpen, setCasoOpen] = useState(false);
   const [etiquetas, setEtiquetas] = useState<string[]>(initialData?.etiquetas ?? []);
   const [form, setForm] = useState<AtendimentoFormState>(buildInitialForm(initialData));
 
@@ -103,6 +108,7 @@ export function NovoAtendimentoModal({
   useEffect(() => {
     if (!form.clienteId) {
       setProcessos([]);
+      setCasos([]);
       return;
     }
 
@@ -117,12 +123,41 @@ export function NovoAtendimentoModal({
           ? items.filter((processo) => !processo.numero?.toUpperCase().startsWith("ATD-"))
           : [];
         setProcessos(processosCliente);
+        if (form.processoId && !processosCliente.some((processo) => processo.id === form.processoId)) {
+          setForm((current) => ({ ...current, processoId: "" }));
+        }
       })
       .catch(() => {
         setProcessos([]);
         toast.error("Nao foi possivel carregar os processos do cliente.");
       })
       .finally(() => setCarregandoProcessos(false));
+  }, [form.clienteId]);
+
+  useEffect(() => {
+    if (!form.clienteId) {
+      setCasos([]);
+      return;
+    }
+
+    setCarregandoCasos(true);
+    casosApi.listar({
+      clienteId: form.clienteId,
+      size: 100,
+    })
+      .then((data) => {
+        const items = data.content ?? data;
+        const casosCliente = Array.isArray(items) ? items : [];
+        setCasos(casosCliente);
+        if (form.casoId && !casosCliente.some((caso) => caso.id === form.casoId)) {
+          setForm((current) => ({ ...current, casoId: "" }));
+        }
+      })
+      .catch(() => {
+        setCasos([]);
+        toast.error("Nao foi possivel carregar os casos do cliente.");
+      })
+      .finally(() => setCarregandoCasos(false));
   }, [form.clienteId]);
 
   const clienteSelecionado = useMemo(
@@ -135,6 +170,11 @@ export function NovoAtendimentoModal({
     [processos, form.processoId],
   );
 
+  const casoSelecionado = useMemo(
+    () => casos.find((caso) => caso.id === form.casoId) ?? null,
+    [casos, form.casoId],
+  );
+
   const setField = (
     field: keyof AtendimentoFormState,
     value: AtendimentoFormState[keyof AtendimentoFormState],
@@ -144,13 +184,15 @@ export function NovoAtendimentoModal({
 
       if (field === "clienteId") {
         next.processoId = "";
-        if (next.relacionamento === "CASO") {
-          next.relacionamento = "NENHUM";
-        }
+        next.casoId = "";
       }
 
       if (field === "relacionamento" && value !== "PROCESSO") {
         next.processoId = "";
+      }
+
+      if (field === "relacionamento" && value !== "CASO") {
+        next.casoId = "";
       }
 
       return next;
@@ -173,20 +215,21 @@ export function NovoAtendimentoModal({
       return;
     }
 
-    if (form.relacionamento === "CASO") {
-      toast.error("A vinculacao com casos sera liberada quando o modulo de Casos estiver pronto.");
+    if (form.relacionamento === "CASO" && !form.casoId) {
+      toast.error("Selecione o caso relacionado ou remova o vinculo.");
       return;
     }
 
     setLoading(true);
     try {
       const processoId = form.relacionamento === "PROCESSO" ? form.processoId : null;
+      const casoId = form.relacionamento === "CASO" ? form.casoId : null;
       const payload = {
         clienteId: form.clienteId,
         usuarioId: user.id,
         processoId,
-        tipoVinculo: processoId ? "PROCESSO" : null,
-        vinculoReferenciaId: processoId,
+        tipoVinculo: processoId ? "PROCESSO" : casoId ? "CASO" : null,
+        vinculoReferenciaId: processoId || casoId,
         assunto: form.assunto.trim(),
         descricao: form.descricao.trim() || null,
         etiquetas,
@@ -304,7 +347,12 @@ export function NovoAtendimentoModal({
                 >
                   Processo
                 </Button>
-                <Button type="button" variant="outline" disabled title="Disponivel quando o modulo de Casos for implementado">
+                <Button
+                  type="button"
+                  variant={form.relacionamento === "CASO" ? "default" : "outline"}
+                  onClick={() => setField("relacionamento", "CASO")}
+                  disabled={!form.clienteId}
+                >
                   Caso
                 </Button>
               </div>
@@ -376,6 +424,73 @@ export function NovoAtendimentoModal({
                 </Popover>
                 <p className="text-xs text-muted-foreground">
                   Use quando o cliente veio falar sobre um processo ja existente.
+                </p>
+              </div>
+            )}
+
+            {form.relacionamento === "CASO" && (
+              <div className="space-y-1.5">
+                <Label>Caso relacionado</Label>
+                <Popover open={casoOpen} onOpenChange={setCasoOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={casoOpen}
+                      className="w-full justify-between"
+                      disabled={!form.clienteId || carregandoCasos}
+                    >
+                      <span className={cn("truncate", !casoSelecionado && "text-muted-foreground")}>
+                        {carregandoCasos
+                          ? "A carregar casos..."
+                          : casoSelecionado
+                            ? casoSelecionado.titulo
+                            : "Selecionar caso do cliente"}
+                      </span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Buscar caso..." />
+                      <CommandList>
+                        <CommandEmpty>
+                          {form.clienteId
+                            ? "Nenhum caso encontrado para este cliente."
+                            : "Selecione um cliente primeiro."}
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {casos.map((caso) => (
+                            <CommandItem
+                              key={caso.id}
+                              value={`${caso.titulo} ${caso.clienteNome} ${caso.responsavelNome}`}
+                              onSelect={() => {
+                                setField("casoId", caso.id);
+                                setCasoOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  form.casoId === caso.id ? "opacity-100" : "opacity-0",
+                                )}
+                              />
+                              <div className="min-w-0">
+                                <p className="truncate">{caso.titulo}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {caso.unidadeNome} - {caso.responsavelNome}
+                                </p>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                <p className="text-xs text-muted-foreground">
+                  Use quando o contacto estiver ligado a um caso ainda sem processo ou a um conjunto maior de fatos.
                 </p>
               </div>
             )}

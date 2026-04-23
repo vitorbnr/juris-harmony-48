@@ -54,7 +54,7 @@ const DemandasPorAreaTooltip = ({
   }
 
   return (
-    <div className="rounded-xl border border-border/70 bg-background/95 px-3 py-2 text-xs shadow-xl backdrop-blur">
+    <div className="rounded-lg border border-border bg-popover px-3 py-2 text-xs shadow-[0_18px_36px_-28px_rgba(15,23,42,0.24)]">
       <div className="flex items-center gap-2">
         <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.fill }} />
         <p className="font-medium text-foreground">{item.area}</p>
@@ -127,7 +127,7 @@ export const ProcessosPorAreaChart = ({ data = [], loading = false }: Props) => 
                   {areaPrincipal?.area ?? "Nao informado"}
                 </p>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  {areaPrincipal?.quantidade.toLocaleString("pt-BR") ?? "0"} processos nesta area
+                  {areaPrincipal?.quantidade.toLocaleString("pt-BR") ?? "0"} processos nesta área
                 </p>
               </div>
             </div>
@@ -206,7 +206,7 @@ export const ProcessosPorAreaChart = ({ data = [], loading = false }: Props) => 
                           <p className="text-xs text-muted-foreground">{percentualFormatado}% do total</p>
                         </div>
                       </div>
-                      <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary/95">
+                      <span className="shrink-0 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-semibold text-foreground">
                         {item.quantidade.toLocaleString("pt-BR")}
                       </span>
                     </div>
@@ -222,7 +222,7 @@ export const ProcessosPorAreaChart = ({ data = [], loading = false }: Props) => 
                     </div>
 
                     <div className="mt-2 flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
-                      <span>Participacao</span>
+                      <span>Participação</span>
                       <span>{percentualFormatado}% da carteira</span>
                     </div>
                   </div>

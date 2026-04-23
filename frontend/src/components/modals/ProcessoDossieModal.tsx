@@ -75,9 +75,9 @@ type FormAndamento = {
 type DocumentoPreviewKind = "image" | "pdf" | "video" | "audio" | "text" | "unsupported";
 
 const STATUS_BADGE_CLASS: Record<NonNullable<ProcessoDetalhe["status"]>, string> = {
-  ATIVO: "border-emerald-400/30 bg-emerald-500/10 text-emerald-200",
-  ARQUIVADO: "border-zinc-600 bg-zinc-800/80 text-zinc-300",
-  SUSPENSO: "border-amber-400/30 bg-amber-500/10 text-amber-200",
+  ATIVO: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300",
+  ARQUIVADO: "border-slate-200 bg-slate-100 text-slate-700 dark:border-zinc-700 dark:bg-zinc-800/80 dark:text-zinc-300",
+  SUSPENSO: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300",
 };
 
 const STATUS_LABEL: Record<NonNullable<ProcessoDetalhe["status"]>, string> = {
@@ -377,6 +377,8 @@ function toEditableProcesso(detalhe: ProcessoDetalhe): Processo {
     numero: detalhe.numero || detalhe.npu,
     clienteId: detalhe.clienteId ?? "",
     clienteNome: detalhe.clienteNome ?? detalhe.titulo,
+    casoId: detalhe.casoId ?? undefined,
+    casoTitulo: detalhe.casoTitulo ?? undefined,
     tipo: (detalhe.tipo as Processo["tipo"]) ?? "CIVEL",
     vara: detalhe.vara ?? "",
     tribunal: detalhe.tribunal ?? "",
@@ -424,12 +426,12 @@ function InfoMetric({
   value: string;
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 backdrop-blur-sm">
-      <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-zinc-400">
+    <div className="rounded-xl border border-border bg-background px-4 py-3">
+      <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
         <Icon className="h-3.5 w-3.5" />
         <span>{label}</span>
       </div>
-      <p className="mt-2 text-sm font-medium leading-6 text-zinc-100">{value}</p>
+      <p className="mt-2 text-sm font-medium leading-6 text-foreground">{value}</p>
     </div>
   );
 }
@@ -457,20 +459,20 @@ function ParteSection({
   onOpenCliente: (cliente: Cliente) => void;
 }) {
   return (
-    <section className="rounded-3xl border border-border bg-card/70 p-5">
+    <section className="rounded-2xl border border-border bg-card p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-base font-semibold text-foreground">{title}</h3>
           <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
         </div>
-        <Badge variant="outline" className="border-border bg-background/70 text-muted-foreground">
+        <Badge variant="outline" className="border-border bg-background text-foreground">
           {partes.length}
         </Badge>
       </div>
 
       <div className="mt-4 space-y-3">
         {partes.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border bg-background/60 px-4 py-8 text-sm text-muted-foreground">
+          <div className="rounded-xl border border-dashed border-border bg-muted/35 px-4 py-8 text-sm text-muted-foreground">
             Nenhuma parte registada neste polo.
           </div>
         ) : (
@@ -478,7 +480,7 @@ function ParteSection({
             const clienteRelacionado = resolveClienteRelacionado(parte, clientes);
 
             return (
-              <article key={parte.id} className="rounded-2xl border border-border/70 bg-background/70 p-4">
+              <article key={parte.id} className="rounded-xl border border-border bg-background p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     {clienteRelacionado ? (
@@ -495,10 +497,10 @@ function ParteSection({
                     )}
 
                     <div className="mt-2 flex flex-wrap gap-2">
-                      <Badge variant="outline" className="border-border bg-card/70 text-muted-foreground">
+                      <Badge variant="outline" className="border-border bg-background text-foreground">
                         {formatPolo(parte.polo)}
                       </Badge>
-                      <Badge variant="outline" className="border-border bg-card/70 text-muted-foreground">
+                      <Badge variant="outline" className="border-border bg-background text-foreground">
                         {formatTipoParte(parte.tipo)}
                       </Badge>
                       {parte.principal && (
@@ -510,7 +512,7 @@ function ParteSection({
                   </div>
 
                   {parte.documento && (
-                    <span className="rounded-full border border-border px-2 py-1 text-[11px] text-muted-foreground">
+                    <span className="rounded-full border border-border px-2 py-1 text-[11px] text-foreground">
                       {parte.documento}
                     </span>
                   )}
@@ -865,7 +867,7 @@ export function ProcessoDossieModal({
   return (
     <>
       <Sheet open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
-        <SheetContent side="right" className="w-full border-l border-border bg-card p-0 sm:max-w-[1280px]">
+        <SheetContent side="right" className="w-full border-l border-border bg-background p-0 sm:max-w-[1280px]">
           <SheetHeader className="sr-only">
             <SheetTitle>Dossie do processo</SheetTitle>
             <SheetDescription>Visao consolidada do processo com resumo, partes, historico, prazos e documentos.</SheetDescription>
@@ -877,7 +879,7 @@ export function ProcessoDossieModal({
             </div>
           ) : erroCarregamento ? (
             <div className="flex h-full items-center justify-center px-6">
-              <div className="w-full max-w-md rounded-3xl border border-border bg-background/70 p-6 text-center">
+              <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 text-center">
                 <p className="text-base font-semibold text-foreground">Falha ao carregar o dossie</p>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">{erroCarregamento}</p>
                 {processoId && (
@@ -889,21 +891,18 @@ export function ProcessoDossieModal({
             </div>
           ) : !detalhe ? null : (
             <div className="flex h-full min-h-0 flex-col">
-              <div className="relative overflow-hidden border-b border-border bg-gradient-to-br from-zinc-950 via-zinc-900 to-emerald-950/20 px-8 py-7">
-                <div className="absolute -left-10 bottom-[-120px] h-64 w-64 rounded-full bg-sky-500/10 blur-3xl" />
-                <div className="absolute -right-16 top-[-90px] h-72 w-72 rounded-full bg-emerald-400/10 blur-3xl" />
-
-                <div className="relative flex flex-wrap items-start justify-between gap-6">
+              <div className="border-b border-border bg-card px-8 py-7">
+                <div className="flex flex-wrap items-start justify-between gap-6">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-3">
                       <Badge variant="outline" className={cn("border text-xs", STATUS_BADGE_CLASS[detalhe.status])}>
                         <ShieldCheck className="mr-1 h-3.5 w-3.5" />
                         {STATUS_LABEL[detalhe.status]}
                       </Badge>
-                      <span className="font-mono text-2xl font-bold tracking-tight text-white">{maskNpu(detalhe.npu)}</span>
+                      <span className="font-mono text-2xl font-bold tracking-tight text-foreground">{maskNpu(detalhe.npu)}</span>
                     </div>
 
-                    <p className="mt-3 text-lg text-zinc-300">{detalhe.titulo || "Titulo nao informado"}</p>
+                    <p className="mt-3 text-lg text-foreground">{detalhe.titulo || "Titulo nao informado"}</p>
 
                     <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                       <InfoMetric
@@ -930,26 +929,18 @@ export function ProcessoDossieModal({
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                      variant="outline"
-                      className="border-white/10 bg-white/5 text-zinc-100 hover:bg-white/10"
-                      onClick={() => setUploadDocumentoAberto(true)}
-                    >
+                    <Button variant="outline" onClick={() => setUploadDocumentoAberto(true)}>
                       <Upload className="mr-2 h-4 w-4" />
                       Adicionar documento
                     </Button>
-                    <Button
-                      variant="outline"
-                      className="border-white/10 bg-white/5 text-zinc-100 hover:bg-white/10"
-                      onClick={() => setEditando(true)}
-                    >
+                    <Button variant="outline" onClick={() => setEditando(true)}>
                       <PencilLine className="mr-2 h-4 w-4" />
                       Gerir processo
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-10 w-10 text-zinc-200 hover:bg-white/10 hover:text-white"
+                      className="h-10 w-10 text-muted-foreground hover:bg-muted hover:text-foreground"
                       onClick={onClose}
                     >
                       <X className="h-4 w-4" />
@@ -993,7 +984,7 @@ export function ProcessoDossieModal({
                                   <CardTitle className="text-lg">Dados do Processo</CardTitle>
                                   <CardDescription>Leitura direta do cadastro, do foro e do contexto operacional.</CardDescription>
                                 </div>
-                                <Badge variant="outline" className="border-border bg-background/70 text-muted-foreground">
+                                <Badge variant="outline" className="border-border bg-background text-foreground">
                                   {formatStatusOriginal(detalhe.statusOriginal)}
                                 </Badge>
                               </div>
@@ -1003,6 +994,7 @@ export function ProcessoDossieModal({
                               <SummaryField label="Numero / NPU" value={maskNpu(detalhe.npu || detalhe.numero)} />
                               <SummaryField label="Foro / Juizo" value={foroResumo} />
                               <SummaryField label="Valor da causa" value={formatCurrency(detalhe.valorCausa)} />
+                              <SummaryField label="Caso" value={detalhe.casoTitulo || "Sem caso vinculado"} />
                               <SummaryField
                                 label="Distribuido em"
                                 value={detalhe.dataDistribuicao ? formatDate(detalhe.dataDistribuicao) : "Nao informado"}
@@ -1033,10 +1025,10 @@ export function ProcessoDossieModal({
                               </div>
                             </CardHeader>
                             <CardContent className="grid gap-4 md:grid-cols-2">
-                              <div className="rounded-2xl border border-border/70 bg-background/60 p-4">
+                              <div className="rounded-2xl border border-border bg-muted/35 p-4">
                                 <div className="mb-3 flex items-center justify-between gap-3">
                                   <h4 className="text-sm font-semibold text-foreground">Polo Ativo</h4>
-                                  <Badge variant="outline" className="border-border bg-background text-muted-foreground">
+                                  <Badge variant="outline" className="border-border bg-background text-foreground">
                                     {partesAtivas.length}
                                   </Badge>
                                 </div>
@@ -1048,7 +1040,7 @@ export function ProcessoDossieModal({
                                       const clienteRelacionado = resolveClienteRelacionado(parte, clientes);
 
                                       return (
-                                        <div key={parte.id} className="rounded-2xl border border-border/60 bg-card/70 px-3 py-3">
+                                        <div key={parte.id} className="rounded-2xl border border-border bg-card px-3 py-3">
                                           {clienteRelacionado ? (
                                             <button
                                               type="button"
@@ -1069,10 +1061,10 @@ export function ProcessoDossieModal({
                                 )}
                               </div>
 
-                              <div className="rounded-2xl border border-border/70 bg-background/60 p-4">
+                              <div className="rounded-2xl border border-border bg-muted/35 p-4">
                                 <div className="mb-3 flex items-center justify-between gap-3">
                                   <h4 className="text-sm font-semibold text-foreground">Polo Passivo</h4>
-                                  <Badge variant="outline" className="border-border bg-background text-muted-foreground">
+                                  <Badge variant="outline" className="border-border bg-background text-foreground">
                                     {partesPassivas.length}
                                   </Badge>
                                 </div>
@@ -1084,7 +1076,7 @@ export function ProcessoDossieModal({
                                       const clienteRelacionado = resolveClienteRelacionado(parte, clientes);
 
                                       return (
-                                        <div key={parte.id} className="rounded-2xl border border-border/60 bg-card/70 px-3 py-3">
+                                        <div key={parte.id} className="rounded-2xl border border-border bg-card px-3 py-3">
                                           {clienteRelacionado ? (
                                             <button
                                               type="button"
@@ -1125,10 +1117,10 @@ export function ProcessoDossieModal({
                                   {movimentacoes.slice(0, 5).map((movimentacao) => (
                                     <div
                                       key={movimentacao.id}
-                                      className="flex flex-col gap-2 rounded-2xl border border-border/70 bg-background/60 px-4 py-4"
+                                      className="flex flex-col gap-2 rounded-2xl border border-border bg-muted/35 px-4 py-4"
                                     >
                                       <div className="flex flex-wrap items-center gap-2">
-                                        <Badge variant="outline" className="border-border bg-background/70 text-muted-foreground">
+                                        <Badge variant="outline" className="border-border bg-background text-foreground">
                                           {formatTipoMovimentacao(movimentacao.tipo)}
                                         </Badge>
                                         <span className="text-xs text-muted-foreground">
@@ -1140,7 +1132,7 @@ export function ProcessoDossieModal({
                                   ))}
                                 </div>
                               ) : (
-                                <div className="rounded-2xl border border-dashed border-border bg-background/60 px-5 py-10 text-sm text-muted-foreground">
+                                <div className="rounded-2xl border border-dashed border-border bg-muted/35 px-5 py-10 text-sm text-muted-foreground">
                                   Nenhum historico disponivel para este processo.
                                 </div>
                               )}
@@ -1168,7 +1160,7 @@ export function ProcessoDossieModal({
                                   {prazosVinculados.slice(0, 4).map((prazo) => (
                                     <div
                                       key={prazo.id}
-                                      className="rounded-2xl border border-border/70 bg-background/60 px-4 py-4"
+                                      className="rounded-2xl border border-border bg-muted/35 px-4 py-4"
                                     >
                                       <div className="flex flex-wrap items-center justify-between gap-3">
                                         <Badge variant="outline" className="border-border bg-background text-primary">
@@ -1183,7 +1175,7 @@ export function ProcessoDossieModal({
                                   ))}
                                 </div>
                               ) : (
-                                <div className="rounded-2xl border border-dashed border-border bg-background/60 px-5 py-10 text-sm text-muted-foreground">
+                                <div className="rounded-2xl border border-dashed border-border bg-muted/35 px-5 py-10 text-sm text-muted-foreground">
                                   Nenhum prazo vinculado a este processo.
                                 </div>
                               )}
@@ -1213,7 +1205,7 @@ export function ProcessoDossieModal({
                                   {documentosRecentes.map((doc) => (
                                     <div
                                       key={doc.id}
-                                      className="rounded-2xl border border-border/70 bg-background/60 px-4 py-4"
+                                      className="rounded-2xl border border-border bg-muted/35 px-4 py-4"
                                     >
                                       <div className="flex items-start justify-between gap-3">
                                         <div className="min-w-0">
@@ -1240,7 +1232,7 @@ export function ProcessoDossieModal({
                                   ))}
                                 </div>
                               ) : (
-                                <div className="rounded-2xl border border-dashed border-border bg-background/60 px-5 py-10 text-sm text-muted-foreground">
+                                <div className="rounded-2xl border border-dashed border-border bg-muted/35 px-5 py-10 text-sm text-muted-foreground">
                                   {erroDocumentos || "Nenhum documento associado a este processo."}
                                 </div>
                               )}
@@ -1253,7 +1245,7 @@ export function ProcessoDossieModal({
                               <CardDescription>Indicadores de apoio para quem assume o processo.</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                              <div className="rounded-2xl border border-border/70 bg-background/60 p-4">
+                              <div className="rounded-2xl border border-border bg-muted/35 p-4">
                                 <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Etiquetas</p>
                                 <div className="mt-3 flex flex-wrap gap-2">
                                   {detalhe.etiquetas && detalhe.etiquetas.length > 0 ? (
@@ -1273,13 +1265,13 @@ export function ProcessoDossieModal({
                               </div>
 
                               <div className="grid gap-4 sm:grid-cols-2">
-                                <div className="rounded-2xl border border-border/70 bg-background/60 p-4">
+                                <div className="rounded-2xl border border-border bg-muted/35 p-4">
                                   <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Partes</p>
                                   <p className="mt-2 text-sm font-medium text-foreground">
                                     {partesAtivas.length + partesPassivas.length} parte(s) registada(s)
                                   </p>
                                 </div>
-                                <div className="rounded-2xl border border-border/70 bg-background/60 p-4">
+                                <div className="rounded-2xl border border-border bg-muted/35 p-4">
                                   <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Documentos</p>
                                   <p className="mt-2 text-sm font-medium text-foreground">{documentos.length} arquivo(s) associado(s)</p>
                                 </div>
@@ -1298,7 +1290,7 @@ export function ProcessoDossieModal({
                           { label: "Unidade", value: detalhe.unidadeNome || "Nao informada" },
                           { label: "Tribunal / Vara", value: [detalhe.tribunal, detalhe.vara].filter(Boolean).join(" / ") || "Nao informado" },
                         ].map((item) => (
-                          <div key={item.label} className="rounded-3xl border border-border bg-card/70 p-5">
+                          <div key={item.label} className="rounded-2xl border border-border bg-card p-5">
                             <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{item.label}</p>
                             <p className="mt-2 text-sm font-medium text-foreground">{item.value}</p>
                           </div>
@@ -1335,7 +1327,7 @@ export function ProcessoDossieModal({
                         </Button>
                       </div>
 
-                      <section className="rounded-3xl border border-border bg-card/70 p-5">
+                      <section className="rounded-2xl border border-border bg-card p-5">
                         {movimentacoes.length > 0 ? (
                           <div className="relative space-y-0">
                             {movimentacoes.map((movimentacao, index) => (
@@ -1346,7 +1338,7 @@ export function ProcessoDossieModal({
                                 </div>
                                 <div className="pb-5">
                                   <div className="flex flex-wrap items-center gap-2">
-                                    <Badge variant="outline" className="border-border bg-background/70 text-muted-foreground">
+                                    <Badge variant="outline" className="border-border bg-background text-foreground">
                                       {formatTipoMovimentacao(movimentacao.tipo)}
                                     </Badge>
                                     <span className="text-xs text-muted-foreground">
@@ -1362,7 +1354,7 @@ export function ProcessoDossieModal({
                             ))}
                           </div>
                         ) : (
-                          <div className="rounded-2xl border border-dashed border-border bg-background/60 px-5 py-10 text-sm text-muted-foreground">
+                          <div className="rounded-2xl border border-dashed border-border bg-muted/35 px-5 py-10 text-sm text-muted-foreground">
                             Nenhum andamento registado para este processo.
                           </div>
                         )}
@@ -1381,8 +1373,8 @@ export function ProcessoDossieModal({
                         </Button>
                       </div>
 
-                      <section className="overflow-hidden rounded-3xl border border-border bg-card/70">
-                        <div className="grid grid-cols-[minmax(0,1.7fr)_160px_160px] gap-4 border-b border-border/70 bg-background/70 px-5 py-3 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                      <section className="overflow-hidden rounded-2xl border border-border bg-card">
+                        <div className="grid grid-cols-[minmax(0,1.7fr)_160px_160px] gap-4 border-b border-border bg-muted/35 px-5 py-3 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
                           <span>Titulo</span>
                           <span>Data fatal</span>
                           <span>Kanban</span>
@@ -1392,7 +1384,7 @@ export function ProcessoDossieModal({
                           prazosVinculados.map((prazo) => (
                             <div
                               key={prazo.id}
-                              className="grid grid-cols-[minmax(0,1.7fr)_160px_160px] gap-4 border-b border-border/60 px-5 py-4 text-sm last:border-b-0"
+                              className="grid grid-cols-[minmax(0,1.7fr)_160px_160px] gap-4 border-b border-border px-5 py-4 text-sm last:border-b-0"
                             >
                               <div className="min-w-0">
                                 <p className="truncate font-medium text-foreground">{prazo.titulo}</p>
@@ -1400,7 +1392,7 @@ export function ProcessoDossieModal({
                               </div>
                               <div className="text-muted-foreground">{prazo.dataFatal ? formatDate(prazo.dataFatal) : "Nao informada"}</div>
                               <div>
-                                <Badge variant="outline" className="border-border bg-background/70 text-foreground">
+                                <Badge variant="outline" className="border-border bg-background text-foreground">
                                   {formatKanbanStatus(prazo.statusKanban)}
                                 </Badge>
                               </div>
@@ -1425,13 +1417,13 @@ export function ProcessoDossieModal({
                       </div>
 
                       {erroDocumentos && documentos.length === 0 && (
-                        <div className="rounded-2xl border border-dashed border-border bg-background/60 px-5 py-6 text-sm text-muted-foreground">
+                        <div className="rounded-2xl border border-dashed border-border bg-muted/35 px-5 py-6 text-sm text-muted-foreground">
                           {erroDocumentos}
                         </div>
                       )}
 
-                      <section className="overflow-hidden rounded-3xl border border-border bg-card/70">
-                        <div className="hidden grid-cols-[minmax(0,1.6fr)_120px_170px_190px] gap-4 border-b border-border/70 bg-background/70 px-5 py-3 text-[11px] uppercase tracking-[0.18em] text-muted-foreground md:grid">
+                      <section className="overflow-hidden rounded-2xl border border-border bg-card">
+                        <div className="hidden grid-cols-[minmax(0,1.6fr)_120px_170px_190px] gap-4 border-b border-border bg-muted/35 px-5 py-3 text-[11px] uppercase tracking-[0.18em] text-muted-foreground md:grid">
                           <span>Documento</span>
                           <span>Tipo</span>
                           <span>Upload</span>
@@ -1446,12 +1438,12 @@ export function ProcessoDossieModal({
                           documentos.map((doc) => (
                             <div
                               key={doc.id}
-                              className="grid gap-4 border-b border-border/60 px-5 py-4 text-sm last:border-b-0 md:grid-cols-[minmax(0,1.6fr)_120px_170px_190px]"
+                              className="grid gap-4 border-b border-border px-5 py-4 text-sm last:border-b-0 md:grid-cols-[minmax(0,1.6fr)_120px_170px_190px]"
                             >
                               <div className="min-w-0">
                                 <p className="truncate font-medium text-foreground">{doc.nome}</p>
                                 <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                  <Badge variant="outline" className="border-border bg-background/70 text-muted-foreground">
+                                  <Badge variant="outline" className="border-border bg-background text-foreground">
                                     {formatCategoriaDocumento(doc.categoria)}
                                   </Badge>
                                   <span>{doc.tamanho}</span>
@@ -1563,7 +1555,7 @@ export function ProcessoDossieModal({
                 { label: "Advogado responsavel", value: clientePreview.advogadoResponsavel || "Nao informado" },
                 { label: "Unidade", value: clientePreview.unidadeNome || "Nao informada" },
               ].map((item) => (
-                <div key={item.label} className="rounded-2xl border border-border bg-background/70 px-4 py-3">
+                <div key={item.label} className="rounded-2xl border border-border bg-background px-4 py-3">
                   <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{item.label}</p>
                   <p className="mt-1 text-sm font-medium text-foreground">{item.value}</p>
                 </div>
@@ -1576,7 +1568,7 @@ export function ProcessoDossieModal({
       <Dialog open={Boolean(documentoPreview)} onOpenChange={(nextOpen) => !nextOpen && fecharPreviewDocumento()}>
         <DialogContent className="max-h-[90vh] overflow-hidden border-border bg-card p-0 sm:max-w-[1120px]">
           <div className="grid max-h-[90vh] min-h-0 lg:grid-cols-[320px_minmax(0,1fr)]">
-            <div className="border-b border-border bg-background/70 p-6 lg:border-b-0 lg:border-r">
+            <div className="border-b border-border bg-background p-6 lg:border-b-0 lg:border-r">
               <DialogHeader className="text-left">
                 <DialogTitle>{documentoPreview?.nome || "Preview do documento"}</DialogTitle>
                 <DialogDescription>
@@ -1588,11 +1580,11 @@ export function ProcessoDossieModal({
 
               {documentoPreview && (
                 <div className="mt-6 space-y-4">
-                  <div className="rounded-2xl border border-border bg-card/70 p-4">
+                  <div className="rounded-2xl border border-border bg-card p-4">
                     <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Upload</p>
                     <p className="mt-2 text-sm font-medium text-foreground">{formatDate(documentoPreview.dataUpload)}</p>
                   </div>
-                  <div className="rounded-2xl border border-border bg-card/70 p-4">
+                  <div className="rounded-2xl border border-border bg-card p-4">
                     <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Preview</p>
                     <p className="mt-2 text-sm font-medium text-foreground">
                       {previewKind === "unsupported" ? "Tipo nao suportado no preview embutido" : "Visualizacao disponivel"}

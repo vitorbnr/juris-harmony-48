@@ -17,7 +17,7 @@ export const StagnantProcesses = ({ processos = [], loading = false }: Props) =>
     <div className="mb-5 flex items-center justify-between gap-4">
       <div>
         <h3 className="font-heading text-lg font-semibold text-foreground">Processos parados</h3>
-        <p className="text-xs text-muted-foreground">Sem movimentacao há mais de 60 dias</p>
+        <p className="text-xs text-muted-foreground">Sem movimentação há mais de 60 dias</p>
       </div>
       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
         <AlertTriangle className="h-4 w-4" />
@@ -45,12 +45,12 @@ export const StagnantProcesses = ({ processos = [], loading = false }: Props) =>
                 <p className="truncate text-xs text-muted-foreground">{processo.clienteNome}</p>
                 {processo.ultimaMovimentacao && (
                   <p className="mt-2 text-[11px] text-muted-foreground">
-                    Ultima movimentacao em {formatarData(processo.ultimaMovimentacao)}
+                    Última movimentação em {formatarData(processo.ultimaMovimentacao)}
                   </p>
                 )}
               </div>
               <span className="shrink-0 rounded-full bg-destructive/10 px-2.5 py-1 text-[11px] font-semibold text-destructive">
-                Parado ha {processo.diasParados} dias
+                Parado há {processo.diasParados} dias
               </span>
             </div>
           </div>

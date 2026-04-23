@@ -83,7 +83,7 @@ const DashboardContent = ({ onNavigate }: { onNavigate: (id: string) => void }) 
   return (
     <div className="p-6 md:p-8 space-y-6">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <StatCard icon={Scale}         label="Processos Ativos"   value={dashboardData.processosAtivos} change="Ativos no momento"  changeType="positive" delay={0} />
+        <StatCard icon={Scale}         label="Processos ativos"   value={dashboardData.processosAtivos} change="Ativos no momento"  changeType="positive" delay={0} />
         <StatCard icon={Users}         label="Clientes"           value={dashboardData.totalClientes}   change="Cadastrados"        changeType="positive" delay={75} />
         <StatCard icon={CalendarClock} label="Prazos esta semana" value={dashboardData.prazosSemana}    change="Pendentes"          changeType="negative" delay={150} />
       </div>

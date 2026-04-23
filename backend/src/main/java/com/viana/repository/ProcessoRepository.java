@@ -29,6 +29,7 @@ public interface ProcessoRepository extends JpaRepository<Processo, UUID> {
         FROM Processo p
         LEFT JOIN FETCH p.cliente
         LEFT JOIN FETCH p.unidade
+        LEFT JOIN FETCH p.caso
         LEFT JOIN FETCH p.partes partes
         WHERE p.id = :id
     """)

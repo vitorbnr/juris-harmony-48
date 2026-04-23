@@ -29,6 +29,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { NovoAtendimentoModal } from "@/components/modals/NovoAtendimentoModal";
+import { NovoCasoModal } from "@/components/modals/NovoCasoModal";
 import { NovoClienteModal } from "@/components/modals/NovoClienteModal";
 import { NovoProcessoModal } from "@/components/modals/NovoProcessoModal";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -88,6 +89,7 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [unidades, setUnidades] = useState<Unidade[]>([]);
   const [modalCliente, setModalCliente] = useState(false);
+  const [modalCaso, setModalCaso] = useState(false);
   const [modalProcesso, setModalProcesso] = useState(false);
   const [modalAtendimento, setModalAtendimento] = useState(false);
   const showUnitSelector = activeItem === "clientes";
@@ -185,7 +187,7 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
       label: "Caso",
       icon: Briefcase,
       onClick: () => {
-        // TODO: Abrir modal de Caso.
+        setModalCaso(true);
       },
     },
     {
@@ -298,7 +300,7 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
 
   return (
     <>
-      <header className="sticky top-0 z-20 flex flex-col gap-4 border-b border-border/70 bg-background/78 px-4 py-3.5 shadow-[0_18px_40px_-36px_rgba(15,23,42,0.75)] backdrop-blur-2xl sm:flex-row sm:items-center sm:justify-between sm:px-6">
+      <header className="sticky top-0 z-20 flex flex-col gap-4 border-b border-border bg-background px-4 py-3.5 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div className="min-w-0 flex-1">
           <h2 className="truncate font-heading text-xl font-semibold text-foreground">{section.title}</h2>
           <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -326,7 +328,7 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
                   align="start"
                   sideOffset={10}
                   collisionPadding={16}
-                  className="w-56 rounded-2xl border-border/80 bg-card/95 p-1.5 shadow-2xl backdrop-blur-xl"
+                  className="w-56 rounded-lg border-border bg-popover p-1.5 shadow-[0_18px_36px_-28px_rgba(15,23,42,0.24)]"
                 >
                   <DropdownMenuLabel className="px-3 py-2 text-xs uppercase tracking-[0.16em] text-muted-foreground">
                     Unidade ativa
@@ -342,7 +344,7 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
                         key={id}
                         onClick={() => setUnidadeSelecionada(id, id === "todas" ? undefined : label)}
                         className={cn(
-                          "rounded-xl px-3 py-2.5 text-sm",
+                          "rounded-lg px-3 py-2.5 text-sm",
                           selecionado && "bg-primary/10 text-primary focus:bg-primary/10 focus:text-primary",
                         )}
                       >
@@ -361,14 +363,14 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
         <div className="flex shrink-0 items-center justify-end gap-1.5 sm:gap-2">
           <WeatherWidget />
 
-          <ThemeToggle className="border border-border/70 bg-card/80 shadow-[0_12px_24px_-18px_rgba(15,23,42,0.35)] hover:bg-accent/85" />
+          <ThemeToggle className="border border-border bg-background shadow-sm hover:bg-muted" />
 
           <Popover open={notifOpen} onOpenChange={setNotifOpen}>
             <PopoverTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon"
-                className="relative h-9 w-9 rounded-xl border border-border/70 bg-card/80 shadow-[0_12px_24px_-18px_rgba(15,23,42,0.35)] hover:bg-accent/85"
+                className="relative h-9 w-9 rounded-lg border border-border bg-background shadow-sm hover:bg-muted"
                 aria-label="Abrir notificacoes"
               >
                 <Bell className="h-4 w-4 text-foreground/70" />
@@ -384,7 +386,7 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
               align="end"
               sideOffset={10}
               collisionPadding={16}
-              className="w-[min(24rem,calc(100vw-1rem))] rounded-[1.5rem] border-border/80 bg-popover/95 p-0 shadow-[0_30px_80px_-44px_rgba(15,23,42,0.52)] backdrop-blur-xl"
+              className="w-[min(24rem,calc(100vw-1rem))] rounded-lg border-border bg-popover p-0 shadow-[0_18px_36px_-28px_rgba(15,23,42,0.24)]"
             >
               <div className="border-b border-border/70 px-4 py-4">
                 <div className="flex items-center justify-between gap-3">
@@ -402,7 +404,7 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
               </div>
 
               <Tabs defaultValue="urgentes" className="w-full">
-                <TabsList className="mx-4 mt-4 grid h-auto grid-cols-2 rounded-xl bg-muted/60 p-1">
+                <TabsList className="mx-4 mt-4 grid h-auto grid-cols-2 rounded-lg bg-muted p-1">
                   <TabsTrigger value="urgentes" className="rounded-lg text-xs sm:text-sm">
                     Urgentes
                   </TabsTrigger>
@@ -423,7 +425,7 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
               <div className="border-t border-border/70 p-2">
                 <Button
                   variant="ghost"
-                  className="w-full justify-center rounded-xl text-sm text-primary hover:bg-primary/10 hover:text-primary"
+                  className="w-full justify-center rounded-lg text-sm text-primary hover:bg-muted hover:text-foreground"
                   onClick={marcarTodasLidas}
                   disabled={unreadCount === 0}
                 >
@@ -437,7 +439,7 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
             <DropdownMenuTrigger asChild>
               <Button
                 size="icon"
-                className="h-9 w-9 rounded-xl bg-primary text-primary-foreground shadow-[0_18px_34px_-20px_rgba(15,23,42,0.5)] transition-transform hover:scale-[1.02] hover:bg-primary/90"
+                className="h-9 w-9 rounded-lg bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
                 aria-label="Abrir criacao rapida"
               >
                 <Plus className="h-4 w-4" />
@@ -448,7 +450,7 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
               align="end"
               sideOffset={10}
               collisionPadding={16}
-              className="w-64 rounded-2xl border-border/80 bg-card/95 p-2 shadow-2xl backdrop-blur-xl"
+              className="w-64 rounded-lg border-border bg-popover p-2 shadow-[0_18px_36px_-28px_rgba(15,23,42,0.24)]"
             >
               <DropdownMenuLabel className="px-3 py-2 text-xs uppercase tracking-[0.16em] text-muted-foreground">
                 Criacao rapida
@@ -459,7 +461,7 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
                 <DropdownMenuItem
                   key={label}
                   onClick={onClick}
-                  className="rounded-xl px-3 py-2.5 text-sm focus:bg-primary/10 focus:text-foreground"
+                  className="rounded-lg px-3 py-2.5 text-sm focus:bg-muted focus:text-foreground"
                 >
                   <span className="mr-3 flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
                     <Icon className="h-4 w-4" />
@@ -474,7 +476,7 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="rounded-full border border-border/60 bg-card/65 p-0.5 shadow-sm transition-[transform,box-shadow] hover:scale-[1.02] hover:shadow-md"
+                className="rounded-full border border-border bg-background p-0.5 shadow-sm transition-shadow hover:shadow-md"
                 aria-label="Abrir menu do utilizador"
               >
                 <Avatar className="h-9 w-9 cursor-pointer border-2 border-primary/30 shadow-sm" title={user?.nome}>
@@ -489,7 +491,7 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
               align="end"
               sideOffset={10}
               collisionPadding={16}
-              className="w-64 rounded-2xl border-border/80 bg-card/95 p-2 shadow-2xl backdrop-blur-xl"
+              className="w-64 rounded-lg border-border bg-popover p-2 shadow-[0_18px_36px_-28px_rgba(15,23,42,0.24)]"
             >
               <DropdownMenuLabel className="px-3 py-3">
                 <p className="truncate text-sm font-semibold text-foreground">{user?.nome ?? "Utilizador"}</p>
@@ -513,6 +515,7 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
       </header>
 
       {modalCliente && <NovoClienteModal onClose={() => setModalCliente(false)} onSaved={() => window.location.reload()} />}
+      {modalCaso && <NovoCasoModal onClose={() => setModalCaso(false)} onSaved={() => window.location.reload()} />}
       {modalProcesso && <NovoProcessoModal onClose={() => setModalProcesso(false)} onSaved={() => window.location.reload()} />}
       {modalAtendimento && (
         <NovoAtendimentoModal onClose={() => setModalAtendimento(false)} onSaved={() => window.location.reload()} />

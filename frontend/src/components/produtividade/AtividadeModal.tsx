@@ -16,10 +16,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
-import { atendimentosApi, prazosApi, processosApi, usuariosApi } from "@/services/api";
+import { atendimentosApi, casosApi, prazosApi, processosApi, usuariosApi } from "@/services/api";
 import { toast } from "sonner";
 import type {
   Atendimento,
+  Caso,
   EtapaPrazo,
   ModalidadeAtividade,
   Prazo,
@@ -73,6 +74,7 @@ type ProcessOption = {
 };
 
 type AtendimentoOption = Pick<Atendimento, "id" | "assunto" | "clienteNome" | "processoId" | "processoNumero">;
+type CasoOption = Pick<Caso, "id" | "titulo" | "clienteNome" | "unidadeNome" | "responsavelNome">;
 
 type AuthUserOption = {
   id: string;
@@ -227,6 +229,7 @@ export function AtividadeModal({
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [processos, setProcessos] = useState<ProcessOption[]>([]);
   const [atendimentos, setAtendimentos] = useState<AtendimentoOption[]>([]);
+  const [casos, setCasos] = useState<CasoOption[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -245,8 +248,9 @@ export function AtividadeModal({
       usuariosApi.listar(),
       processosApi.listar({ size: 1000 }),
       atendimentosApi.listar({ size: 1000 }),
+      casosApi.listar({ size: 1000 }),
     ])
-      .then(([usuariosResult, processosResult, atendimentosResult]) => {
+      .then(([usuariosResult, processosResult, atendimentosResult, casosResult]) => {
         if (!active) return;
 
         const usersFromApi =
@@ -262,10 +266,15 @@ export function AtividadeModal({
           atendimentosResult.status === "fulfilled"
             ? extractItems<AtendimentoOption>(atendimentosResult.value)
             : [];
+        const casoItems =
+          casosResult.status === "fulfilled"
+            ? extractItems<CasoOption>(casosResult.value)
+            : [];
 
         setUsuarios(mergedUsers);
         setProcessos(processItems);
         setAtendimentos(atendimentoItems);
+        setCasos(casoItems);
 
         setForm((current) => ({
           ...current,
@@ -277,7 +286,8 @@ export function AtividadeModal({
         if (
           usuariosResult.status === "rejected" &&
           processosResult.status === "rejected" &&
-          atendimentosResult.status === "rejected"
+          atendimentosResult.status === "rejected" &&
+          casosResult.status === "rejected"
         ) {
           toast.error("Nao foi possivel carregar as opcoes do formulario de atividade.");
         }
@@ -315,6 +325,10 @@ export function AtividadeModal({
     () => atendimentos.find((atendimento) => atendimento.id === form.vinculoReferenciaId) ?? null,
     [atendimentos, form.vinculoReferenciaId],
   );
+  const casoSelecionado = useMemo(
+    () => casos.find((caso) => caso.id === form.vinculoReferenciaId) ?? null,
+    [casos, form.vinculoReferenciaId],
+  );
   const participantsDisponiveis = useMemo(
     () =>
       usuarios.filter((usuario) => {
@@ -348,9 +362,21 @@ export function AtividadeModal({
       ),
     [atendimentos, vinculoBusca],
   );
+  const casosFiltrados = useMemo(
+    () =>
+      casos.filter((caso) =>
+        [caso.titulo, caso.clienteNome, caso.unidadeNome, caso.responsavelNome]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(vinculoBusca),
+      ),
+    [casos, vinculoBusca],
+  );
   const canClearVinculo = !isPrazo && !isAudiencia;
   const showProcessoVinculo = form.vinculoTipo === "processo";
   const showAtendimentoVinculo = form.vinculoTipo === "atendimento";
+  const showCasoVinculo = form.vinculoTipo === "caso";
   const responsavelSelecionado =
     usuarios.find((usuario) => usuario.id === form.responsavelId) ??
     (currentUserOption?.id === form.responsavelId ? currentUserOption : null);
@@ -405,7 +431,7 @@ export function AtividadeModal({
     });
   };
 
-  const handleSelecionarVinculo = (tipo: Exclude<TipoVinculoPrazo, "caso">) => {
+  const handleSelecionarVinculo = (tipo: TipoVinculoPrazo) => {
     updateField("vinculoTipo", form.vinculoTipo === tipo && canClearVinculo ? "" : tipo);
   };
 
@@ -433,7 +459,7 @@ export function AtividadeModal({
     }
 
     if (isPrazo && !form.processoId) {
-      return "O prazo precisa de um processo vinculado. O modulo de Caso ficara disponivel futuramente.";
+      return "O prazo precisa de um processo vinculado.";
     }
 
     if (isAudiencia) {
@@ -449,8 +475,8 @@ export function AtividadeModal({
       return "O horario final nao pode ser anterior ao horario inicial.";
     }
 
-    if ((isEvento || isTarefa) && form.vinculoTipo === "caso") {
-      return "O modulo de Caso ainda nao foi implementado. A fundacao ficou preparada para a proxima etapa.";
+    if ((isEvento || isTarefa) && form.vinculoTipo === "caso" && !form.vinculoReferenciaId) {
+      return "Selecione o caso relacionado ou remova o vinculo.";
     }
 
     return null;
@@ -473,7 +499,7 @@ export function AtividadeModal({
     const vinculoReferenciaId =
       vinculoTipo === "processo"
         ? form.processoId
-        : vinculoTipo === "atendimento"
+        : vinculoTipo === "atendimento" || vinculoTipo === "caso"
         ? form.vinculoReferenciaId
         : "";
 
@@ -726,18 +752,24 @@ export function AtividadeModal({
                             Atendimento
                           </button>
                         )}
-                        <button
-                          type="button"
-                          disabled
-                          className="rounded-full border border-dashed border-border px-3 py-1.5 text-xs font-medium text-muted-foreground opacity-70"
-                          title="Base preparada para implementação futura do modulo de Casos."
-                        >
-                          Caso (futuro)
-                        </button>
+                        {!isPrazo && !isAudiencia && (
+                          <button
+                            type="button"
+                            onClick={() => handleSelecionarVinculo("caso")}
+                            className={cn(
+                              "rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
+                              form.vinculoTipo === "caso"
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-border bg-card text-muted-foreground hover:border-primary/40",
+                            )}
+                          >
+                            Caso
+                          </button>
+                        )}
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {canClearVinculo
-                          ? "O vinculo e opcional para tarefas e eventos. Pode trocar ou remover sem fechar o modal."
+                          ? "O vinculo e opcional para tarefas e eventos. Processo, atendimento e caso podem ser usados como contexto."
                           : "Prazo e audiencia continuam a exigir processo vinculado."}
                       </p>
                     </div>
@@ -831,6 +863,58 @@ export function AtividadeModal({
                                   <span className="text-xs text-muted-foreground">
                                     {atendimento.clienteNome}
                                     {atendimento.processoNumero ? ` • ${atendimento.processoNumero}` : ""}
+                                  </span>
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {showCasoVinculo && (
+                      <div className="space-y-3 md:col-span-2">
+                        <Label>Buscar caso</Label>
+                        <Input
+                          value={form.vinculoBusca}
+                          onChange={(e) => updateField("vinculoBusca", e.target.value)}
+                          placeholder="Buscar por titulo, cliente, pasta ou responsavel..."
+                        />
+                        {casoSelecionado && (
+                          <div className="rounded-xl border border-primary/30 bg-primary/5 px-3 py-3 text-sm">
+                            <p className="font-medium text-foreground">{casoSelecionado.titulo}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {[casoSelecionado.clienteNome, casoSelecionado.unidadeNome, casoSelecionado.responsavelNome]
+                                .filter(Boolean)
+                                .join(" • ")}
+                            </p>
+                          </div>
+                        )}
+                        <div className="scroll-subtle max-h-48 space-y-2 overflow-y-auto pr-1">
+                          {casosFiltrados.length === 0 ? (
+                            <div className="rounded-xl border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
+                              Nenhum caso encontrado para essa busca.
+                            </div>
+                          ) : (
+                            casosFiltrados.slice(0, 10).map((caso) => {
+                              const selected = caso.id === form.vinculoReferenciaId;
+                              return (
+                                <button
+                                  key={caso.id}
+                                  type="button"
+                                  onClick={() => updateField("vinculoReferenciaId", caso.id)}
+                                  className={cn(
+                                    "flex w-full flex-col rounded-xl border px-3 py-3 text-left transition-colors",
+                                    selected
+                                      ? "border-primary bg-primary/10"
+                                      : "border-border bg-card/60 hover:border-primary/30",
+                                  )}
+                                >
+                                  <span className="text-sm font-medium text-foreground">{caso.titulo}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {[caso.clienteNome, caso.unidadeNome, caso.responsavelNome]
+                                      .filter(Boolean)
+                                      .join(" • ")}
                                   </span>
                                 </button>
                               );
@@ -986,7 +1070,7 @@ export function AtividadeModal({
 
         <div className="flex shrink-0 flex-col gap-3 border-t border-border px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-muted-foreground">
-            O vinculo com <strong className="font-medium text-foreground">Caso</strong> ja esta previsto na estrutura e sera ativado quando o modulo existir.
+            Tarefas e eventos podem ser ligados a processo, atendimento ou caso sem perder o dono principal no Kanban.
           </p>
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={onClose}>

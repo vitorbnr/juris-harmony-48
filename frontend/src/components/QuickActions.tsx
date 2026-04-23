@@ -326,9 +326,9 @@ export const QuickActions = () => {
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={() => setModalProcesso(true)}
-            className="surface-panel group flex flex-col items-center gap-2 rounded-2xl border border-border/80 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30"
+            className="surface-panel group flex flex-col items-center gap-2 rounded-lg border border-border/80 p-4 transition-colors duration-200 hover:border-primary/20"
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-transform group-hover:scale-105">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <Plus className="h-5 w-5" />
             </div>
             <span className="text-center text-xs font-medium text-foreground">Novo Processo</span>
@@ -336,9 +336,9 @@ export const QuickActions = () => {
 
           <button
             onClick={() => setModalCliente(true)}
-            className="surface-panel group flex flex-col items-center gap-2 rounded-2xl border border-border/80 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30"
+            className="surface-panel group flex flex-col items-center gap-2 rounded-lg border border-border/80 p-4 transition-colors duration-200 hover:border-primary/20"
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-chart-blue/15 text-chart-blue transition-transform group-hover:scale-105">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-chart-blue/15 text-chart-blue">
               <UserPlus className="h-5 w-5" />
             </div>
             <span className="text-center text-xs font-medium text-foreground">Novo Cliente</span>
@@ -346,9 +346,9 @@ export const QuickActions = () => {
 
           <button
             onClick={() => setModalNpu(true)}
-            className="surface-panel group flex flex-col items-center gap-2 rounded-2xl border border-border/80 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30"
+            className="surface-panel group flex flex-col items-center gap-2 rounded-lg border border-border/80 p-4 transition-colors duration-200 hover:border-primary/20"
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary transition-transform group-hover:scale-105">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <Search className="h-5 w-5" />
             </div>
             <span className="text-center text-xs font-medium text-foreground">Consultar NPU</span>
@@ -356,9 +356,9 @@ export const QuickActions = () => {
 
           <button
             onClick={() => setModalNotaRapida(true)}
-            className="surface-panel group flex flex-col items-center gap-2 rounded-2xl border border-border/80 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30"
+            className="surface-panel group flex flex-col items-center gap-2 rounded-lg border border-border/80 p-4 transition-colors duration-200 hover:border-primary/20"
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-700 transition-transform group-hover:scale-105 dark:text-emerald-300">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
               <FileText className="h-5 w-5" />
             </div>
             <span className="text-center text-xs font-medium text-foreground">Nota Rápida</span>
@@ -366,9 +366,9 @@ export const QuickActions = () => {
 
           <button
             onClick={() => setModalDocumento(true)}
-            className="surface-panel group flex flex-col items-center gap-2 rounded-2xl border border-border/80 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30"
+            className="surface-panel group flex flex-col items-center gap-2 rounded-lg border border-border/80 p-4 transition-colors duration-200 hover:border-primary/20"
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/15 text-amber-700 transition-transform group-hover:scale-105 dark:text-amber-300">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/15 text-amber-700 dark:text-amber-300">
               <Upload className="h-5 w-5" />
             </div>
             <span className="text-center text-xs font-medium text-foreground">Vincular Documento</span>

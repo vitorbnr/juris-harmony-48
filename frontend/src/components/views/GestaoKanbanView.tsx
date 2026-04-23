@@ -37,17 +37,17 @@ const KANBAN_ORDER: KanbanEtapa[] = ["a_fazer", "em_andamento", "concluido"];
 const KANBAN_META: Record<KanbanEtapa, { titulo: string; descricao: string; accent: string }> = {
   a_fazer: {
     titulo: "A Fazer",
-    descricao: "Itens prontos para serem atacados.",
+    descricao: "Itens prontos para serem feitos.",
     accent: "border-sky-500/20 bg-sky-500/5",
   },
   em_andamento: {
     titulo: "Em Andamento",
-    descricao: "Trabalho ativo em execucao.",
+    descricao: "Trabalho ativo em execução.",
     accent: "border-amber-500/20 bg-amber-500/5",
   },
   concluido: {
-    titulo: "Concluido",
-    descricao: "Demandas finalizadas no fluxo diario.",
+    titulo: "Concluído",
+    descricao: "Demandas finalizadas no fluxo diário.",
     accent: "border-emerald-500/20 bg-emerald-500/5",
   },
 };
@@ -241,8 +241,7 @@ export const GestaoKanbanView = () => {
           </div>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
             Arraste os cards entre as colunas ou use o menu de 3 pontos em cada tarefa para reorganizar o fluxo de
-            trabalho. A interface atualiza localmente e sincroniza a etapa em background sem recarregar a lista
-            inteira.
+            trabalho.
           </p>
         </div>
 

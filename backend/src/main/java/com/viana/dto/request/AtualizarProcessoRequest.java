@@ -23,5 +23,6 @@ public class AtualizarProcessoRequest {
     private String descricao;
     private List<String> etiquetas;
     private List<ParteProcessoRequest> partes;
+    private UUID casoId;
     private UUID unidadeId;
 }

@@ -941,7 +941,7 @@ export const AgendaNotasView = () => {
         <div>
           <h3 className="text-lg font-semibold text-foreground">Agenda & Notas</h3>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Painel dividido para acompanhar tarefas, prazos, eventos e audiencias do periodo sem interromper o fluxo de trabalho.
+            Painel dividido para acompanhar tarefas, prazos, eventos e audiências do período sem interromper o fluxo de trabalho.
           </p>
         </div>
         <DropdownMenu>

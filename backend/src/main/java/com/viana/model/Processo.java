@@ -76,6 +76,10 @@ public class Processo {
     @JoinColumn(name = "unidade_id", nullable = false)
     private Unidade unidade;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "caso_id")
+    private Caso caso;
+
     @OneToMany(mappedBy = "processo", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("data DESC")
     @Builder.Default

@@ -1,6 +1,7 @@
 import api from "@/lib/api";
 import type {
   Atendimento,
+  Caso,
   DashboardMetricas,
   DocumentoAtividade,
   EvolucaoProdutividade,
@@ -189,6 +190,21 @@ export interface AtendimentoPayload {
   etiquetas?: string[];
 }
 
+export interface CasoPayload {
+  clienteId: string;
+  unidadeId?: string | null;
+  responsavelId: string;
+  titulo: string;
+  descricao?: string | null;
+  observacoes?: string | null;
+  etiquetas?: string[];
+  acesso: "PUBLICO" | "PRIVADO" | "EQUIPE";
+  envolvidos?: Array<{
+    nome: string;
+    qualificacao?: string | null;
+  }>;
+}
+
 export interface PrazoPayload {
   titulo: string;
   data: string;
@@ -311,6 +327,24 @@ export const atendimentosApi = {
 
   reabrir: (id: string) =>
     api.patch(`/atendimentos/${id}/reabrir`).then(r => r.data as Atendimento),
+};
+
+export const casosApi = {
+  listar: (params?: {
+    unidadeId?: string;
+    clienteId?: string;
+    responsavelId?: string;
+    busca?: string;
+    page?: number;
+    size?: number;
+    sort?: string;
+  }) => api.get("/casos", { params: cleanParams(params) }).then(r => r.data),
+
+  buscar: (id: string) =>
+    api.get(`/casos/${id}`).then(r => r.data as Caso),
+
+  criar: (data: CasoPayload) =>
+    api.post("/casos", data).then(r => r.data as Caso),
 };
 
 export const clientesApi = {

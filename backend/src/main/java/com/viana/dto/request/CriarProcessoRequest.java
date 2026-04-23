@@ -40,6 +40,7 @@ public class CriarProcessoRequest {
     private String descricao;
     private List<String> etiquetas;
     private List<ParteProcessoRequest> partes;
+    private UUID casoId;
 
     @NotNull(message = "Unidade e obrigatoria")
     private UUID unidadeId;

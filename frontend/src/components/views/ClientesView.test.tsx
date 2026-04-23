@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { ClientesView } from "./ClientesView";
 import { useUnidade } from "@/context/UnidadeContext";
 import { clientesApi } from "@/services/api";
@@ -50,12 +50,21 @@ describe("ClientesView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (useUnidade as any).mockReturnValue({ unidadeSelecionada: "todas" });
-    (clientesApi.listar as any).mockResolvedValue({ content: mockClientes });
+    (clientesApi.listar as any).mockResolvedValue({
+      content: mockClientes,
+      number: 0,
+      size: 40,
+      totalElements: 1,
+      totalPages: 1,
+      first: true,
+      last: true,
+    });
   });
 
   it("deve carregar e exibir a lista de clientes em modo grid por padrao", async () => {
     render(<ClientesView />);
     expect(await screen.findByText(/Empresa Alfa/i)).toBeDefined();
+    expect(clientesApi.listar).toHaveBeenCalledWith(expect.objectContaining({ page: 0, size: 40 }));
   });
 
   it("deve exibir indicador visual para cliente falecido", async () => {
@@ -82,5 +91,19 @@ describe("ClientesView", () => {
     render(<ClientesView />);
     fireEvent(window, new CustomEvent("open_novo_processo", { detail: "c1" }));
     expect(screen.getByTestId("novo-processo-modal")).toBeDefined();
+  });
+
+  it("deve enviar a busca paginada para a API", async () => {
+    render(<ClientesView />);
+
+    fireEvent.change(screen.getByPlaceholderText(/Buscar por nome, e-mail ou CPF\/CNPJ/i), {
+      target: { value: "Alfa" },
+    });
+
+    await waitFor(() => {
+      expect(clientesApi.listar).toHaveBeenCalledWith(
+        expect.objectContaining({ busca: "Alfa", page: 0, size: 40 }),
+      );
+    });
   });
 });

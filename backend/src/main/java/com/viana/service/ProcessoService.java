@@ -12,6 +12,7 @@ import com.viana.dto.response.ProcessoResponse;
 import com.viana.exception.BusinessException;
 import com.viana.exception.ResourceNotFoundException;
 import com.viana.model.Cliente;
+import com.viana.model.Caso;
 import com.viana.model.FonteSync;
 import com.viana.model.Movimentacao;
 import com.viana.model.Prazo;
@@ -35,6 +36,7 @@ import com.viana.model.enums.TipoNotificacao;
 import com.viana.model.enums.TipoProcesso;
 import com.viana.model.enums.TipoReferenciaIntegracao;
 import com.viana.repository.ClienteRepository;
+import com.viana.repository.CasoRepository;
 import com.viana.repository.FonteSyncRepository;
 import com.viana.repository.MovimentacaoRepository;
 import com.viana.repository.PrazoRepository;
@@ -66,6 +68,7 @@ import java.util.stream.Collectors;
 public class ProcessoService {
 
     private final ProcessoRepository processoRepository;
+    private final CasoRepository casoRepository;
     private final ClienteRepository clienteRepository;
     private final UsuarioRepository usuarioRepository;
     private final UnidadeRepository unidadeRepository;
@@ -141,6 +144,7 @@ public class ProcessoService {
                 .orElseThrow(() -> new ResourceNotFoundException("Cliente não encontrado"));
         Unidade unidade = unidadeRepository.findById(request.getUnidadeId())
                 .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada"));
+        Caso caso = resolverCaso(request.getCasoId(), cliente, unidade);
 
         StatusProcesso statusEnum = parseEnumRequired(StatusProcesso.class, request.getStatus(), "Status");
         TipoProcesso tipoEnum = parseEnumRequired(TipoProcesso.class, request.getTipo(), "Tipo");
@@ -160,6 +164,7 @@ public class ProcessoService {
                 .valorCausa(request.getValorCausa())
                 .descricao(request.getDescricao())
                 .unidade(unidade)
+                .caso(caso)
                 .build();
         aplicarEtiquetas(processo, request.getEtiquetas());
         aplicarPartes(processo, request.getPartes());
@@ -218,7 +223,15 @@ public class ProcessoService {
         if (request.getUnidadeId() != null) {
             Unidade unidade = unidadeRepository.findById(request.getUnidadeId())
                     .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada"));
+            if (processo.getCaso() != null && processo.getCaso().getUnidade() != null
+                    && !processo.getCaso().getUnidade().getId().equals(unidade.getId())) {
+                throw new BusinessException("Nao e possivel mover o processo para outra pasta mantendo o caso atual.");
+            }
             processo.setUnidade(unidade);
+        }
+
+        if (request.getCasoId() != null) {
+            processo.setCaso(resolverCaso(request.getCasoId(), processo.getCliente(), processo.getUnidade()));
         }
 
         return toResponse(processoRepository.save(processo));
@@ -475,6 +488,25 @@ public class ProcessoService {
                 .orElseThrow(() -> new ResourceNotFoundException("Processo nao encontrado"));
     }
 
+    private Caso resolverCaso(UUID casoId, Cliente cliente, Unidade unidade) {
+        if (casoId == null) {
+            return null;
+        }
+
+        Caso caso = casoRepository.findById(casoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Caso nao encontrado"));
+
+        if (!caso.getCliente().getId().equals(cliente.getId())) {
+            throw new BusinessException("O caso selecionado nao pertence ao cliente informado.");
+        }
+
+        if (unidade != null && caso.getUnidade() != null && !caso.getUnidade().getId().equals(unidade.getId())) {
+            throw new BusinessException("O caso selecionado pertence a outra pasta.");
+        }
+
+        return caso;
+    }
+
     private ProcessoDetalheResponse toDetalheResponse(
             Processo processo,
             List<Movimentacao> timeline,
@@ -498,6 +530,8 @@ public class ProcessoService {
                 .numero(processo.getNumero())
                 .clienteId(processo.getCliente() != null ? processo.getCliente().getId().toString() : null)
                 .clienteNome(processo.getCliente() != null ? processo.getCliente().getNome() : null)
+                .casoId(processo.getCaso() != null ? processo.getCaso().getId().toString() : null)
+                .casoTitulo(processo.getCaso() != null ? processo.getCaso().getTitulo() : null)
                 .titulo(buildTituloProcesso(processo))
                 .tipo(processo.getTipo() != null ? processo.getTipo().name() : null)
                 .tipoAcao(buildTipoAcao(processo.getTipo()))

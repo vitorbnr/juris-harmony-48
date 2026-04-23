@@ -26,7 +26,7 @@ export const UpcomingDeadlines = ({ prazos = [], loading = false }: Props) => {
   return (
     <div className="surface-card rounded-[1.35rem] border border-border/80 p-6 opacity-0 animate-fade-in" style={{ animationDelay: "400ms" }}>
       <div className="mb-5 flex items-center justify-between">
-        <h3 className="font-heading text-lg font-semibold text-foreground">Proximos prazos</h3>
+        <h3 className="font-heading text-lg font-semibold text-foreground">Próximos prazos</h3>
       </div>
       <div className="space-y-3">
         {loading ? (

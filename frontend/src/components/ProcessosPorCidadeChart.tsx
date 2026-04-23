@@ -16,13 +16,13 @@ export const ProcessosPorCidadeChart = ({ data = [], loading = false }: Props) =
   const maiorValor = Math.max(...itens.map((item) => item.totalProcessos), 1);
 
   return (
-    <div className="rounded-xl border border-border bg-card p-6 opacity-0 animate-fade-in" style={{ animationDelay: "560ms" }}>
+    <div className="surface-card rounded-[1.35rem] border border-border bg-card p-6 opacity-0 animate-fade-in" style={{ animationDelay: "560ms" }}>
       <div className="mb-5 flex items-center justify-between gap-4">
         <div>
           <h3 className="font-heading text-lg font-semibold text-foreground">Andamento por Cidade</h3>
           <p className="text-xs text-muted-foreground">Processos ativos por cidade e unidade</p>
         </div>
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-background text-primary">
           <MapPin className="h-4 w-4" />
         </div>
       </div>
@@ -52,7 +52,7 @@ export const ProcessosPorCidadeChart = ({ data = [], loading = false }: Props) =
                     {item.unidadeNome} · {item.estado}
                   </p>
                 </div>
-                <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+                <span className="shrink-0 rounded-md border border-border bg-background px-2.5 py-1 text-xs font-semibold text-foreground">
                   {item.totalProcessos}
                 </span>
               </div>

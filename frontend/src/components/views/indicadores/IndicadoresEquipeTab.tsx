@@ -1,4 +1,4 @@
-import { useEffect, useState, type ElementType } from "react";
+import { useEffect, useMemo, useState, type ElementType } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -51,8 +51,10 @@ import type {
   TipoPeriodoIndicadoresEquipe,
 } from "@/types";
 
-const SAGE = "#7aab8a";
 const OVERLOAD_LIMIT = 50;
+const ON_TIME_COLOR = "hsl(var(--chart-green))";
+const LATE_COLOR = "hsl(var(--chart-red))";
+const BAR_COLOR = "hsl(var(--chart-blue))";
 
 const PERIODOS: Array<{
   value: TipoPeriodoIndicadoresEquipe;
@@ -62,17 +64,17 @@ const PERIODOS: Array<{
   {
     value: "ESTE_MES",
     label: "Este mes",
-    helper: "Foco no mes corrente",
+    helper: "Leitura do desempenho no mes corrente.",
   },
   {
     value: "MES_PASSADO",
     label: "Mes passado",
-    helper: "Comparacao com a janela anterior",
+    helper: "Comparacao com a janela imediatamente anterior.",
   },
   {
     value: "ULTIMOS_90_DIAS",
     label: "Ultimos 90 dias",
-    helper: "Leitura mais ampla da produtividade",
+    helper: "Tendencia mais ampla para planejamento da operacao.",
   },
 ];
 
@@ -89,64 +91,124 @@ const completionRate = (responsavel: IndicadorResponsavel) => {
   if (total === 0) {
     return 0;
   }
+
   return Math.round((responsavel.prazosConcluidosNoPrazo / total) * 100);
 };
 
-const MetricCard = ({
+const getInitials = (nome: string) =>
+  nome
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((parte) => parte[0])
+    .join("")
+    .toUpperCase();
+
+const SummaryCard = ({
   icon: Icon,
   label,
   value,
-  accentClass,
+  helper,
+  tone = "default",
 }: {
   icon: ElementType;
   label: string;
   value: string;
-  accentClass?: string;
+  helper: string;
+  tone?: "default" | "critical" | "warning";
 }) => (
-  <div className="rounded-2xl border border-border/70 bg-black/10 p-4">
-    <div className="flex items-center justify-between gap-3">
-      <div>
-        <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">{label}</p>
-        <p className="mt-2 text-2xl font-semibold text-foreground">{value}</p>
+  <div className="rounded-lg border border-border bg-card p-5">
+    <div className="flex items-start justify-between gap-4">
+      <div className="space-y-2">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          {label}
+        </p>
+        <p className="text-3xl font-semibold tracking-tight text-foreground">{value}</p>
+        <p className="text-sm leading-6 text-muted-foreground">{helper}</p>
       </div>
+
       <div
         className={cn(
-          "flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-primary",
-          accentClass,
+          "flex h-11 w-11 items-center justify-center rounded-md border",
+          tone === "critical" &&
+            "border-red-200 bg-red-50 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300",
+          tone === "warning" &&
+            "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300",
+          tone === "default" &&
+            "border-border bg-background text-primary",
         )}
       >
-        <Icon className="h-5 w-5" />
+        <Icon className="h-4 w-4" />
       </div>
     </div>
   </div>
 );
 
-const CompletionCell = ({
-  responsavel,
+const DetailMetric = ({
+  icon: Icon,
+  label,
+  value,
+  helper,
+  tone = "default",
 }: {
-  responsavel: IndicadorResponsavel;
-}) => {
+  icon: ElementType;
+  label: string;
+  value: string;
+  helper: string;
+  tone?: "default" | "critical";
+}) => (
+  <div className="rounded-lg border border-border bg-background px-4 py-4">
+    <div className="flex items-start justify-between gap-3">
+      <div className="space-y-2">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          {label}
+        </p>
+        <p className="text-2xl font-semibold tracking-tight text-foreground">{value}</p>
+        <p className="text-sm leading-6 text-muted-foreground">{helper}</p>
+      </div>
+      <div
+        className={cn(
+          "flex h-10 w-10 items-center justify-center rounded-md border",
+          tone === "critical"
+            ? "border-red-200 bg-red-50 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300"
+            : "border-border bg-card text-primary",
+        )}
+      >
+        <Icon className="h-4 w-4" />
+      </div>
+    </div>
+  </div>
+);
+
+const CompletionCell = ({ responsavel }: { responsavel: IndicadorResponsavel }) => {
   const total = completionTotal(responsavel);
   const onTimeWidth = total === 0 ? 0 : (responsavel.prazosConcluidosNoPrazo / total) * 100;
   const lateWidth = total === 0 ? 0 : (responsavel.prazosConcluidosAtrasados / total) * 100;
 
   return (
-    <div className="min-w-[210px] space-y-2">
-      <div className="flex h-2.5 overflow-hidden rounded-full bg-muted/70">
+    <div className="min-w-[220px] space-y-2.5">
+      <div className="flex h-2.5 overflow-hidden rounded-sm bg-muted">
         <div
-          className="h-full rounded-l-full bg-[var(--sage-green)] transition-all"
-          style={{ width: `${onTimeWidth}%`, backgroundColor: SAGE }}
+          className="h-full transition-all"
+          style={{ width: `${onTimeWidth}%`, backgroundColor: ON_TIME_COLOR }}
         />
         <div
-          className="h-full rounded-r-full bg-red-400/80 transition-all"
-          style={{ width: `${lateWidth}%` }}
+          className="h-full transition-all"
+          style={{ width: `${lateWidth}%`, backgroundColor: LATE_COLOR }}
         />
       </div>
+
       <div className="flex flex-wrap gap-2">
-        <Badge className="border border-emerald-400/20 bg-emerald-400/10 text-emerald-300 hover:bg-emerald-400/10">
+        <Badge
+          variant="outline"
+          className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300"
+        >
           {formatNumber(responsavel.prazosConcluidosNoPrazo)} no prazo
         </Badge>
-        <Badge className="border border-red-400/20 bg-red-400/10 text-red-300 hover:bg-red-400/10">
+        <Badge
+          variant="outline"
+          className="border-red-200 bg-red-50 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300"
+        >
           {formatNumber(responsavel.prazosConcluidosAtrasados)} atrasados
         </Badge>
       </div>
@@ -159,13 +221,13 @@ const TableSkeleton = () => (
     {[...Array(5)].map((_, index) => (
       <div
         key={index}
-        className="grid grid-cols-[2fr_1fr_1fr_2fr_1fr] gap-4 rounded-2xl border border-border/70 bg-black/10 px-4 py-4"
+        className="grid grid-cols-[2.2fr_1fr_1fr_2fr_1fr] gap-4 rounded-lg border border-border bg-background px-4 py-4"
       >
         <Skeleton className="h-5 w-40" />
-        <Skeleton className="h-5 w-14" />
-        <Skeleton className="h-5 w-14" />
+        <Skeleton className="h-5 w-16" />
+        <Skeleton className="h-5 w-16" />
         <Skeleton className="h-5 w-32" />
-        <Skeleton className="h-5 w-14" />
+        <Skeleton className="h-5 w-16" />
       </div>
     ))}
   </div>
@@ -223,7 +285,6 @@ export const IndicadoresEquipeTab = () => {
     }
 
     let ativo = true;
-
     setLoadingEvolucao(true);
 
     indicadoresEquipeApi
@@ -250,86 +311,142 @@ export const IndicadoresEquipeTab = () => {
   const periodoMeta = getPeriodoMeta(periodo);
   const responsavelSelecionado =
     indicadores.find((item) => item.usuarioId === selectedUsuarioId) ?? null;
-  const totalPendencias = indicadores.reduce((total, item) => total + item.prazosPendentes, 0);
-  const sobrecarregados = indicadores.filter(
-    (item) => item.prazosPendentes > OVERLOAD_LIMIT,
-  ).length;
+
+  const resumo = useMemo(() => {
+    const totalPendencias = indicadores.reduce((total, item) => total + item.prazosPendentes, 0);
+    const totalMovimentacoes = indicadores.reduce(
+      (total, item) => total + item.movimentacoesRegistadas,
+      0,
+    );
+    const sobrecarregados = indicadores.filter(
+      (item) => item.prazosPendentes > OVERLOAD_LIMIT,
+    ).length;
+    const totalConcluidos = indicadores.reduce(
+      (total, item) => total + completionTotal(item),
+      0,
+    );
+    const totalNoPrazo = indicadores.reduce(
+      (total, item) => total + item.prazosConcluidosNoPrazo,
+      0,
+    );
+    const aderenciaMedia =
+      totalConcluidos === 0 ? 0 : Math.round((totalNoPrazo / totalConcluidos) * 100);
+
+    return {
+      totalPendencias,
+      totalMovimentacoes,
+      sobrecarregados,
+      aderenciaMedia,
+    };
+  }, [indicadores]);
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-        <div className="space-y-3">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#7aab8a]/25 bg-[#7aab8a]/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.24em] text-[#b7d3bd]">
-            <Users className="h-3.5 w-3.5" />
-            Equipe e produtividade
-          </div>
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
+          <SummaryCard
+            icon={Users}
+            label="Responsaveis monitorados"
+            value={formatNumber(indicadores.length)}
+            helper="Membros com carteira ou atividade consolidada na janela selecionada."
+          />
+          <SummaryCard
+            icon={CalendarClock}
+            label="Prazos pendentes"
+            value={formatNumber(resumo.totalPendencias)}
+            helper="Volume total de pendencias abertas sob acompanhamento da equipe."
+            tone="warning"
+          />
+          <SummaryCard
+            icon={Activity}
+            label="Aderencia ao prazo"
+            value={`${resumo.aderenciaMedia}%`}
+            helper="Percentual agregado de conclusoes feitas dentro do prazo."
+          />
+          <SummaryCard
+            icon={AlertTriangle}
+            label="Zona critica"
+            value={formatNumber(resumo.sobrecarregados)}
+            helper={`Responsaveis acima do limite de ${OVERLOAD_LIMIT} pendencias.`}
+            tone={resumo.sobrecarregados > 0 ? "critical" : "default"}
+          />
+        </div>
+
+        <Card className="border-border bg-card">
+          <CardContent className="space-y-4 p-5">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                Periodo de analise
+              </p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                Ajusta a janela da consolidacao para comparacao de carga e ritmo da equipe.
+              </p>
+            </div>
+
+            <Select
+              value={periodo}
+              onValueChange={(value) => setPeriodo(value as TipoPeriodoIndicadoresEquipe)}
+            >
+              <SelectTrigger className="h-11 bg-background">
+                <SelectValue placeholder="Selecione o periodo" />
+              </SelectTrigger>
+              <SelectContent>
+                {PERIODOS.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <div className="rounded-lg border border-border bg-background px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                Janela atual
+              </p>
+              <p className="mt-1 text-sm font-semibold text-foreground">{periodoMeta.label}</p>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">{periodoMeta.helper}</p>
+            </div>
+
+            <div className="rounded-lg border border-border bg-background px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                Movimentacoes registadas
+              </p>
+              <p className="mt-1 text-sm font-semibold text-foreground">
+                {formatNumber(resumo.totalMovimentacoes)}
+              </p>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                Soma de atividades lancadas pela equipe no periodo filtrado.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      <Card className="border-border bg-card">
+        <CardHeader className="gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h2 className="text-2xl font-semibold tracking-tight text-foreground">
-              Ranking de carga e ritmo da equipe
-            </h2>
-            <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-              Painel orientado a responsaveis para localizar gargalos, comparar entregas e abrir
-              rapidamente o perfil operacional de cada membro do escritorio.
-            </p>
+            <CardTitle className="text-xl">Carga por responsavel</CardTitle>
+            <CardDescription>
+              Ordenacao pela fila pendente para facilitar redistribuicao e triagem de risco.
+            </CardDescription>
           </div>
+
           <div className="flex flex-wrap gap-2">
-            <Badge variant="outline" className="border-white/10 bg-white/5 text-muted-foreground">
-              {formatNumber(indicadores.length)} membros ativos
+            <Badge variant="outline" className="border-border bg-background text-muted-foreground">
+              Clique em uma linha para abrir o detalhe individual
             </Badge>
             <Badge
               variant="outline"
-              className={cn(
-                "border-white/10 bg-white/5",
-                sobrecarregados > 0
-                  ? "border-red-400/30 bg-red-400/10 text-red-300"
-                  : "text-[#b7d3bd]",
-              )}
+              className="border-red-200 bg-red-50 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300"
             >
-              {formatNumber(sobrecarregados)} em zona critica
+              Acima de {OVERLOAD_LIMIT} pendencias exige atencao
             </Badge>
-            <Badge variant="outline" className="border-white/10 bg-white/5 text-muted-foreground">
-              {formatNumber(totalPendencias)} prazos pendentes
-            </Badge>
-          </div>
-        </div>
-
-        <div className="w-full max-w-[240px]">
-          <p className="mb-2 text-xs uppercase tracking-[0.24em] text-muted-foreground">Periodo</p>
-          <Select
-            value={periodo}
-            onValueChange={(value) => setPeriodo(value as TipoPeriodoIndicadoresEquipe)}
-          >
-            <SelectTrigger className="h-11 rounded-2xl border-white/10 bg-black/10">
-              <SelectValue placeholder="Selecione o periodo" />
-            </SelectTrigger>
-            <SelectContent>
-              {PERIODOS.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <p className="mt-2 text-xs text-muted-foreground">{periodoMeta.helper}</p>
-        </div>
-      </div>
-
-      <Card className="border-white/5 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(0,0,0,0.08))]">
-        <CardHeader className="gap-3 md:flex-row md:items-end md:justify-between">
-          <div>
-            <CardTitle className="text-xl">Tabela de produtividade</CardTitle>
-            <CardDescription>
-              Ordenada por carga pendente para destacar rapidamente quem esta mais pressionado.
-            </CardDescription>
-          </div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-red-400/20 bg-red-400/10 px-3 py-1 text-xs text-red-300">
-            <AlertTriangle className="h-3.5 w-3.5" />
-            Linhas com mais de {OVERLOAD_LIMIT} pendencias recebem destaque sutil
           </div>
         </CardHeader>
+
         <CardContent>
           {error ? (
-            <Alert className="border-red-400/20 bg-red-400/10 text-red-100">
+            <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>Falha ao carregar</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
@@ -337,7 +454,7 @@ export const IndicadoresEquipeTab = () => {
           ) : loading ? (
             <TableSkeleton />
           ) : indicadores.length === 0 ? (
-            <div className="flex min-h-[220px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border/70 bg-black/10 text-center">
+            <div className="flex min-h-[220px] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-background text-center">
               <Users className="h-8 w-8 text-muted-foreground/50" />
               <div>
                 <p className="text-sm font-medium text-foreground">Nenhum indicador disponivel.</p>
@@ -351,73 +468,86 @@ export const IndicadoresEquipeTab = () => {
               <div className="min-w-[980px]">
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-border/70 hover:bg-transparent">
-                      <TableHead>Funcionario</TableHead>
+                    <TableRow className="border-border hover:bg-transparent">
+                      <TableHead>Responsavel</TableHead>
                       <TableHead className="text-center">Processos ativos</TableHead>
                       <TableHead className="text-center">Prazos pendentes</TableHead>
-                      <TableHead>Prazos no prazo vs atrasados</TableHead>
-                      <TableHead className="text-center">Movimentacoes registadas</TableHead>
+                      <TableHead>Concluidos no prazo x atrasados</TableHead>
+                      <TableHead className="text-center">Movimentacoes</TableHead>
                     </TableRow>
                   </TableHeader>
+
                   <TableBody>
                     {indicadores.map((item) => {
                       const critico = item.prazosPendentes > OVERLOAD_LIMIT;
+                      const selecionado = item.usuarioId === selectedUsuarioId;
 
                       return (
                         <TableRow
                           key={item.usuarioId}
+                          onClick={() => setSelectedUsuarioId(item.usuarioId)}
                           className={cn(
-                            "border-border/60 transition-colors hover:bg-white/5",
-                            critico && "bg-red-400/5 hover:bg-red-400/10",
+                            "cursor-pointer border-border/70",
+                            critico &&
+                              "bg-red-50/70 hover:bg-red-50 dark:bg-red-500/5 dark:hover:bg-red-500/10",
+                            selecionado &&
+                              "bg-accent/60 hover:bg-accent/60 dark:bg-accent/50 dark:hover:bg-accent/50",
+                            !critico && !selecionado && "hover:bg-muted/40",
                           )}
                         >
                           <TableCell className="py-4">
                             <div className="flex items-center gap-3">
-                              <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#7aab8a]/20 bg-[#7aab8a]/10 text-sm font-semibold text-[#b7d3bd]">
-                                {item.nomeUsuario
-                                  .split(" ")
-                                  .filter(Boolean)
-                                  .slice(0, 2)
-                                  .map((parte) => parte[0])
-                                  .join("")
-                                  .toUpperCase()}
+                              <div className="flex h-11 w-11 items-center justify-center rounded-md border border-border bg-background text-sm font-semibold text-primary">
+                                {getInitials(item.nomeUsuario)}
                               </div>
+
                               <div className="space-y-1">
                                 <p className="font-medium text-foreground">{item.nomeUsuario}</p>
-                                <div className="flex flex-wrap gap-2">
-                                  {critico ? (
-                                    <Badge className="border border-red-400/20 bg-red-400/10 text-red-300 hover:bg-red-400/10">
-                                      Carga critica
-                                    </Badge>
-                                  ) : (
-                                    <Badge className="border border-[#7aab8a]/20 bg-[#7aab8a]/10 text-[#b7d3bd] hover:bg-[#7aab8a]/10">
-                                      Fluxo estavel
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <Badge
+                                    variant="outline"
+                                    className={cn(
+                                      critico
+                                        ? "border-red-200 bg-red-50 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300"
+                                        : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300",
+                                    )}
+                                  >
+                                    {critico ? "Carga critica" : "Fluxo estavel"}
+                                  </Badge>
+
+                                  {selecionado && (
+                                    <Badge variant="outline" className="border-border bg-card text-foreground">
+                                      Em analise
                                     </Badge>
                                   )}
                                 </div>
                               </div>
                             </div>
                           </TableCell>
+
                           <TableCell className="text-center text-base font-semibold text-foreground">
                             {formatNumber(item.processosSobResponsabilidade)}
                           </TableCell>
+
                           <TableCell className="text-center">
                             <span
                               className={cn(
-                                "inline-flex min-w-16 items-center justify-center rounded-full px-3 py-1 text-sm font-semibold",
+                                "inline-flex min-w-16 items-center justify-center rounded-md border px-3 py-1 text-sm font-semibold",
                                 critico
-                                  ? "bg-red-400/15 text-red-300"
-                                  : "bg-white/5 text-foreground",
+                                  ? "border-red-200 bg-red-50 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300"
+                                  : "border-border bg-background text-foreground",
                               )}
                             >
                               {formatNumber(item.prazosPendentes)}
                             </span>
                           </TableCell>
+
                           <TableCell>
                             <CompletionCell responsavel={item} />
                           </TableCell>
+
                           <TableCell className="text-center">
-                            <span className="inline-flex min-w-16 items-center justify-center rounded-full bg-[#7aab8a]/12 px-3 py-1 text-sm font-semibold text-[#b7d3bd]">
+                            <span className="inline-flex min-w-16 items-center justify-center rounded-md border border-border bg-background px-3 py-1 text-sm font-semibold text-foreground">
                               {formatNumber(item.movimentacoesRegistadas)}
                             </span>
                           </TableCell>
@@ -432,22 +562,22 @@ export const IndicadoresEquipeTab = () => {
         </CardContent>
       </Card>
 
-      <Card className="border-[#7aab8a]/15 bg-[radial-gradient(circle_at_top_left,rgba(122,171,138,0.14),transparent_40%),linear-gradient(180deg,rgba(255,255,255,0.04),rgba(0,0,0,0.08))]">
-        <CardHeader className="gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <Card className="border-border bg-card">
+        <CardHeader className="gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <CardTitle className="text-xl">Perfil individual do responsavel</CardTitle>
             <CardDescription>
-              Abra o recorte operacional de um membro da equipe e acompanhe o ritmo das ultimas
-              quatro semanas.
+              Recorte operacional com carteira atual, fila pendente e historico das ultimas quatro
+              semanas.
             </CardDescription>
           </div>
 
-          <div className="w-full lg:max-w-[280px]">
-            <p className="mb-2 text-xs uppercase tracking-[0.24em] text-muted-foreground">
-              Ver detalhes do funcionario
+          <div className="w-full xl:max-w-[320px]">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              Selecionar responsavel
             </p>
             <Select value={selectedUsuarioId} onValueChange={setSelectedUsuarioId}>
-              <SelectTrigger className="h-11 rounded-2xl border-white/10 bg-black/10">
+              <SelectTrigger className="h-11 bg-background">
                 <SelectValue placeholder="Selecione um membro da equipe" />
               </SelectTrigger>
               <SelectContent>
@@ -463,10 +593,10 @@ export const IndicadoresEquipeTab = () => {
 
         <CardContent className="space-y-6">
           {!responsavelSelecionado ? (
-            <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border/70 bg-black/10 text-center">
+            <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-background text-center">
               <BarChart3 className="h-8 w-8 text-muted-foreground/50" />
               <div>
-                <p className="text-sm font-medium text-foreground">Selecione um funcionario.</p>
+                <p className="text-sm font-medium text-foreground">Selecione um responsavel.</p>
                 <p className="text-sm text-muted-foreground">
                   O detalhe individual aparece aqui assim que um membro da equipe for escolhido.
                 </p>
@@ -474,81 +604,131 @@ export const IndicadoresEquipeTab = () => {
             </div>
           ) : (
             <>
-              <div className="grid gap-4 lg:grid-cols-3">
-                <MetricCard
-                  icon={Scale}
-                  label="Processos em carteira"
-                  value={formatNumber(responsavelSelecionado.processosSobResponsabilidade)}
-                />
-                <MetricCard
-                  icon={CalendarClock}
-                  label="Prazos pendentes"
-                  value={formatNumber(responsavelSelecionado.prazosPendentes)}
-                  accentClass={
-                    responsavelSelecionado.prazosPendentes > OVERLOAD_LIMIT
-                      ? "border-red-400/20 bg-red-400/10 text-red-300"
-                      : undefined
-                  }
-                />
-                <MetricCard
-                  icon={Activity}
-                  label="Movimentacoes no periodo"
-                  value={formatNumber(responsavelSelecionado.movimentacoesRegistadas)}
-                />
-              </div>
+              <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
+                <div className="rounded-lg border border-border bg-background p-5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-md border border-border bg-card text-base font-semibold text-primary">
+                      {getInitials(responsavelSelecionado.nomeUsuario)}
+                    </div>
+                    <div>
+                      <p className="text-lg font-semibold text-foreground">
+                        {responsavelSelecionado.nomeUsuario}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Leitura consolidada para {periodoMeta.label.toLowerCase()}.
+                      </p>
+                    </div>
+                  </div>
 
-              <div className="flex flex-wrap gap-2">
-                <Badge className="border border-emerald-400/20 bg-emerald-400/10 text-emerald-300 hover:bg-emerald-400/10">
-                  {formatNumber(responsavelSelecionado.prazosConcluidosNoPrazo)} concluidos no prazo
-                </Badge>
-                <Badge className="border border-red-400/20 bg-red-400/10 text-red-300 hover:bg-red-400/10">
-                  {formatNumber(responsavelSelecionado.prazosConcluidosAtrasados)} concluidos atrasados
-                </Badge>
-                <Badge className="border border-[#7aab8a]/20 bg-[#7aab8a]/10 text-[#b7d3bd] hover:bg-[#7aab8a]/10">
-                  {completionRate(responsavelSelecionado)}% de aderencia ao prazo
-                </Badge>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Badge
+                      variant="outline"
+                      className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300"
+                    >
+                      {completionRate(responsavelSelecionado)}% de aderencia
+                    </Badge>
+                    <Badge variant="outline" className="border-border bg-card text-foreground">
+                      {formatNumber(completionTotal(responsavelSelecionado))} concluidos
+                    </Badge>
+                  </div>
+
+                  <div className="mt-5 space-y-3 text-sm">
+                    <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
+                      <span className="text-muted-foreground">Movimentacoes no periodo</span>
+                      <span className="font-semibold text-foreground">
+                        {formatNumber(responsavelSelecionado.movimentacoesRegistadas)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
+                      <span className="text-muted-foreground">Concluidos no prazo</span>
+                      <span className="font-semibold text-foreground">
+                        {formatNumber(responsavelSelecionado.prazosConcluidosNoPrazo)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-muted-foreground">Concluidos atrasados</span>
+                      <span className="font-semibold text-foreground">
+                        {formatNumber(responsavelSelecionado.prazosConcluidosAtrasados)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  <DetailMetric
+                    icon={Scale}
+                    label="Processos em carteira"
+                    value={formatNumber(responsavelSelecionado.processosSobResponsabilidade)}
+                    helper="Casos ativos sob responsabilidade direta."
+                  />
+                  <DetailMetric
+                    icon={CalendarClock}
+                    label="Prazos pendentes"
+                    value={formatNumber(responsavelSelecionado.prazosPendentes)}
+                    helper="Fila operacional atual aguardando tratamento."
+                    tone={
+                      responsavelSelecionado.prazosPendentes > OVERLOAD_LIMIT
+                        ? "critical"
+                        : "default"
+                    }
+                  />
+                  <DetailMetric
+                    icon={Activity}
+                    label="Ritmo no periodo"
+                    value={formatNumber(responsavelSelecionado.movimentacoesRegistadas)}
+                    helper="Volume de atividades registradas na janela selecionada."
+                  />
+                </div>
               </div>
 
               {responsavelSelecionado.prazosPendentes > OVERLOAD_LIMIT && (
-                <Alert className="border-red-400/20 bg-red-400/10 text-red-100">
+                <Alert variant="destructive">
                   <AlertTriangle className="h-4 w-4" />
                   <AlertTitle>Risco de sobrecarga</AlertTitle>
                   <AlertDescription>
                     {responsavelSelecionado.nomeUsuario} ultrapassou o limite critico de{" "}
-                    {OVERLOAD_LIMIT} prazos pendentes e merece triagem prioritaria.
+                    {OVERLOAD_LIMIT} pendencias e merece triagem prioritaria.
                   </AlertDescription>
                 </Alert>
               )}
 
-              <Card className="border-white/5 bg-black/10">
-                <CardHeader>
-                  <CardTitle className="text-lg">Grafico de ritmo</CardTitle>
-                  <CardDescription>
-                    Tarefas e prazos concluidos nas ultimas quatro semanas.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="h-[300px]">
+              <div className="rounded-lg border border-border bg-background p-5">
+                <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                  <div>
+                    <p className="text-lg font-semibold text-foreground">Ritmo semanal</p>
+                    <p className="text-sm leading-6 text-muted-foreground">
+                      Volume de tarefas concluidas nas ultimas quatro semanas para apoiar a leitura
+                      de consistencia da equipe.
+                    </p>
+                  </div>
+
+                  <Badge variant="outline" className="border-border bg-card text-foreground">
+                    Barra semanal de produtividade
+                  </Badge>
+                </div>
+
+                <div className="h-[300px]">
                   {loadingEvolucao ? (
                     <div className="space-y-4 pt-4">
                       <Skeleton className="h-5 w-40" />
-                      <Skeleton className="h-[220px] w-full rounded-2xl" />
+                      <Skeleton className="h-[220px] w-full rounded-lg" />
                     </div>
                   ) : evolucao.length === 0 ? (
-                    <div className="flex h-full flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border/70 bg-black/5 text-center">
+                    <div className="flex h-full flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-card text-center">
                       <BarChart3 className="h-8 w-8 text-muted-foreground/50" />
                       <div>
                         <p className="text-sm font-medium text-foreground">
                           Nenhuma conclusao consolidada.
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          O historico semanal sera exibido quando houver entregas registadas.
+                          O historico semanal sera exibido quando houver entregas registradas.
                         </p>
                       </div>
                     </div>
                   ) : (
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={evolucao} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" opacity={0.14} />
+                        <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="hsl(var(--border))" />
                         <XAxis
                           dataKey="data"
                           tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
@@ -562,12 +742,13 @@ export const IndicadoresEquipeTab = () => {
                           tickLine={false}
                         />
                         <Tooltip
-                          cursor={{ fill: "rgba(122, 171, 138, 0.12)" }}
+                          cursor={{ fill: "hsl(var(--accent))" }}
                           contentStyle={{
-                            backgroundColor: "rgba(11, 15, 18, 0.94)",
-                            border: "1px solid rgba(122, 171, 138, 0.22)",
-                            borderRadius: "16px",
-                            color: "#e8f0ea",
+                            backgroundColor: "hsl(var(--popover))",
+                            border: "1px solid hsl(var(--border))",
+                            borderRadius: "10px",
+                            color: "hsl(var(--popover-foreground))",
+                            boxShadow: "0 14px 28px -20px rgba(15, 23, 42, 0.25)",
                           }}
                           formatter={(value: number) => [
                             `${formatNumber(value)} concluidas`,
@@ -576,15 +757,15 @@ export const IndicadoresEquipeTab = () => {
                         />
                         <Bar
                           dataKey="tarefasConcluidas"
-                          radius={[8, 8, 0, 0]}
-                          fill={SAGE}
-                          barSize={42}
+                          radius={[4, 4, 0, 0]}
+                          fill={BAR_COLOR}
+                          barSize={40}
                         />
                       </BarChart>
                     </ResponsiveContainer>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </>
           )}
         </CardContent>

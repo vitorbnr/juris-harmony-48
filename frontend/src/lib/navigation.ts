@@ -60,14 +60,14 @@ export const appSections: AppSectionConfig[] = [
     id: "agenda-notas",
     label: "Agenda e Notas",
     title: "Agenda e Notas",
-    subtitle: "Calendario operacional e bloco de notas pessoal com gravacao automatica.",
+    subtitle: "Calendário operacional e bloco de notas pessoal com gravação automática.",
     icon: NotebookPen,
   },
   {
     id: "clientes",
     label: "Clientes",
     title: "Clientes",
-    subtitle: "Carteira de clientes do escritorio.",
+    subtitle: "Carteira de clientes do escritório.",
     icon: Users,
   },
   {
@@ -81,7 +81,7 @@ export const appSections: AppSectionConfig[] = [
     id: "processos",
     label: "Processos e Casos",
     title: "Processos e Casos",
-    subtitle: "Gerencie os processos e casos do escritorio.",
+    subtitle: "Gerencie os processos e casos do escritório.",
     icon: Scale,
   },
   {
@@ -95,14 +95,14 @@ export const appSections: AppSectionConfig[] = [
     id: "documentos",
     label: "Documentos",
     title: "Documentos",
-    subtitle: "Repositorio central de arquivos e documentos.",
+    subtitle: "Repositório central de arquivos e documentos.",
     icon: FileText,
   },
   {
     id: "indicadores",
     label: "Indicadores",
     title: "Indicadores",
-    subtitle: "Painel consolidado de metricas operacionais e juridicas.",
+    subtitle: "Painel consolidado de métricas operacionais e jurídicas.",
     icon: BarChart3,
   },
 ];

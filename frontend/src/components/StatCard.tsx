@@ -28,9 +28,8 @@ export const StatCard = ({
       )}
       style={{ animationDelay: `${delay}ms` }}
     >
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/35 to-transparent" />
       <div className="flex items-start justify-between">
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/15">
+        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10">
           <Icon className="h-5 w-5 text-primary" />
         </div>
         {change && (

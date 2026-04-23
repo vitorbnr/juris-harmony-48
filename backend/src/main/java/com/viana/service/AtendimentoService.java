@@ -6,6 +6,7 @@ import com.viana.dto.response.ProcessoResponse;
 import com.viana.exception.BusinessException;
 import com.viana.exception.ResourceNotFoundException;
 import com.viana.model.Atendimento;
+import com.viana.model.Caso;
 import com.viana.model.Cliente;
 import com.viana.model.Processo;
 import com.viana.model.Unidade;
@@ -15,6 +16,7 @@ import com.viana.model.enums.StatusAtendimento;
 import com.viana.model.enums.TipoAcao;
 import com.viana.model.enums.TipoVinculoAtendimento;
 import com.viana.repository.AtendimentoRepository;
+import com.viana.repository.CasoRepository;
 import com.viana.repository.ClienteRepository;
 import com.viana.repository.ProcessoRepository;
 import com.viana.repository.UnidadeRepository;
@@ -43,6 +45,7 @@ public class AtendimentoService {
     private static final int LIMITE_ARMAZENAMENTO_ETIQUETAS = 255;
 
     private final AtendimentoRepository atendimentoRepository;
+    private final CasoRepository casoRepository;
     private final ClienteRepository clienteRepository;
     private final ProcessoRepository processoRepository;
     private final UsuarioRepository usuarioRepository;
@@ -219,6 +222,11 @@ public class AtendimentoService {
             return new VinculoAtendimentoInfo(TipoVinculoAtendimento.PROCESSO, processo.getId(), processo);
         }
 
+        if (tipo == TipoVinculoAtendimento.CASO) {
+            Caso caso = resolverCasoDoCliente(referenciaId, cliente);
+            return new VinculoAtendimentoInfo(TipoVinculoAtendimento.CASO, caso.getId(), null);
+        }
+
         return new VinculoAtendimentoInfo(tipo, referenciaId, null);
     }
 
@@ -231,6 +239,17 @@ public class AtendimentoService {
         }
 
         return processo;
+    }
+
+    private Caso resolverCasoDoCliente(UUID casoId, Cliente cliente) {
+        Caso caso = casoRepository.findById(casoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Caso nao encontrado"));
+
+        if (!caso.getCliente().getId().equals(cliente.getId())) {
+            throw new BusinessException("O caso selecionado nao pertence ao cliente informado.");
+        }
+
+        return caso;
     }
 
     private Unidade resolverUnidade(UUID unidadeId, Cliente cliente, Usuario responsavel, Processo processo) {
