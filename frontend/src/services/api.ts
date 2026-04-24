@@ -448,6 +448,9 @@ export const documentosApi = {
   listarPorProcesso: (processoId: string, params?: { page?: number; size?: number }) =>
     api.get(`/documentos/processo/${processoId}`, { params: cleanParams(params) }).then(r => r.data),
 
+  atividadesGerais: (params?: { page?: number; size?: number }) =>
+    api.get("/documentos/atividades", { params: cleanParams(params) }).then(r => r.data),
+
   upload: (formData: FormData, onProgress?: (pct: number) => void) =>
     api.post("/documentos", formData, {
       headers: { "Content-Type": "multipart/form-data" },

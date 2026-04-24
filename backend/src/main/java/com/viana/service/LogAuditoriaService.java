@@ -58,6 +58,17 @@ public class LogAuditoriaService {
     }
 
     @Transactional(readOnly = true)
+    public Page<LogAuditoriaResponse> listarPorModulo(ModuloLog modulo, Pageable pageable, UUID unidadeId, boolean isAdmin) {
+        if (isAdmin || unidadeId == null) {
+            return logRepository.findByModuloOrderByDataHoraDesc(modulo, pageable)
+                    .map(this::toResponse);
+        }
+
+        return logRepository.findByModuloAndUsuarioUnidadeIdOrderByDataHoraDesc(modulo, unidadeId, pageable)
+                .map(this::toResponse);
+    }
+
+    @Transactional(readOnly = true)
     public List<LogAuditoriaResponse> listarPorReferencia(String referenciaTipo, UUID referenciaId) {
         return logRepository.findByReferenciaTipoAndReferenciaIdOrderByDataHoraDesc(referenciaTipo, referenciaId)
                 .stream()

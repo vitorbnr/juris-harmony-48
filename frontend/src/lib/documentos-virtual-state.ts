@@ -11,6 +11,7 @@ interface DocumentoVirtualState {
   overrides: Record<string, DocumentoVirtualOverride>;
   trashedIds: string[];
   purgedIds: string[];
+  trashedItems: Record<string, Documento>;
 }
 
 function getDefaultState(): DocumentoVirtualState {
@@ -18,6 +19,7 @@ function getDefaultState(): DocumentoVirtualState {
     overrides: {},
     trashedIds: [],
     purgedIds: [],
+    trashedItems: {},
   };
 }
 
@@ -41,6 +43,10 @@ function readState(): DocumentoVirtualState {
           ? (parsed as { deletedIds?: string[] }).deletedIds ?? []
           : [],
       purgedIds: Array.isArray(parsed.purgedIds) ? parsed.purgedIds : [],
+      trashedItems:
+        parsed.trashedItems && typeof parsed.trashedItems === "object"
+          ? (parsed.trashedItems as Record<string, Documento>)
+          : {},
     };
   } catch {
     return getDefaultState();
@@ -88,20 +94,36 @@ export function saveDocumentoVirtualOverride(id: string, override: DocumentoVirt
     },
     trashedIds: state.trashedIds.filter((storedId) => storedId !== id),
     purgedIds: state.purgedIds.filter((storedId) => storedId !== id),
+    trashedItems: Object.fromEntries(
+      Object.entries(state.trashedItems).filter(([storedId]) => storedId !== id),
+    ),
   });
 }
 
-export function markDocumentoVirtualDeleted(id: string) {
+export function markDocumentoVirtualDeleted(documentoOrId: Documento | string) {
   const state = readState();
+  const id = typeof documentoOrId === "string" ? documentoOrId : documentoOrId.id;
   const trashedIds = state.trashedIds.includes(id) ? state.trashedIds : [...state.trashedIds, id];
 
   const overrides = { ...state.overrides };
   delete overrides[id];
 
+  const trashedItems = { ...state.trashedItems };
+  if (typeof documentoOrId === "string") {
+    delete trashedItems[id];
+  } else {
+    trashedItems[id] = {
+      ...documentoOrId,
+      deletedAt: documentoOrId.deletedAt ?? new Date().toISOString(),
+      deletedPor: documentoOrId.deletedPor ?? "Sistema",
+    };
+  }
+
   writeState({
     overrides,
     trashedIds,
     purgedIds: state.purgedIds.filter((storedId) => storedId !== id),
+    trashedItems,
   });
 }
 
@@ -112,6 +134,9 @@ export function restoreDocumentoVirtual(id: string) {
     overrides: state.overrides,
     trashedIds: state.trashedIds.filter((storedId) => storedId !== id),
     purgedIds: state.purgedIds,
+    trashedItems: Object.fromEntries(
+      Object.entries(state.trashedItems).filter(([storedId]) => storedId !== id),
+    ),
   });
 }
 
@@ -124,25 +149,45 @@ export function purgeDocumentoVirtual(id: string) {
     overrides,
     trashedIds: state.trashedIds.filter((storedId) => storedId !== id),
     purgedIds: state.purgedIds.includes(id) ? state.purgedIds : [...state.purgedIds, id],
+    trashedItems: Object.fromEntries(
+      Object.entries(state.trashedItems).filter(([storedId]) => storedId !== id),
+    ),
   });
 }
 
 export function listDocumentoVirtualTrashed(documentos: Documento[]) {
   const state = readState();
   const trashedIds = new Set(state.trashedIds);
+  const merged = new Map<string, Documento>();
 
-  return documentos
+  Object.values(state.trashedItems).forEach((documento) => {
+    if (trashedIds.has(documento.id)) {
+      merged.set(documento.id, documento);
+    }
+  });
+
+  documentos
     .filter((documento) => trashedIds.has(documento.id))
-    .map((documento) => {
-      const override = state.overrides[documento.id];
-      if (!override) {
-        return documento;
-      }
-
-      return {
+    .forEach((documento) => {
+      const snapshot = state.trashedItems[documento.id];
+      merged.set(documento.id, {
         ...documento,
-        nome: override.nome ?? documento.nome,
-        categoria: override.categoria ?? documento.categoria,
-      };
+        ...snapshot,
+        deletedAt: snapshot?.deletedAt ?? documento.deletedAt,
+        deletedPor: snapshot?.deletedPor ?? documento.deletedPor,
+      });
     });
+
+  return Array.from(merged.values()).map((documento) => {
+    const override = state.overrides[documento.id];
+    if (!override) {
+      return documento;
+    }
+
+    return {
+      ...documento,
+      nome: override.nome ?? documento.nome,
+      categoria: override.categoria ?? documento.categoria,
+    };
+  });
 }

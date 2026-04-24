@@ -5,6 +5,7 @@ import com.viana.dto.response.AcervoCidadeResponse;
 import com.viana.dto.response.DocumentoResponse;
 import com.viana.model.Documento;
 import com.viana.model.Usuario;
+import com.viana.model.enums.ModuloLog;
 import com.viana.repository.UsuarioRepository;
 import com.viana.service.DocumentoService;
 import com.viana.service.LogAuditoriaService;
@@ -238,6 +239,21 @@ public class DocumentoController {
         Usuario usuario = getUsuario(authentication);
         return ResponseEntity.ok(
                 documentoService.listarLixeira(pageable, getUnidadeEscopo(usuario), isAdmin(authentication))
+        );
+    }
+
+    @GetMapping("/atividades")
+    public ResponseEntity<Page<LogAuditoriaService.LogAuditoriaResponse>> listarAtividadesModulo(
+            @PageableDefault(size = 100, sort = "dataHora", direction = Sort.Direction.DESC) Pageable pageable,
+            Authentication authentication) {
+        Usuario usuario = getUsuario(authentication);
+        return ResponseEntity.ok(
+                logAuditoriaService.listarPorModulo(
+                        ModuloLog.DOCUMENTOS,
+                        pageable,
+                        getUnidadeEscopo(usuario),
+                        isAdmin(authentication)
+                )
         );
     }
 

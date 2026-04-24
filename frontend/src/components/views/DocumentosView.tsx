@@ -25,6 +25,7 @@ import { DocumentoUploadModal } from "@/components/modals/DocumentoUploadModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { clientes as clientesMock, documentos as documentosMock, processos as processosMock } from "@/data/mockData";
 import {
   applyDocumentoVirtualState,
@@ -137,6 +138,7 @@ interface BreadcrumbItem {
 
 type PreviewTab = "preview" | "info" | "activities";
 type PreviewKind = "pdf" | "image" | "video" | "text" | "unsupported";
+type PainelDetalhesModo = "documento" | "atividade_global";
 
 const SHOULD_MERGE_DEMO_DOCUMENTS = import.meta.env.DEV || import.meta.env.MODE === "test";
 
@@ -787,12 +789,16 @@ export const DocumentosView = () => {
   const [loadingDocumentos, setLoadingDocumentos] = useState(true);
   const [ordenacao, setOrdenacao] = useState<OrdenacaoDocumentos>("recentes");
   const [categoriaFiltro, setCategoriaFiltro] = useState("todas");
+  const [painelDetalhesAberto, setPainelDetalhesAberto] = useState(false);
+  const [painelDetalhesModo, setPainelDetalhesModo] = useState<PainelDetalhesModo>("documento");
   const [previewTab, setPreviewTab] = useState<PreviewTab>("preview");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewErro, setPreviewErro] = useState<string | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [atividades, setAtividades] = useState<DocumentoAtividade[]>([]);
   const [loadingAtividades, setLoadingAtividades] = useState(false);
+  const [atividadesGerais, setAtividadesGerais] = useState<DocumentoAtividade[]>([]);
+  const [loadingAtividadesGerais, setLoadingAtividadesGerais] = useState(false);
   const previewObjectUrlRef = useRef<string | null>(null);
 
   const hidratarDocumentos = useCallback((docs: Documento[]) => applyDocumentoVirtualState(docs), []);
@@ -851,7 +857,7 @@ export const DocumentosView = () => {
       setExpandedCities((prev) => {
         const next = { ...prev };
         acervoLista.forEach((cidade) => {
-          if (next[cidade.chave] === undefined) next[cidade.chave] = true;
+          if (next[cidade.chave] === undefined) next[cidade.chave] = false;
         });
         return next;
       });
@@ -954,8 +960,11 @@ export const DocumentosView = () => {
 
   useEffect(() => {
     setDocumentoSelecionado(null);
+    setPainelDetalhesAberto(false);
+    setPainelDetalhesModo("documento");
     setPreviewTab("preview");
     setAtividades([]);
+    setAtividadesGerais([]);
     setPreviewErro(null);
     setPreviewUrl(null);
     limparPreviewObjectUrl();
@@ -980,14 +989,14 @@ export const DocumentosView = () => {
     setExpandedCities((prev) => {
       const next = { ...prev };
       acervoAgrupado.forEach((cidade) => {
-        if (next[cidade.chave] === undefined) next[cidade.chave] = true;
+        if (next[cidade.chave] === undefined) next[cidade.chave] = false;
       });
       return next;
     });
   }, [acervoAgrupado]);
 
   const selecionarCidade = useCallback((cidade: AcervoCidadeDocumento) => {
-    setExpandedCities((prev) => ({ ...prev, [cidade.chave]: true }));
+    setExpandedCities((prev) => ({ ...prev, [cidade.chave]: !(prev[cidade.chave] ?? false) }));
     setSelecao({ type: "cidade", cidade });
   }, []);
 
@@ -1053,18 +1062,41 @@ export const DocumentosView = () => {
     }
   };
 
+  const abrirPainelDetalhesDocumento = (tab: PreviewTab = "info") => {
+    if (!documentoSelecionado) {
+      toast.error("Selecione um documento para visualizar detalhes.");
+      return;
+    }
+
+    setPainelDetalhesModo("documento");
+    setPreviewTab(tab);
+    setPainelDetalhesAberto(true);
+  };
+
+  const abrirPainelAtividadesGerais = () => {
+    setPainelDetalhesModo("atividade_global");
+    setPainelDetalhesAberto(true);
+  };
+
   const excluirDocumentoPersistido = useCallback(async (doc: Documento) => {
+    const snapshotLixeira: Documento = {
+      ...doc,
+      deletedAt: doc.deletedAt ?? new Date().toISOString(),
+      deletedPor: doc.deletedPor ?? "Sistema",
+    };
+
     if (isDocumentoDemo(doc)) {
-      markDocumentoVirtualDeleted(doc.id);
+      markDocumentoVirtualDeleted(snapshotLixeira);
       return;
     }
 
     if (isDocumentoLocal(doc)) {
-      markDocumentoVirtualDeleted(doc.id);
+      markDocumentoVirtualDeleted(snapshotLixeira);
       return;
     }
 
     await documentosApi.excluir(doc.id);
+    markDocumentoVirtualDeleted(snapshotLixeira);
   }, []);
 
   const handleExcluir = async (doc: Documento) => {
@@ -1306,6 +1338,38 @@ export const DocumentosView = () => {
       ativo = false;
     };
   }, [documentoSelecionado]);
+
+  useEffect(() => {
+    let ativo = true;
+
+    const carregarAtividadesGerais = async () => {
+      if (!painelDetalhesAberto || painelDetalhesModo !== "atividade_global") {
+        setLoadingAtividadesGerais(false);
+        return;
+      }
+
+      setLoadingAtividadesGerais(true);
+      try {
+        const response = await documentosApi.atividadesGerais({ size: 100 });
+        if (!ativo) return;
+        const items = response?.content ?? response;
+        setAtividadesGerais(Array.isArray(items) ? items : []);
+      } catch {
+        if (!ativo) return;
+        setAtividadesGerais([]);
+      } finally {
+        if (ativo) {
+          setLoadingAtividadesGerais(false);
+        }
+      }
+    };
+
+    void carregarAtividadesGerais();
+
+    return () => {
+      ativo = false;
+    };
+  }, [painelDetalhesAberto, painelDetalhesModo]);
 
   useEffect(() => {
     let ativo = true;
@@ -1552,18 +1616,6 @@ export const DocumentosView = () => {
   const initialClienteId = selecao.type === "cliente" ? selecao.cliente.id : undefined;
   const initialPastaId = selecao.type === "interna" ? selecao.pastaId : undefined;
   const acervoVisivel = acervoAberto || Boolean(buscaNormalizada);
-
-  const abrirTodasCidades = () => {
-    setExpandedCities(
-      Object.fromEntries(acervoAgrupado.map((cidade) => [cidade.chave, true])),
-    );
-  };
-
-  const fecharTodasCidades = () => {
-    setExpandedCities(
-      Object.fromEntries(acervoAgrupado.map((cidade) => [cidade.chave, false])),
-    );
-  };
 
   const toggleAcervo = () => {
     setAcervoAberto((prev) => !prev);
@@ -1902,184 +1954,229 @@ export const DocumentosView = () => {
   };
 
   const renderPainelDetalhes = () => (
-    <aside className="hidden xl:flex w-[360px] shrink-0 border-l border-border bg-card/60 flex-col">
-      <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">Detalhes</p>
-          <p className="mt-1 text-sm font-medium text-foreground truncate max-w-[240px]">
-            {documentoSelecionado?.nome ?? "Nenhum item selecionado"}
+    <Sheet
+      open={painelDetalhesAberto && (painelDetalhesModo === "atividade_global" || Boolean(documentoSelecionado))}
+      onOpenChange={(open) => {
+        setPainelDetalhesAberto(open);
+      }}
+    >
+      <SheetContent side="right" className="w-full border-l border-border bg-card p-0 sm:max-w-[520px]">
+        <SheetHeader className="border-b border-border px-5 py-4 pr-14 text-left">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+            {painelDetalhesModo === "atividade_global" ? "Atividades" : "Detalhes"}
           </p>
-        </div>
-        {documentoSelecionado && (
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setDocumentoSelecionado(null)}>
-            <X className="h-4 w-4" />
-          </Button>
+          <SheetTitle className="mt-1 truncate text-base">
+            {painelDetalhesModo === "atividade_global" ? "Historico do modulo de documentos" : documentoSelecionado?.nome ?? "Documento"}
+          </SheetTitle>
+          <SheetDescription className="sr-only">
+            {painelDetalhesModo === "atividade_global"
+              ? "Historico geral de uploads, alteracoes, exclusoes e restauracoes do modulo de documentos."
+              : "Preview, informacoes e atividades do documento selecionado."}
+          </SheetDescription>
+        </SheetHeader>
+
+        {painelDetalhesModo === "documento" && (
+          <div className="flex items-center gap-1 border-b border-border px-4 py-3">
+            <button
+              type="button"
+              onClick={() => setPreviewTab("preview")}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                previewTab === "preview" ? "bg-background text-foreground" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              Preview
+            </button>
+            <button
+              type="button"
+              onClick={() => setPreviewTab("info")}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                previewTab === "info" ? "bg-background text-foreground" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              Informacoes
+            </button>
+            <button
+              type="button"
+              onClick={() => setPreviewTab("activities")}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                previewTab === "activities" ? "bg-background text-foreground" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              Atividades
+            </button>
+          </div>
         )}
-      </div>
 
-      <div className="flex items-center gap-1 border-b border-border px-3 py-2">
-        <button
-          type="button"
-          onClick={() => setPreviewTab("preview")}
-          className={cn("rounded-md px-3 py-1.5 text-xs font-medium transition-colors", previewTab === "preview" ? "bg-background text-foreground" : "text-muted-foreground hover:text-foreground")}
-        >
-          Preview
-        </button>
-        <button
-          type="button"
-          onClick={() => setPreviewTab("info")}
-          className={cn("rounded-md px-3 py-1.5 text-xs font-medium transition-colors", previewTab === "info" ? "bg-background text-foreground" : "text-muted-foreground hover:text-foreground")}
-        >
-          Informacoes
-        </button>
-        <button
-          type="button"
-          onClick={() => setPreviewTab("activities")}
-          className={cn("rounded-md px-3 py-1.5 text-xs font-medium transition-colors", previewTab === "activities" ? "bg-background text-foreground" : "text-muted-foreground hover:text-foreground")}
-        >
-          Atividades
-        </button>
-      </div>
-
-      <div className="flex-1 min-h-0 overflow-y-auto">
-        {previewTab === "preview" && (
-          <div className="h-full p-3">
-            <div className="h-full rounded-2xl border border-border bg-background/70 overflow-hidden">
-              {renderPreviewConteudo()}
+        <div className="h-[calc(100%-121px)] overflow-y-auto">
+          {painelDetalhesModo === "atividade_global" && (
+            <div className="p-4">
+              {loadingAtividadesGerais ? (
+                <div className="flex min-h-[240px] items-center justify-center">
+                  <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-primary" />
+                </div>
+              ) : atividadesGerais.length === 0 ? (
+                <div className="space-y-2 rounded-2xl border border-dashed border-border bg-background/50 px-4 py-10 text-center text-sm text-muted-foreground">
+                  <Clock3 className="mx-auto h-8 w-8 opacity-40" />
+                  <p>Nenhuma atividade registrada ainda no modulo de documentos.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {atividadesGerais.map((atividade) => (
+                    <div key={atividade.id} className="rounded-2xl border border-border bg-background/60 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">{formatTipoAcao(atividade.acao)}</p>
+                          <p className="mt-1 text-sm text-muted-foreground">{atividade.descricao}</p>
+                        </div>
+                        <Clock3 className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      </div>
+                      <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                        <span>{atividade.usuarioNome}</span>
+                        <span>{formatDateTimeLabel(atividade.dataHora)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
-        )}
+          )}
 
-        {previewTab === "info" && (
-          <div className="space-y-4 p-4">
-            {documentoSelecionado ? (
-              <>
-                <div className="rounded-2xl border border-border bg-background/60 p-4">
-                  <div className="flex items-center gap-3">
-                    <FileIcon tipo={documentoSelecionado.tipo} size="md" />
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-foreground">{documentoSelecionado.nome}</p>
-                      <p className="text-xs text-muted-foreground">{tipoConfig[documentoSelecionado.tipo]?.label ?? documentoSelecionado.tipo?.toUpperCase?.() ?? "Arquivo"}</p>
+          {painelDetalhesModo === "documento" && previewTab === "preview" && (
+            <div className="h-full p-4">
+              <div className="h-full min-h-[420px] overflow-hidden rounded-2xl border border-border bg-background/70">
+                {renderPreviewConteudo()}
+              </div>
+            </div>
+          )}
+
+          {painelDetalhesModo === "documento" && previewTab === "info" && (
+            <div className="space-y-4 p-4">
+              {documentoSelecionado ? (
+                <>
+                  <div className="rounded-2xl border border-border bg-background/60 p-4">
+                    <div className="flex items-center gap-3">
+                      <FileIcon tipo={documentoSelecionado.tipo} size="md" />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-foreground">{documentoSelecionado.nome}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {tipoConfig[documentoSelecionado.tipo]?.label ?? documentoSelecionado.tipo?.toUpperCase?.() ?? "Arquivo"}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div className="rounded-xl border border-border bg-background/60 p-3">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Categoria</p>
-                    <p className="mt-2 text-foreground">{categoriaLabel[documentoSelecionado.categoria] ?? documentoSelecionado.categoria}</p>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="rounded-xl border border-border bg-background/60 p-3">
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Categoria</p>
+                      <p className="mt-2 text-foreground">{categoriaLabel[documentoSelecionado.categoria] ?? documentoSelecionado.categoria}</p>
+                    </div>
+                    <div className="rounded-xl border border-border bg-background/60 p-3">
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Tamanho</p>
+                      <p className="mt-2 text-foreground">{documentoSelecionado.tamanho}</p>
+                    </div>
+                    <div className="rounded-xl border border-border bg-background/60 p-3">
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Enviado em</p>
+                      <p className="mt-2 text-foreground">{formatDateTimeLabel(documentoSelecionado.dataUpload)}</p>
+                    </div>
+                    <div className="rounded-xl border border-border bg-background/60 p-3">
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Enviado por</p>
+                      <p className="mt-2 text-foreground">{documentoSelecionado.uploadedPor || "-"}</p>
+                    </div>
                   </div>
-                  <div className="rounded-xl border border-border bg-background/60 p-3">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Tamanho</p>
-                    <p className="mt-2 text-foreground">{documentoSelecionado.tamanho}</p>
-                  </div>
-                  <div className="rounded-xl border border-border bg-background/60 p-3">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Enviado em</p>
-                    <p className="mt-2 text-foreground">{formatDateTimeLabel(documentoSelecionado.dataUpload)}</p>
-                  </div>
-                  <div className="rounded-xl border border-border bg-background/60 p-3">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Enviado por</p>
-                    <p className="mt-2 text-foreground">{documentoSelecionado.uploadedPor || "-"}</p>
-                  </div>
-                </div>
 
-                <div className="space-y-3 rounded-2xl border border-border bg-background/60 p-4 text-sm">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Cliente</p>
-                    <p className="mt-1 text-foreground">{documentoSelecionado.clienteNome || "-"}</p>
+                  <div className="space-y-3 rounded-2xl border border-border bg-background/60 p-4 text-sm">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Cliente</p>
+                      <p className="mt-1 text-foreground">{documentoSelecionado.clienteNome || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Processo</p>
+                      <p className="mt-1 text-foreground">{documentoSelecionado.processoNumero || "-"}</p>
+                    </div>
+                    {selecao.type === "trash" && (
+                      <>
+                        <div>
+                          <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Excluido em</p>
+                          <p className="mt-1 text-foreground">{formatDateTimeLabel(documentoSelecionado.deletedAt)}</p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Excluido por</p>
+                          <p className="mt-1 text-foreground">{documentoSelecionado.deletedPor || "-"}</p>
+                        </div>
+                      </>
+                    )}
                   </div>
-                  <div>
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Processo</p>
-                    <p className="mt-1 text-foreground">{documentoSelecionado.processoNumero || "-"}</p>
-                  </div>
-                  {selecao.type === "trash" && (
-                    <>
-                      <div>
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Excluido em</p>
-                        <p className="mt-1 text-foreground">{formatDateTimeLabel(documentoSelecionado.deletedAt)}</p>
-                      </div>
-                      <div>
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Excluido por</p>
-                        <p className="mt-1 text-foreground">{documentoSelecionado.deletedPor || "-"}</p>
-                      </div>
-                    </>
-                  )}
-                </div>
 
-                <div className="flex flex-wrap gap-2">
-                  {selecao.type === "trash" ? (
-                    <>
-                      <Button variant="outline" size="sm" className="gap-2" onClick={() => void handleRestaurarDocumento(documentoSelecionado)}>
-                        <RotateCcw className="h-3.5 w-3.5" />
-                        Restaurar
-                      </Button>
-                      <Button variant="destructive" size="sm" className="gap-2" onClick={() => void handleExcluirPermanentemente(documentoSelecionado)}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Excluir permanente
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Button variant="outline" size="sm" className="gap-2" onClick={() => void handleDownload(documentoSelecionado)}>
-                        <Download className="h-3.5 w-3.5" />
-                        Baixar
-                      </Button>
-                      {!isDocumentoVirtual(documentoSelecionado) && (
-                        <Button variant="outline" size="sm" className="gap-2" onClick={() => setDocumentoEditando(documentoSelecionado)}>
-                          <Pencil className="h-3.5 w-3.5" />
-                          Editar
+                  <div className="flex flex-wrap gap-2">
+                    {selecao.type === "trash" ? (
+                      <>
+                        <Button variant="outline" size="sm" className="gap-2" onClick={() => void handleRestaurarDocumento(documentoSelecionado)}>
+                          <RotateCcw className="h-3.5 w-3.5" />
+                          Restaurar
                         </Button>
-                      )}
-                    </>
-                  )}
-                </div>
-              </>
-            ) : (
-              <div className="flex min-h-[240px] items-center justify-center text-center text-sm text-muted-foreground">
-                Selecione um documento para ver informacoes.
-              </div>
-            )}
-          </div>
-        )}
-
-        {previewTab === "activities" && (
-          <div className="p-4">
-            {!documentoSelecionado ? (
-              <div className="flex min-h-[240px] items-center justify-center text-center text-sm text-muted-foreground">
-                Selecione um documento para acompanhar as atividades.
-              </div>
-            ) : loadingAtividades ? (
-              <div className="flex min-h-[240px] items-center justify-center">
-                <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-primary" />
-              </div>
-            ) : atividades.length === 0 ? (
-              <div className="space-y-2 rounded-2xl border border-dashed border-border bg-background/50 px-4 py-10 text-center text-sm text-muted-foreground">
-                <Clock3 className="mx-auto h-8 w-8 opacity-40" />
-                <p>Nenhuma atividade detalhada disponivel para este documento.</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {atividades.map((atividade) => (
-                  <div key={atividade.id} className="rounded-2xl border border-border bg-background/60 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{formatTipoAcao(atividade.acao)}</p>
-                        <p className="mt-1 text-sm text-muted-foreground">{atividade.descricao}</p>
-                      </div>
-                      <Clock3 className="h-4 w-4 text-muted-foreground shrink-0" />
-                    </div>
-                    <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                      <span>{atividade.usuarioNome}</span>
-                      <span>{formatDateTimeLabel(atividade.dataHora)}</span>
-                    </div>
+                        <Button variant="destructive" size="sm" className="gap-2" onClick={() => void handleExcluirPermanentemente(documentoSelecionado)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Excluir permanente
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button variant="outline" size="sm" className="gap-2" onClick={() => void handleDownload(documentoSelecionado)}>
+                          <Download className="h-3.5 w-3.5" />
+                          Baixar
+                        </Button>
+                        {!isDocumentoVirtual(documentoSelecionado) && (
+                          <Button variant="outline" size="sm" className="gap-2" onClick={() => setDocumentoEditando(documentoSelecionado)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                            Editar
+                          </Button>
+                        )}
+                      </>
+                    )}
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </aside>
+                </>
+              ) : null}
+            </div>
+          )}
+
+          {painelDetalhesModo === "documento" && previewTab === "activities" && (
+            <div className="p-4">
+              {!documentoSelecionado ? null : loadingAtividades ? (
+                <div className="flex min-h-[240px] items-center justify-center">
+                  <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-primary" />
+                </div>
+              ) : atividades.length === 0 ? (
+                <div className="space-y-2 rounded-2xl border border-dashed border-border bg-background/50 px-4 py-10 text-center text-sm text-muted-foreground">
+                  <Clock3 className="mx-auto h-8 w-8 opacity-40" />
+                  <p>Nenhuma atividade detalhada disponivel para este documento.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {atividades.map((atividade) => (
+                    <div key={atividade.id} className="rounded-2xl border border-border bg-background/60 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">{formatTipoAcao(atividade.acao)}</p>
+                          <p className="mt-1 text-sm text-muted-foreground">{atividade.descricao}</p>
+                        </div>
+                        <Clock3 className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      </div>
+                      <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                        <span>{atividade.usuarioNome}</span>
+                        <span>{formatDateTimeLabel(atividade.dataHora)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 
   return (
@@ -2116,7 +2213,7 @@ export const DocumentosView = () => {
             <span className="truncate">Lixeira</span>
           </button>
 
-          <div className="px-4 pt-4 pb-2 flex items-center justify-between gap-2">
+          <div className="px-4 pt-4 pb-2 flex items-center gap-2">
             <button
               type="button"
               onClick={toggleAcervo}
@@ -2126,24 +2223,6 @@ export const DocumentosView = () => {
               <MapPin className="h-3.5 w-3.5" />
               <span>Escritório Viana</span>
             </button>
-            {acervoVisivel && !loadingEstruturas && acervoAgrupado.length > 0 && (
-              <div className="flex items-center gap-2 text-[10px]">
-                <button
-                  type="button"
-                  onClick={abrirTodasCidades}
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Abrir todos
-                </button>
-                <button
-                  type="button"
-                  onClick={fecharTodasCidades}
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Fechar todos
-                </button>
-              </div>
-            )}
           </div>
 
           {!acervoVisivel ? null : loadingEstruturas ? (
@@ -2152,7 +2231,7 @@ export const DocumentosView = () => {
             <p className="px-4 py-3 text-[11px] text-muted-foreground/60 italic">Nenhum cliente ativo no acervo.</p>
           ) : (
             acervoFiltrado.map((cidade) => {
-              const expanded = buscaNormalizada ? true : (expandedCities[cidade.chave] ?? true);
+              const expanded = buscaNormalizada ? true : (expandedCities[cidade.chave] ?? false);
               const cidadeAtiva = selecao.type === "cidade" && selecao.cidade.chave === cidade.chave;
 
               return (
@@ -2183,7 +2262,7 @@ export const DocumentosView = () => {
                           : "text-muted-foreground hover:text-foreground hover:bg-muted/40",
                       )}
                     >
-                      {cidadeAtiva ? (
+                      {expanded || cidadeAtiva ? (
                         <FolderOpen className="h-3.5 w-3.5 shrink-0 text-yellow-500" />
                       ) : (
                         <FolderClosed className="h-3.5 w-3.5 shrink-0 text-yellow-500/70" />
@@ -2316,6 +2395,25 @@ export const DocumentosView = () => {
             </button>
           </div>
 
+          <Button
+            variant="outline"
+            className="gap-2"
+            disabled={!documentoSelecionado}
+            onClick={() => abrirPainelDetalhesDocumento("info")}
+          >
+            <FileText className="h-4 w-4" />
+            Detalhes
+          </Button>
+
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={abrirPainelAtividadesGerais}
+          >
+            <Clock3 className="h-4 w-4" />
+            Atividades
+          </Button>
+
           {selecao.type !== "trash" && (
             <>
               <Button variant="outline" className="gap-2" onClick={() => setNovaPastaAberta(true)}>
@@ -2363,24 +2461,27 @@ export const DocumentosView = () => {
               </div>
             ) : (
               <div className="space-y-5">
-                <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card/60 p-5 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="space-y-2">
+                <div className="flex flex-col gap-4 rounded-xl border border-border bg-card/60 p-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="space-y-2 min-w-0">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
                       {contextEyebrow}
                     </p>
                     <div>
-                      <h2 className="text-xl font-semibold text-foreground">{contextTitle}</h2>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <h2 className="text-lg font-semibold text-foreground">{contextTitle}</h2>
+                        <span className="text-xs text-muted-foreground">{subtituloSelecao}</span>
+                      </div>
                       <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{contextDescription}</p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="rounded-xl border border-border bg-background/70 px-4 py-3">
-                      <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Itens visiveis</p>
-                      <p className="mt-2 text-2xl font-semibold text-foreground">{totalItensVisiveis}</p>
+                  <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                    <div className="rounded-lg border border-border bg-background/70 px-3 py-2">
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Itens</p>
+                      <p className="mt-1 text-lg font-semibold leading-none text-foreground">{totalItensVisiveis}</p>
                     </div>
-                    <div className="rounded-xl border border-border bg-background/70 px-4 py-3">
-                      <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Resumo</p>
-                      <p className="mt-2 text-sm font-medium text-foreground">{subtituloSelecao}</p>
+                    <div className="max-w-[280px] rounded-lg border border-border bg-background/70 px-3 py-2">
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Contexto</p>
+                      <p className="mt-1 truncate text-xs font-medium text-foreground">{subtituloSelecao}</p>
                     </div>
                   </div>
                 </div>
@@ -2413,8 +2514,9 @@ export const DocumentosView = () => {
           </div>
         </div>
 
-        {renderPainelDetalhes()}
       </div>
+
+      {renderPainelDetalhes()}
 
       {uploadAberto && (
         <DocumentoUploadModal
