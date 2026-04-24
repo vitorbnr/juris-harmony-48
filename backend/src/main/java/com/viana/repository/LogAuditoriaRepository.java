@@ -20,4 +20,5 @@ public interface LogAuditoriaRepository extends JpaRepository<LogAuditoria, UUID
     Page<LogAuditoria> findByUsuarioIdOrderByDataHoraDesc(UUID usuarioId, Pageable pageable);
 
     List<LogAuditoria> findByReferenciaTipoAndReferenciaIdOrderByDataHoraDesc(String referenciaTipo, UUID referenciaId);
+    Page<LogAuditoria> findByReferenciaTipoAndReferenciaIdOrderByDataHoraDesc(String referenciaTipo, UUID referenciaId, Pageable pageable);
 }

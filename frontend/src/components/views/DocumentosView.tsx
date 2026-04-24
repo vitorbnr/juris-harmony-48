@@ -140,7 +140,16 @@ type PreviewTab = "preview" | "info" | "activities";
 type PreviewKind = "pdf" | "image" | "video" | "text" | "unsupported";
 type PainelDetalhesModo = "documento" | "atividade_global";
 
+interface ActivityPageState {
+  number: number;
+  totalPages: number;
+  totalElements: number;
+  first: boolean;
+  last: boolean;
+}
+
 const SHOULD_MERGE_DEMO_DOCUMENTS = import.meta.env.DEV || import.meta.env.MODE === "test";
+const ACTIVITIES_PAGE_SIZE = 15;
 
 const clienteMockPorId = new Map(clientesMock.map((cliente) => [cliente.id, cliente]));
 const processoMockPorId = new Map(processosMock.map((processo) => [processo.id, processo]));
@@ -368,6 +377,30 @@ function formatTipoAcao(acao?: string | null) {
     default:
       return acao ?? "Atividade";
   }
+}
+
+function createInitialActivityPageState(): ActivityPageState {
+  return {
+    number: 0,
+    totalPages: 1,
+    totalElements: 0,
+    first: true,
+    last: true,
+  };
+}
+
+function getActivityPageState(response: unknown): ActivityPageState {
+  const data = (response ?? {}) as Partial<ActivityPageState> & { totalPages?: number; totalElements?: number; number?: number; first?: boolean; last?: boolean };
+  const totalPages = Math.max(data.totalPages ?? 1, 1);
+  const number = Math.min(data.number ?? 0, totalPages - 1);
+
+  return {
+    number,
+    totalPages,
+    totalElements: data.totalElements ?? 0,
+    first: data.first ?? number <= 0,
+    last: data.last ?? number >= totalPages - 1,
+  };
 }
 
 function FileIcon({ tipo, size = "md" }: { tipo: string; size?: "sm" | "md" | "lg" }) {
@@ -797,8 +830,12 @@ export const DocumentosView = () => {
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [atividades, setAtividades] = useState<DocumentoAtividade[]>([]);
   const [loadingAtividades, setLoadingAtividades] = useState(false);
+  const [atividadeDocumentoPage, setAtividadeDocumentoPage] = useState(0);
+  const [atividadeDocumentoMeta, setAtividadeDocumentoMeta] = useState<ActivityPageState>(createInitialActivityPageState);
   const [atividadesGerais, setAtividadesGerais] = useState<DocumentoAtividade[]>([]);
   const [loadingAtividadesGerais, setLoadingAtividadesGerais] = useState(false);
+  const [atividadeGeralPage, setAtividadeGeralPage] = useState(0);
+  const [atividadeGeralMeta, setAtividadeGeralMeta] = useState<ActivityPageState>(createInitialActivityPageState);
   const previewObjectUrlRef = useRef<string | null>(null);
 
   const hidratarDocumentos = useCallback((docs: Documento[]) => applyDocumentoVirtualState(docs), []);
@@ -964,7 +1001,11 @@ export const DocumentosView = () => {
     setPainelDetalhesModo("documento");
     setPreviewTab("preview");
     setAtividades([]);
+    setAtividadeDocumentoPage(0);
+    setAtividadeDocumentoMeta(createInitialActivityPageState());
     setAtividadesGerais([]);
+    setAtividadeGeralPage(0);
+    setAtividadeGeralMeta(createInitialActivityPageState());
     setPreviewErro(null);
     setPreviewUrl(null);
     limparPreviewObjectUrl();
@@ -1069,12 +1110,16 @@ export const DocumentosView = () => {
     }
 
     setPainelDetalhesModo("documento");
+    if (tab === "activities") {
+      setAtividadeDocumentoPage(0);
+    }
     setPreviewTab(tab);
     setPainelDetalhesAberto(true);
   };
 
   const abrirPainelAtividadesGerais = () => {
     setPainelDetalhesModo("atividade_global");
+    setAtividadeGeralPage(0);
     setPainelDetalhesAberto(true);
   };
 
@@ -1308,23 +1353,35 @@ export const DocumentosView = () => {
   }, [documentoSelecionado, docsFiltrados]);
 
   useEffect(() => {
+    setAtividadeDocumentoPage(0);
+    setAtividadeDocumentoMeta(createInitialActivityPageState());
+  }, [documentoSelecionado?.id]);
+
+  useEffect(() => {
     let ativo = true;
 
     const carregarAtividades = async () => {
       if (!documentoSelecionado || isDocumentoVirtual(documentoSelecionado)) {
         setAtividades([]);
         setLoadingAtividades(false);
+        setAtividadeDocumentoMeta(createInitialActivityPageState());
         return;
       }
 
       setLoadingAtividades(true);
       try {
-        const response = await documentosApi.atividades(documentoSelecionado.id);
+        const response = await documentosApi.atividades(documentoSelecionado.id, {
+          page: atividadeDocumentoPage,
+          size: ACTIVITIES_PAGE_SIZE,
+        });
         if (!ativo) return;
-        setAtividades(Array.isArray(response) ? response : []);
+        const items = response?.content ?? response;
+        setAtividades(Array.isArray(items) ? items : []);
+        setAtividadeDocumentoMeta(getActivityPageState(response));
       } catch {
         if (!ativo) return;
         setAtividades([]);
+        setAtividadeDocumentoMeta(createInitialActivityPageState());
       } finally {
         if (ativo) {
           setLoadingAtividades(false);
@@ -1337,7 +1394,7 @@ export const DocumentosView = () => {
     return () => {
       ativo = false;
     };
-  }, [documentoSelecionado]);
+  }, [atividadeDocumentoPage, documentoSelecionado]);
 
   useEffect(() => {
     let ativo = true;
@@ -1350,13 +1407,18 @@ export const DocumentosView = () => {
 
       setLoadingAtividadesGerais(true);
       try {
-        const response = await documentosApi.atividadesGerais({ size: 100 });
+        const response = await documentosApi.atividadesGerais({
+          page: atividadeGeralPage,
+          size: ACTIVITIES_PAGE_SIZE,
+        });
         if (!ativo) return;
         const items = response?.content ?? response;
         setAtividadesGerais(Array.isArray(items) ? items : []);
+        setAtividadeGeralMeta(getActivityPageState(response));
       } catch {
         if (!ativo) return;
         setAtividadesGerais([]);
+        setAtividadeGeralMeta(createInitialActivityPageState());
       } finally {
         if (ativo) {
           setLoadingAtividadesGerais(false);
@@ -1369,7 +1431,7 @@ export const DocumentosView = () => {
     return () => {
       ativo = false;
     };
-  }, [painelDetalhesAberto, painelDetalhesModo]);
+  }, [atividadeGeralPage, painelDetalhesAberto, painelDetalhesModo]);
 
   useEffect(() => {
     let ativo = true;
@@ -1616,6 +1678,7 @@ export const DocumentosView = () => {
   const initialClienteId = selecao.type === "cliente" ? selecao.cliente.id : undefined;
   const initialPastaId = selecao.type === "interna" ? selecao.pastaId : undefined;
   const acervoVisivel = acervoAberto || Boolean(buscaNormalizada);
+  const canCriarPasta = selecao.type !== "trash" && selecao.type !== "cliente" && selecao.type !== "interna";
 
   const toggleAcervo = () => {
     setAcervoAberto((prev) => !prev);
@@ -1666,18 +1729,6 @@ export const DocumentosView = () => {
                 <FolderClosed className="h-3.5 w-3.5 shrink-0 text-yellow-500/70" />
               )}
               <span className="truncate text-xs">{node.nome}</span>
-            </button>
-            <button
-              type="button"
-              aria-label={`Excluir pasta ${node.nome}`}
-              title="Excluir pasta"
-              onClick={(event) => {
-                event.stopPropagation();
-                void handleExcluirPasta(node);
-              }}
-              className="mr-2 rounded-md p-1.5 text-muted-foreground transition-all hover:bg-accent hover:text-destructive"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
             </button>
           </div>
 
@@ -1953,6 +2004,33 @@ export const DocumentosView = () => {
     return <iframe title={`Preview de ${documentoSelecionado.nome}`} src={previewUrl} className="h-full w-full border-0" />;
   };
 
+  const renderPaginationControls = (
+    meta: ActivityPageState,
+    loading: boolean,
+    onPrev: () => void,
+    onNext: () => void,
+  ) => {
+    if (meta.totalElements <= 0) {
+      return null;
+    }
+
+    return (
+      <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-border bg-background/50 px-3 py-2">
+        <div className="text-xs text-muted-foreground">
+          Pagina {meta.number + 1} de {meta.totalPages} • {meta.totalElements} atividades
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" disabled={loading || meta.first} onClick={onPrev}>
+            Anterior
+          </Button>
+          <Button variant="outline" size="sm" disabled={loading || meta.last} onClick={onNext}>
+            Proxima
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
   const renderPainelDetalhes = () => (
     <Sheet
       open={painelDetalhesAberto && (painelDetalhesModo === "atividade_global" || Boolean(documentoSelecionado))}
@@ -2039,6 +2117,12 @@ export const DocumentosView = () => {
                       </div>
                     </div>
                   ))}
+                  {renderPaginationControls(
+                    atividadeGeralMeta,
+                    loadingAtividadesGerais,
+                    () => setAtividadeGeralPage((prev) => Math.max(prev - 1, 0)),
+                    () => setAtividadeGeralPage((prev) => Math.min(prev + 1, Math.max(atividadeGeralMeta.totalPages - 1, 0))),
+                  )}
                 </div>
               )}
             </div>
@@ -2170,6 +2254,12 @@ export const DocumentosView = () => {
                       </div>
                     </div>
                   ))}
+                  {renderPaginationControls(
+                    atividadeDocumentoMeta,
+                    loadingAtividades,
+                    () => setAtividadeDocumentoPage((prev) => Math.max(prev - 1, 0)),
+                    () => setAtividadeDocumentoPage((prev) => Math.min(prev + 1, Math.max(atividadeDocumentoMeta.totalPages - 1, 0))),
+                  )}
                 </div>
               )}
             </div>
@@ -2414,18 +2504,20 @@ export const DocumentosView = () => {
             Atividades
           </Button>
 
-          {selecao.type !== "trash" && (
+          {canCriarPasta && (
             <>
               <Button variant="outline" className="gap-2" onClick={() => setNovaPastaAberta(true)}>
                 <Plus className="h-4 w-4" />
                 Nova pasta
               </Button>
-
-              <Button className="gap-2 ml-auto" onClick={() => setUploadAberto(true)}>
-                <Upload className="h-4 w-4" />
-                Upload
-              </Button>
             </>
+          )}
+
+          {selecao.type !== "trash" && (
+            <Button className="gap-2 ml-auto" onClick={() => setUploadAberto(true)}>
+              <Upload className="h-4 w-4" />
+              Upload
+            </Button>
           )}
           </div>
 
@@ -2497,10 +2589,12 @@ export const DocumentosView = () => {
                           <Upload className="h-3.5 w-3.5" />
                           Fazer upload
                         </Button>
-                        <Button variant="outline" size="sm" className="gap-2" onClick={() => setNovaPastaAberta(true)}>
-                          <Plus className="h-3.5 w-3.5" />
-                          Nova pasta
-                        </Button>
+                        {canCriarPasta && (
+                          <Button variant="outline" size="sm" className="gap-2" onClick={() => setNovaPastaAberta(true)}>
+                            <Plus className="h-3.5 w-3.5" />
+                            Nova pasta
+                          </Button>
+                        )}
                       </div>
                     )}
                   </div>

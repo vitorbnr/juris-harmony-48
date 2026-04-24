@@ -76,6 +76,12 @@ public class LogAuditoriaService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public Page<LogAuditoriaResponse> listarPorReferencia(String referenciaTipo, UUID referenciaId, Pageable pageable) {
+        return logRepository.findByReferenciaTipoAndReferenciaIdOrderByDataHoraDesc(referenciaTipo, referenciaId, pageable)
+                .map(this::toResponse);
+    }
+
     private LogAuditoriaResponse toResponse(LogAuditoria l) {
         return LogAuditoriaResponse.builder()
                 .id(l.getId().toString())

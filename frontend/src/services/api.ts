@@ -481,8 +481,8 @@ export const documentosApi = {
   listarLixeira: (params?: { page?: number; size?: number }) =>
     api.get("/documentos/lixeira", { params: cleanParams(params) }).then(r => r.data),
 
-  atividades: (id: string) =>
-    api.get(`/documentos/${id}/atividades`).then(r => r.data as DocumentoAtividade[]),
+  atividades: (id: string, params?: { page?: number; size?: number }) =>
+    api.get(`/documentos/${id}/atividades`, { params: cleanParams(params) }).then(r => r.data),
 
   excluir: (id: string) => api.delete(`/documentos/${id}`),
 

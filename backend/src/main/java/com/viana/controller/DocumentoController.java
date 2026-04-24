@@ -258,12 +258,13 @@ public class DocumentoController {
     }
 
     @GetMapping("/{id}/atividades")
-    public ResponseEntity<List<LogAuditoriaService.LogAuditoriaResponse>> listarAtividades(
+    public ResponseEntity<Page<LogAuditoriaService.LogAuditoriaResponse>> listarAtividades(
             @PathVariable UUID id,
+            @PageableDefault(size = 15, sort = "dataHora", direction = Sort.Direction.DESC) Pageable pageable,
             Authentication authentication) {
         Usuario usuario = getUsuario(authentication);
         return ResponseEntity.ok(
-                documentoService.listarAtividades(id, getUnidadeEscopo(usuario), isAdmin(authentication))
+                documentoService.listarAtividades(id, getUnidadeEscopo(usuario), isAdmin(authentication), pageable)
         );
     }
 

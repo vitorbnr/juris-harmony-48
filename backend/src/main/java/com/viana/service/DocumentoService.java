@@ -406,9 +406,9 @@ public class DocumentoService {
     }
 
     @Transactional(readOnly = true)
-    public List<LogAuditoriaService.LogAuditoriaResponse> listarAtividades(UUID id, UUID unidadeId, boolean isAdmin) {
+    public Page<LogAuditoriaService.LogAuditoriaResponse> listarAtividades(UUID id, UUID unidadeId, boolean isAdmin, Pageable pageable) {
         Documento documento = findDocumentoAutorizado(id, unidadeId, isAdmin);
-        return logAuditoriaService.listarPorReferencia(REFERENCIA_DOCUMENTO, documento.getId());
+        return logAuditoriaService.listarPorReferencia(REFERENCIA_DOCUMENTO, documento.getId(), pageable);
     }
 
     @Transactional(readOnly = true)
