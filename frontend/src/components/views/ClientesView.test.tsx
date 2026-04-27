@@ -49,8 +49,8 @@ describe("ClientesView", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (useUnidade as any).mockReturnValue({ unidadeSelecionada: "todas" });
-    (clientesApi.listar as any).mockResolvedValue({
+    vi.mocked(useUnidade).mockReturnValue({ unidadeSelecionada: "todas" } as ReturnType<typeof useUnidade>);
+    vi.mocked(clientesApi.listar).mockResolvedValue({
       content: mockClientes,
       number: 0,
       size: 40,
