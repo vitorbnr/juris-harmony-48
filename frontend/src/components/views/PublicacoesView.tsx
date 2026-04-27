@@ -1121,24 +1121,36 @@ export const PublicacoesView = () => {
 
         {isMobile ? (
           <div className="grid gap-6">
-            <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-[0_24px_70px_-48px_rgba(0,0,0,0.7)]">
-              {painelFila}
-            </div>
-            <div className="min-h-[420px] overflow-hidden rounded-2xl border border-border bg-card shadow-[0_24px_70px_-48px_rgba(0,0,0,0.7)]">
-              {painelDetalhe}
-            </div>
+            {publicacoesFiltradas.length === 0 ? (
+              <div className="min-h-[420px] overflow-hidden rounded-2xl border border-border bg-card shadow-[0_24px_70px_-48px_rgba(0,0,0,0.7)]">
+                {painelDetalhe}
+              </div>
+            ) : (
+              <>
+                <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-[0_24px_70px_-48px_rgba(0,0,0,0.7)]">
+                  {painelFila}
+                </div>
+                <div className="min-h-[420px] overflow-hidden rounded-2xl border border-border bg-card shadow-[0_24px_70px_-48px_rgba(0,0,0,0.7)]">
+                  {painelDetalhe}
+                </div>
+              </>
+            )}
           </div>
         ) : (
           <div className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-border bg-card shadow-[0_30px_80px_-45px_rgba(0,0,0,0.65)]">
-            <ResizablePanelGroup direction="horizontal">
-              <ResizablePanel defaultSize={35} minSize={26}>
-                {painelFila}
-              </ResizablePanel>
-              <ResizableHandle withHandle />
-              <ResizablePanel defaultSize={65} minSize={38}>
-                {painelDetalhe}
-              </ResizablePanel>
-            </ResizablePanelGroup>
+            {publicacoesFiltradas.length === 0 ? (
+              painelDetalhe
+            ) : (
+              <ResizablePanelGroup direction="horizontal">
+                <ResizablePanel defaultSize={35} minSize={26}>
+                  {painelFila}
+                </ResizablePanel>
+                <ResizableHandle withHandle />
+                <ResizablePanel defaultSize={65} minSize={38}>
+                  {painelDetalhe}
+                </ResizablePanel>
+              </ResizablePanelGroup>
+            )}
           </div>
         )}
       </div>

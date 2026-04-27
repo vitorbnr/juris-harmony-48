@@ -302,7 +302,10 @@ export const DashboardHeader = ({ activeItem, onNavigate }: Props) => {
     <>
       <header className="sticky top-0 z-20 flex flex-col gap-4 border-b border-border bg-background px-4 py-3.5 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div className="min-w-0 flex-1">
-          <h2 className="truncate font-heading text-xl font-semibold text-foreground">{section.title}</h2>
+          <div className="flex items-center gap-2">
+            {section.icon && <section.icon className="h-5 w-5 text-primary" />}
+            <h2 className="truncate font-heading text-xl font-semibold text-foreground">{section.title}</h2>
+          </div>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <p className="text-xs text-muted-foreground/90">{section.subtitle}</p>
 

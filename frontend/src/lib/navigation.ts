@@ -52,8 +52,8 @@ export const appSections: AppSectionConfig[] = [
   {
     id: "gestao-kanban",
     label: "Gestão Kanban",
-    title: "Gestão Kanban",
-    subtitle: "Mova prazos entre etapas com drag-and-drop e acompanhe o fluxo em tempo real.",
+    title: "Gestão Kanban de Prazos",
+    subtitle: "Arraste os cards entre as colunas ou use o menu de 3 pontos em cada tarefa para reorganizar o fluxo de trabalho.",
     icon: SquareKanban,
   },
   {
