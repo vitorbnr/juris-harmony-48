@@ -1005,14 +1005,7 @@ export const PublicacoesView = () => {
   return (
     <>
       <div className="flex min-h-full flex-col gap-6 p-6 md:h-full md:min-h-0 md:overflow-hidden md:p-8">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h3 className="font-heading text-2xl font-semibold text-foreground">Publicações</h3>
-            <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-              Mesa de triagem pensada para advogados acostumados ao Astrea, com menos cliques, leitura confortavel e base pronta para IA explicavel.
-            </p>
-          </div>
-
+        <div className="flex items-center justify-end gap-4">
           <Button type="button" variant="outline" onClick={() => void carregarDados()} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
             Atualizar fila

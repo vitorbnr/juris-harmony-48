@@ -457,14 +457,7 @@ export const ProcessosView = () => {
     <div className="space-y-6 p-6 md:p-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/70">Contencioso</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">Processos e casos</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-            Entre no modulo ja com leitura executiva do processo e, agora, com uma visao dedicada para os casos do
-            escritorio.
-          </p>
-
-          <Tabs value={abaAtiva} onValueChange={(value) => setAbaAtiva(value as ViewTab)} className="mt-5">
+          <Tabs value={abaAtiva} onValueChange={(value) => setAbaAtiva(value as ViewTab)}>
             <TabsList className="bg-muted/40">
               <TabsTrigger value="processos" className="gap-2">
                 <Scale className="h-4 w-4" />

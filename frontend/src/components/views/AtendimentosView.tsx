@@ -228,14 +228,7 @@ export function AtendimentosView() {
 
   return (
     <div className="space-y-6 p-6 md:p-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h3 className="font-heading text-2xl font-semibold text-foreground">Atendimentos</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Triagem inicial com visao de abertos e fechados, e vinculo opcional a processo apenas como contexto.
-          </p>
-        </div>
-
+      <div className="flex items-center justify-end gap-4">
         <Button className="gap-2" onClick={handleNovo}>
           <Plus className="h-4 w-4" />
           Novo Atendimento

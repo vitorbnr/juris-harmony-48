@@ -837,13 +837,7 @@ export const AgendaNotasView = () => {
 
   return (
     <div className="flex min-h-full flex-col gap-6 p-6 md:h-full md:min-h-0 md:overflow-hidden md:p-8">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 className="text-lg font-semibold text-foreground">Agenda & Notas</h3>
-          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Painel dividido para acompanhar tarefas, prazos, eventos e audiências do período sem interromper o fluxo de trabalho.
-          </p>
-        </div>
+      <div className="flex items-center justify-end gap-3">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="gap-2">

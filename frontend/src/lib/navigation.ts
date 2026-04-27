@@ -59,8 +59,8 @@ export const appSections: AppSectionConfig[] = [
   {
     id: "agenda-notas",
     label: "Agenda e Notas",
-    title: "Agenda e Notas",
-    subtitle: "Calendário operacional e bloco de notas pessoal com gravação automática.",
+    title: "Agenda & Notas",
+    subtitle: "Painel dividido para acompanhar tarefas, prazos, eventos e audiências do período sem interromper o fluxo de trabalho.",
     icon: NotebookPen,
   },
   {
@@ -74,21 +74,21 @@ export const appSections: AppSectionConfig[] = [
     id: "atendimentos",
     label: "Atendimentos",
     title: "Atendimentos",
-    subtitle: "Triagem comercial com vinculo opcional a processo apenas como contexto do atendimento.",
+    subtitle: "Triagem inicial com visao de abertos e fechados, e vinculo opcional a processo apenas como contexto.",
     icon: ClipboardList,
   },
   {
     id: "processos",
     label: "Processos e Casos",
     title: "Processos e Casos",
-    subtitle: "Gerencie os processos e casos do escritório.",
+    subtitle: "Entre no modulo ja com leitura executiva do processo e, agora, com uma visao dedicada para os casos do escritorio.",
     icon: Scale,
   },
   {
     id: "publicacoes",
     label: "Publicações",
     title: "Publicações",
-    subtitle: "Central dedicada ao acompanhamento de publicações jurídicas.",
+    subtitle: "Mesa de triagem pensada para advogados acostumados ao Astrea, com menos cliques, leitura confortavel e base pronta para IA explicavel.",
     icon: Newspaper,
   },
   {
