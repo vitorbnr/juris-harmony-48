@@ -3,10 +3,26 @@ import { ArrowRight, Clock3, Scale } from "lucide-react";
 import type { DashboardMovimentacaoRecente } from "@/types";
 
 const tipoLabel = (tipo?: string | null) => {
-  if (!tipo) return "Movimentacao";
+  if (!tipo) return "Movimentação";
 
-  return tipo
-    .toLowerCase()
+  const labels: Record<string, string> = {
+    peticao: "Petição",
+    publicacao: "Publicação",
+    audiencia: "Audiência",
+    intimacao: "Intimação",
+    sentenca: "Sentença",
+    procuracao: "Procuração",
+    distribuicao: "Distribuição",
+    certidao: "Certidão",
+    pericia: "Perícia",
+    diligencia: "Diligência",
+    movimentacao: "Movimentação",
+  };
+
+  const tipoLower = tipo.toLowerCase();
+  if (labels[tipoLower]) return labels[tipoLower];
+
+  return tipoLower
     .split("_")
     .map((item) => item.charAt(0).toUpperCase() + item.slice(1))
     .join(" ");
@@ -27,7 +43,7 @@ const formatarDataMovimentacao = (data?: string | null, dataHora?: string | null
     return new Date(`${data}T00:00:00`).toLocaleDateString("pt-BR");
   }
 
-  return "Data indisponivel";
+  return "Data indisponível";
 };
 
 interface Props {
@@ -62,7 +78,7 @@ export const RecentProcesses = ({ onNavigate, movimentacoes = [], loading = fals
     ) : movimentacoes.length === 0 ? (
       <div className="flex flex-col items-center justify-center gap-2 py-10 text-muted-foreground">
         <Scale className="h-8 w-8 opacity-30" />
-        <p className="text-sm">Nenhuma movimentacao recente encontrada</p>
+        <p className="text-sm">Nenhuma movimentação recente encontrada</p>
       </div>
     ) : (
       <div className="space-y-3">
@@ -79,7 +95,7 @@ export const RecentProcesses = ({ onNavigate, movimentacoes = [], loading = fals
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="truncate text-sm font-semibold text-foreground">
-                    {movimentacao.processoNumero ?? "Processo sem numero"}
+                    {movimentacao.processoNumero ?? "Processo sem número"}
                   </p>
                   <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
                     {tipoLabel(movimentacao.tipo)}
@@ -87,7 +103,7 @@ export const RecentProcesses = ({ onNavigate, movimentacoes = [], loading = fals
                 </div>
 
                 <p className="truncate text-xs text-muted-foreground">
-                  {movimentacao.clienteNome ?? "Cliente nao identificado"}
+                  {movimentacao.clienteNome ?? "Cliente não identificado"}
                 </p>
 
                 <p className="mt-2 line-clamp-2 text-sm text-foreground/90">
