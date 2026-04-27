@@ -22,4 +22,11 @@ public class PublicacaoResponse {
     private String dataAtualizacao;
     private String iaAcaoSugerida;
     private Integer iaPrazoSugeridoDias;
+    private String resumoOperacional;
+    private Boolean riscoPrazo;
+    private Integer scorePrioridade;
+    private String justificativaPrioridade;
+    private Integer iaConfianca;
+    private String iaTrechosRelevantes;
+    private String ladoProcessualEstimado;
 }

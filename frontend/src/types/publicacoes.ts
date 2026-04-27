@@ -1,4 +1,5 @@
 export type StatusTratamentoPublicacao = "PENDENTE" | "TRATADA" | "DESCARTADA";
+export type LadoProcessualPublicacao = "PARTE_AUTORA" | "PARTE_RE" | "TERCEIRO" | "INDEFINIDO";
 
 export interface Publicacao {
   id: string;
@@ -13,4 +14,20 @@ export interface Publicacao {
   dataAtualizacao?: string | null;
   iaAcaoSugerida?: string | null;
   iaPrazoSugeridoDias?: number | null;
+  resumoOperacional?: string | null;
+  riscoPrazo?: boolean | null;
+  scorePrioridade?: number | null;
+  justificativaPrioridade?: string | null;
+  iaConfianca?: number | null;
+  iaTrechosRelevantes?: string | null;
+  ladoProcessualEstimado?: LadoProcessualPublicacao | null;
+}
+
+export interface PublicacaoMetricas {
+  naoTratadasHoje: number;
+  tratadasHoje: number;
+  descartadasHoje: number;
+  naoTratadas: number;
+  prazoSuspeito: number;
+  semVinculo: number;
 }

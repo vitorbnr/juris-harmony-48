@@ -1,5 +1,6 @@
 package com.viana.model;
 
+import com.viana.model.enums.LadoProcessualPublicacao;
 import com.viana.model.enums.StatusTratamento;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -69,6 +70,30 @@ public class Publicacao {
 
     @Column(name = "ia_prazo_sugerido_dias")
     private Integer iaPrazoSugeridoDias;
+
+    @Column(name = "resumo_operacional", columnDefinition = "TEXT")
+    private String resumoOperacional;
+
+    @Column(name = "risco_prazo", nullable = false)
+    @Builder.Default
+    private boolean riscoPrazo = false;
+
+    @Column(name = "score_prioridade", nullable = false)
+    @Builder.Default
+    private Integer scorePrioridade = 0;
+
+    @Column(name = "justificativa_prioridade", length = 255)
+    private String justificativaPrioridade;
+
+    @Column(name = "ia_confianca")
+    private Integer iaConfianca;
+
+    @Column(name = "ia_trechos_relevantes", columnDefinition = "TEXT")
+    private String iaTrechosRelevantes;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "lado_processual_estimado", length = 30)
+    private LadoProcessualPublicacao ladoProcessualEstimado;
 
     @PrePersist
     protected void onCreate() {

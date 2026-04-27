@@ -1,5 +1,5 @@
 import api from "@/lib/api";
-import type { Publicacao } from "@/types/publicacoes";
+import type { Publicacao, PublicacaoMetricas } from "@/types/publicacoes";
 import type {
   Atendimento,
   Caso,
@@ -576,11 +576,17 @@ export const eventosJuridicosApi = {
 };
 
 export const publicacoesApi = {
-  listar: (params?: { status?: string }) =>
+  listar: (params?: { status?: string; busca?: string; somenteRiscoPrazo?: boolean }) =>
     api.get("/publicacoes", { params: cleanParams(params) }).then(r => r.data as Publicacao[]),
+
+  metricas: () =>
+    api.get("/publicacoes/stats").then(r => r.data as PublicacaoMetricas),
 
   atualizarStatus: (id: string, status: string) =>
     api.put(`/publicacoes/${id}/status`, { status }).then(r => r.data as Publicacao),
+
+  vincularProcesso: (id: string, processoId: string) =>
+    api.put(`/publicacoes/${id}/vincular-processo`, { processoId }).then(r => r.data as Publicacao),
 };
 
 export const integracoesApi = {

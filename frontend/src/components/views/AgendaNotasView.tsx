@@ -362,165 +362,12 @@ function AgendaPrazoCard({
   );
 }
 
-function AgendaPrazoCompactCard({
-  prazo,
-  userId,
-  userRole,
-  onPrazoAtualizado,
-  onRefresh,
-  onSelect,
-}: AgendaPrazoCardProps) {
-  const [loading, setLoading] = useState(false);
-  const [editando, setEditando] = useState(false);
-  const atrasado = !prazo.concluido && prazo.data < new Date().toISOString().slice(0, 10);
-  const etapaAtual = normalizeEtapa(prazo);
-  const canEdit = canEditPrazo(prazo, userId, userRole);
-  const canOperate = canOperatePrazo(prazo, userId, userRole);
-
-  const mover = async (etapa: EtapaPrazo) => {
-    setLoading(true);
-    try {
-      const prazoAtualizado = await prazosApi.atualizarEtapaKanban(prazo.id, etapa.toUpperCase());
-      onPrazoAtualizado(prazoAtualizado);
-      toast.success(`Atividade movida para ${etapaLabel[etapa]}.`);
-    } catch {
-      toast.error("Nao foi possivel atualizar o andamento desta atividade.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const acaoPrimaria =
-    etapaAtual === "a_fazer"
-      ? { label: "Iniciar", etapa: "em_andamento" as EtapaPrazo, icon: MoveRight }
-      : etapaAtual === "em_andamento"
-        ? { label: "Concluir", etapa: "concluido" as EtapaPrazo, icon: CheckCircle2 }
-        : { label: "Reabrir", etapa: "em_andamento" as EtapaPrazo, icon: MoveLeft };
-  const AcaoPrimariaIcon = acaoPrimaria.icon;
-  const detalhesCompactos = [prazo.advogadoNome, prazo.processoNumero, prazo.local].filter(Boolean).slice(0, 2);
-
+function AgendaPrazoPreviewCard({ prazo }: { prazo: Prazo }) {
   return (
-    <>
-      <article
-        onClick={onSelect}
-        className={cn(
-          "cursor-pointer rounded-xl border px-3 py-2.5 transition-colors",
-          atrasado ? "border-red-500/30 bg-red-500/5" : "border-border bg-card/80 hover:bg-card",
-        )}
-      >
-        <div className="flex items-start gap-2">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-start gap-2">
-              <p className="line-clamp-2 flex-1 text-sm font-medium leading-5 text-foreground">{prazo.titulo}</p>
-              <span
-                className={cn(
-                  "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium",
-                  atrasado
-                    ? "border-red-500/30 bg-red-500/10 text-red-300"
-                    : "border-border bg-muted/40 text-muted-foreground",
-                )}
-              >
-                {getPrazoTimeLabel(prazo)}
-              </span>
-            </div>
-
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-medium", getTipoClass(prazo.tipo))}>
-                {getTipoLabel(prazo.tipo)}
-              </span>
-              <span className="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                {etapaLabel[etapaAtual]}
-              </span>
-              {!canEdit && canOperate && (
-                <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                  Participante
-                </span>
-              )}
-            </div>
-
-            {detalhesCompactos.length > 0 && (
-              <div className="mt-2 space-y-1 text-[11px] text-muted-foreground">
-                {detalhesCompactos.map((detalhe) => (
-                  <p key={detalhe} className={cn("truncate", detalhe === prazo.processoNumero && "font-mono")}>
-                    {detalhe}
-                  </p>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {(canOperate || canEdit) && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 shrink-0 rounded-full"
-                  disabled={loading}
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  <span className="sr-only">Mais acoes</span>
-                  <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44">
-                {canOperate &&
-                  (["a_fazer", "em_andamento", "concluido"] as EtapaPrazo[]).map((etapa) => (
-                    <DropdownMenuItem
-                      key={etapa}
-                      disabled={loading || etapa === etapaAtual}
-                      onSelect={() => {
-                        void mover(etapa);
-                      }}
-                    >
-                      Mover para {etapaLabel[etapa]}
-                    </DropdownMenuItem>
-                  ))}
-                {canEdit && (
-                  <DropdownMenuItem
-                    disabled={loading}
-                    onSelect={() => {
-                      setEditando(true);
-                    }}
-                  >
-                    Editar atividade
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </div>
-
-        {canOperate && (
-          <div className="mt-3 border-t border-border/50 pt-3">
-            <Button
-              size="sm"
-              variant={etapaAtual === "concluido" ? "ghost" : "outline"}
-              className="h-8 w-full gap-1.5 rounded-lg text-xs"
-              onClick={(event) => {
-                event.stopPropagation();
-                void mover(acaoPrimaria.etapa);
-              }}
-              disabled={loading}
-            >
-              {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <AcaoPrimariaIcon className="h-3.5 w-3.5" />}
-              {acaoPrimaria.label}
-            </Button>
-          </div>
-        )}
-      </article>
-
-      {editando && canEdit && (
-        <EditarPrazoModal
-          prazo={prazo}
-          onClose={() => setEditando(false)}
-          onSaved={() => {
-            setEditando(false);
-            onRefresh();
-          }}
-        />
-      )}
-    </>
+    <div className={cn("rounded-lg border px-2 py-1.5 text-[10px] md:text-[11px]", getTipoClass(prazo.tipo))}>
+      <div className="line-clamp-2 font-medium leading-4">{prazo.titulo}</div>
+      <div className="mt-1 opacity-80">{getPrazoTimeLabel(prazo)}</div>
+    </div>
   );
 }
 
@@ -647,14 +494,24 @@ export const AgendaNotasView = () => {
     [filtroAtribuicao, filtroTipo, prazos, user?.id],
   );
 
-  const prazosDoDiaSelecionado = sortPrazosByDate(
-    prazosFiltrados.filter((prazo) => dataSelecionada && isSameDay(parseISO(prazo.data), dataSelecionada)),
-  );
   const diasDoMes = useMemo(() => buildMonthDays(referencia), [referencia]);
-
   const diasDaSemana = modo === "semanal"
     ? Array.from({ length: 7 }, (_, index) => addDays(range.inicio, index))
     : [];
+  const dataSelecionadaAtiva = useMemo(() => {
+    if (!dataSelecionada) {
+      return modo === "semanal" ? diasDaSemana[0] : undefined;
+    }
+
+    if (modo === "semanal" && diasDaSemana.length > 0 && !diasDaSemana.some((dia) => isSameDay(dia, dataSelecionada))) {
+      return diasDaSemana[0];
+    }
+
+    return dataSelecionada;
+  }, [dataSelecionada, diasDaSemana, modo]);
+  const prazosDoDiaSelecionado = sortPrazosByDate(
+    prazosFiltrados.filter((prazo) => dataSelecionadaAtiva && isSameDay(parseISO(prazo.data), dataSelecionadaAtiva)),
+  );
 
   const moverPeriodo = (direction: "prev" | "next") => {
     if (modo === "semanal") {
@@ -772,7 +629,7 @@ export const AgendaNotasView = () => {
                         isSameMonth(dia, referencia)
                           ? "border-border bg-background/70 hover:border-primary/40"
                           : "border-border/60 bg-background/30 text-muted-foreground",
-                        dataSelecionada && isSameDay(dia, dataSelecionada) && "ring-2 ring-primary/30",
+                        dataSelecionadaAtiva && isSameDay(dia, dataSelecionadaAtiva) && "ring-2 ring-primary/30",
                       )}
                     >
                       <div className="flex items-center justify-between gap-2">
@@ -817,7 +674,7 @@ export const AgendaNotasView = () => {
               <div className="mb-3">
                 <h4 className="text-sm font-semibold text-foreground">
                   {dataSelecionada
-                    ? format(dataSelecionada, "EEEE, dd 'de' MMMM", { locale: ptBR })
+                    ? format(dataSelecionadaAtiva ?? dataSelecionada, "EEEE, dd 'de' MMMM", { locale: ptBR })
                     : "Selecione um dia"}
                 </h4>
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -847,59 +704,102 @@ export const AgendaNotasView = () => {
             </div>
           </div>
         ) : (
-          <div className="scroll-subtle -mx-1 overflow-x-auto px-1 pb-1">
-            <div className="grid min-w-full grid-flow-col auto-cols-[minmax(220px,1fr)] gap-3 2xl:auto-cols-fr">
-              {diasDaSemana.map((dia) => {
-                const prazosDoDia = sortPrazosByDate(
-                  prazosFiltrados.filter((prazo) => isSameDay(parseISO(prazo.data), dia)),
-                );
-
-                return (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-border bg-card/60 p-3 md:p-4">
+              <div className="mb-2 grid grid-cols-7 gap-2 md:mb-3 md:gap-3">
+                {diasDaSemana.map((dia) => (
                   <div
-                    key={dia.toISOString()}
-                    className={cn(
-                      "flex min-h-[340px] flex-col rounded-2xl border border-border bg-card/50 p-3",
-                      dataSelecionada && isSameDay(dia, dataSelecionada) && "ring-2 ring-primary/30",
-                    )}
+                    key={`header-${dia.toISOString()}`}
+                    className="px-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground md:px-2 md:text-[11px]"
                   >
+                    {format(dia, "EEE", { locale: ptBR }).replace(".", "")}
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-7 gap-2 md:gap-3">
+                {diasDaSemana.map((dia) => {
+                  const prazosDoDia = sortPrazosByDate(
+                    prazosFiltrados.filter((prazo) => isSameDay(parseISO(prazo.data), dia)),
+                  );
+
+                  return (
                     <button
+                      key={dia.toISOString()}
                       type="button"
                       onClick={() => setDataSelecionada(dia)}
-                      className="mb-3 w-full rounded-xl bg-background/70 px-3 py-2.5 text-left transition-colors hover:bg-background"
+                      className={cn(
+                        "min-h-[160px] rounded-xl border px-2 py-2 text-left transition-all md:min-h-[176px] md:rounded-2xl md:px-2.5 md:py-3",
+                        "border-border bg-background/70 hover:border-primary/40",
+                        dataSelecionadaAtiva && isSameDay(dia, dataSelecionadaAtiva) && "ring-2 ring-primary/30",
+                      )}
                     >
-                      <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                        {format(dia, "EEE", { locale: ptBR }).replace(".", "")}
-                      </p>
-                      <div className="mt-1 flex items-end justify-between gap-2">
-                        <p className="text-xl font-semibold text-foreground">{format(dia, "dd")}</p>
-                        <Badge variant="outline" className="rounded-full px-2 py-0 text-[10px]">
-                          {prazosDoDia.length} atividade(s)
-                        </Badge>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-base font-semibold text-foreground md:text-lg">
+                          {format(dia, "dd")}
+                        </span>
+                        {prazosDoDia.length > 0 && (
+                          <Badge variant="outline" className="rounded-full px-2 py-0 text-[10px]">
+                            {prazosDoDia.length}
+                          </Badge>
+                        )}
+                      </div>
+
+                      <div className="mt-2 space-y-1.5">
+                        {prazosDoDia.length === 0 ? (
+                          <div className="rounded-lg border border-dashed border-border px-2 py-3 text-[10px] text-muted-foreground md:text-[11px]">
+                            Sem atividades.
+                          </div>
+                        ) : (
+                          <>
+                            {prazosDoDia.slice(0, 1).map((prazo) => (
+                              <AgendaPrazoPreviewCard key={prazo.id} prazo={prazo} />
+                            ))}
+                            {prazosDoDia.length > 1 && (
+                              <div className="rounded-lg border border-dashed border-border px-2 py-1.5 text-[10px] text-muted-foreground md:text-[11px]">
+                                +{prazosDoDia.length - 1} atividade(s)
+                              </div>
+                            )}
+                          </>
+                        )}
                       </div>
                     </button>
+                  );
+                })}
+              </div>
+            </div>
 
-                    <div className="space-y-2.5">
-                      {prazosDoDia.length === 0 ? (
-                        <div className="rounded-xl border border-dashed border-border px-3 py-5 text-xs text-muted-foreground">
-                          Sem atividades.
-                        </div>
-                      ) : (
-                        prazosDoDia.map((prazo) => (
-                          <AgendaPrazoCompactCard
-                            key={prazo.id}
-                            prazo={prazo}
-                            userId={user?.id}
-                            userRole={user?.papel}
-                            onPrazoAtualizado={atualizarPrazoLocal}
-                            onRefresh={carregarAgenda}
-                            onSelect={() => setPrazoSelecionadoId(prazo.id)}
-                          />
-                        ))
-                      )}
-                    </div>
+            <div className="scroll-subtle rounded-2xl border border-border bg-card/50 p-4 max-h-[320px] overflow-y-auto">
+              <div className="mb-3">
+                <h4 className="text-sm font-semibold text-foreground">
+                  {dataSelecionadaAtiva
+                    ? format(dataSelecionadaAtiva, "EEEE, dd 'de' MMMM", { locale: ptBR })
+                    : "Selecione um dia"}
+                </h4>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {prazosDoDiaSelecionado.length} atividade(s) para a data selecionada.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                {prazosDoDiaSelecionado.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">
+                    Nenhuma atividade para este dia.
                   </div>
-                );
-              })}
+                ) : (
+                  prazosDoDiaSelecionado.map((prazo) => (
+                    <AgendaPrazoCard
+                      key={prazo.id}
+                      prazo={prazo}
+                      userId={user?.id}
+                      userRole={user?.papel}
+                      onPrazoAtualizado={atualizarPrazoLocal}
+                      onRefresh={carregarAgenda}
+                      onSelect={() => setPrazoSelecionadoId(prazo.id)}
+                    />
+                  ))
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -980,11 +880,11 @@ export const AgendaNotasView = () => {
       ) : (
         <div className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-border bg-card shadow-[0_30px_80px_-45px_rgba(0,0,0,0.65)]">
           <ResizablePanelGroup direction="horizontal">
-            <ResizablePanel defaultSize={68} minSize={50}>
+            <ResizablePanel defaultSize={modo === "semanal" ? 74 : 68} minSize={modo === "semanal" ? 58 : 50}>
               {agendaContent}
             </ResizablePanel>
             <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={32} minSize={24}>
+            <ResizablePanel defaultSize={modo === "semanal" ? 26 : 32} minSize={22}>
               {notesContent}
             </ResizablePanel>
           </ResizablePanelGroup>
@@ -994,7 +894,7 @@ export const AgendaNotasView = () => {
       <AtividadeModal
         open={modalAberto}
         initialTipo={tipoInicialModal}
-        dataInicial={dataSelecionada ? format(dataSelecionada, "yyyy-MM-dd") : undefined}
+        dataInicial={dataSelecionadaAtiva ? format(dataSelecionadaAtiva, "yyyy-MM-dd") : undefined}
         onClose={() => setModalAberto(false)}
         onSaved={() => {
           carregarAgenda();

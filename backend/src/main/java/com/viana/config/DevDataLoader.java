@@ -2,6 +2,7 @@ package com.viana.config;
 
 import com.viana.model.Processo;
 import com.viana.model.Publicacao;
+import com.viana.model.enums.LadoProcessualPublicacao;
 import com.viana.model.Usuario;
 import com.viana.model.enums.StatusTratamento;
 import com.viana.repository.ProcessoRepository;
@@ -75,6 +76,13 @@ public class DevDataLoader implements ApplicationRunner {
                         .processo(processoVinculado)
                         .iaAcaoSugerida("CRIAR_PRAZO")
                         .iaPrazoSugeridoDias(5)
+                        .resumoOperacional("Manifestacao sobre laudo pericial com indicio de prazo curto e necessidade de revisao tecnica.")
+                        .riscoPrazo(true)
+                        .scorePrioridade(94)
+                        .justificativaPrioridade("Prazo sugerido pela IA e processo ja vinculado.")
+                        .iaConfianca(88)
+                        .iaTrechosRelevantes("Fica a parte autora intimada para se manifestar sobre o laudo pericial no prazo legal.")
+                        .ladoProcessualEstimado(LadoProcessualPublicacao.PARTE_AUTORA)
                         .build(),
                 Publicacao.builder()
                         .npu("0009876-12.2026.5.05.0010")
@@ -82,6 +90,14 @@ public class DevDataLoader implements ApplicationRunner {
                         .teor("Publica-se despacho determinando a apresentacao de calculos atualizados pela reclamada.\n\nO cartorio registra a disponibilizacao para triagem manual pela equipa.")
                         .dataPublicacao(agora.minusDays(1).plusHours(3))
                         .statusTratamento(StatusTratamento.PENDENTE)
+                        .resumoOperacional("Despacho com exigencia de calculos atualizados e ausencia de vinculacao automatica.")
+                        .riscoPrazo(true)
+                        .scorePrioridade(81)
+                        .justificativaPrioridade("Publicacao sem processo vinculado e com potencial de gerar providencia.")
+                        .iaAcaoSugerida("VINCULAR_PROCESSO")
+                        .iaConfianca(73)
+                        .iaTrechosRelevantes("determinando a apresentacao de calculos atualizados pela reclamada")
+                        .ladoProcessualEstimado(LadoProcessualPublicacao.PARTE_RE)
                         .build(),
                 Publicacao.builder()
                         .npu(null)
@@ -90,6 +106,13 @@ public class DevDataLoader implements ApplicationRunner {
                         .dataPublicacao(agora.minusDays(2))
                         .statusTratamento(StatusTratamento.TRATADA)
                         .iaAcaoSugerida("APENAS_ARQUIVAR")
+                        .resumoOperacional("Expediente interno sem impacto processual identificado.")
+                        .riscoPrazo(false)
+                        .scorePrioridade(18)
+                        .justificativaPrioridade("Sem indicio de prazo ou necessidade de acao.")
+                        .iaConfianca(91)
+                        .iaTrechosRelevantes("expediente interno sem vinculacao automatica de processo")
+                        .ladoProcessualEstimado(LadoProcessualPublicacao.INDEFINIDO)
                         .build()
         );
 
