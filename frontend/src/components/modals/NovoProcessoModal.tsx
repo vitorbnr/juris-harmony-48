@@ -600,7 +600,7 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
               name="descricao"
               render={({ field }) => (
                 <FormItem className="space-y-1.5">
-                  <FormLabel>Descricao</FormLabel>
+                  <FormLabel>Descrição</FormLabel>
                   <FormControl>
                     <textarea
                       className="w-full px-3 py-2 rounded-md bg-secondary text-foreground text-sm resize-none border-none outline-none"

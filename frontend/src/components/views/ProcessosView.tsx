@@ -111,7 +111,7 @@ function normalizeDigits(value?: string | null) {
 }
 
 function maskNpu(value?: string | null) {
-  if (!value) return "NPU nao informado";
+  if (!value) return "NPU não informado";
 
   const digits = normalizeDigits(value);
   if (digits.length === 20) {
@@ -170,7 +170,7 @@ function formatTipoProcesso(tipo?: string | null) {
     case "ADMINISTRATIVO":
       return "Procedimento Administrativo";
     default:
-      return tipo || "Tipo nao informado";
+      return tipo || "Tipo não informado";
   }
 }
 
@@ -418,7 +418,7 @@ export const ProcessosView = () => {
       carregarProcessos();
     } catch (error) {
       console.error("Erro ao sincronizar Datajud em lote:", error);
-      toast.error("Nao foi possivel sincronizar as movimentacoes do Datajud agora.");
+      toast.error("Não foi possível sincronizar as movimentações do Datajud agora.");
     } finally {
       setSyncingDatajud(false);
     }
@@ -611,7 +611,7 @@ export const ProcessosView = () => {
           ) : (
             <>
               <div className="hidden grid-cols-[minmax(0,2.4fr)_minmax(0,1.2fr)_minmax(0,1.5fr)_160px] gap-5 border-b border-border bg-muted/60 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground md:grid">
-                <span>Titulo</span>
+                <span>Título</span>
                 <span>Cliente / Pasta</span>
                 <span>Acao / Foro</span>
                 <span className="text-right">Ult. mov.</span>
@@ -624,7 +624,7 @@ export const ProcessosView = () => {
                     { className: "bg-muted text-foreground border-border", icon: AlertCircle, label: processo.status };
                   const titulo = buildProcessoTitulo(processo);
                   const foro =
-                    [processo.vara, processo.tribunal].filter(Boolean).join(" / ") || processo.unidadeNome || "Foro nao informado";
+                    [processo.vara, processo.tribunal].filter(Boolean).join(" / ") || processo.unidadeNome || "Foro não informado";
 
                   return (
                     <button
@@ -661,7 +661,7 @@ export const ProcessosView = () => {
 
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium text-foreground">{processo.clienteNome}</p>
-                          <p className="mt-1 text-xs text-muted-foreground">{processo.unidadeNome || "Pasta nao informada"}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">{processo.unidadeNome || "Pasta não informada"}</p>
                           <p className="mt-3 truncate text-xs text-muted-foreground">{buildAdvogadoResumo(processo)}</p>
                         </div>
 

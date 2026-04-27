@@ -154,7 +154,7 @@ function normalizeText(value?: string | null) {
 }
 
 function maskNpu(value?: string | null) {
-  if (!value) return "NPU nao informado";
+  if (!value) return "NPU não informado";
 
   const digits = normalizeDigits(value);
   if (digits.length === 20) {
@@ -165,7 +165,7 @@ function maskNpu(value?: string | null) {
 }
 
 function formatDate(value?: string | null) {
-  if (!value) return "Nao informado";
+  if (!value) return "Não informado";
 
   const parsed = new Date(value.length <= 10 ? `${value}T00:00:00` : value);
   if (Number.isNaN(parsed.getTime())) return value;
@@ -178,7 +178,7 @@ function formatDate(value?: string | null) {
 }
 
 function formatDateTime(value?: string | null) {
-  if (!value) return "Nao informado";
+  if (!value) return "Não informado";
 
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
@@ -193,7 +193,7 @@ function formatDateTime(value?: string | null) {
 }
 
 function formatCurrency(value?: number | string | null) {
-  if (value === null || value === undefined || value === "") return "Valor nao informado";
+  if (value === null || value === undefined || value === "") return "Valor não informado";
 
   const parsed = typeof value === "number" ? value : Number.parseFloat(String(value));
   if (!Number.isFinite(parsed)) return String(value);
@@ -205,7 +205,7 @@ function formatCurrency(value?: number | string | null) {
 }
 
 function formatRelativeUpdate(value?: string | null) {
-  if (!value) return "Sem movimentacoes registadas";
+  if (!value) return "Sem movimentações registradas";
 
   const parsed = new Date(value.length <= 10 ? `${value}T00:00:00` : value);
   if (Number.isNaN(parsed.getTime())) return formatDateTime(value);
@@ -255,7 +255,7 @@ function formatPolo(polo?: string | null) {
     case "TERCEIRO":
       return "Terceiro";
     default:
-      return polo || "Nao informado";
+      return polo || "Não informado";
   }
 }
 
@@ -266,9 +266,9 @@ function formatTipoParte(tipo?: string | null) {
     case "PESSOA_JURIDICA":
       return "Pessoa juridica";
     case "NAO_IDENTIFICADO":
-      return "Nao identificado";
+      return "Não identificado";
     default:
-      return tipo || "Nao informado";
+      return tipo || "Não informado";
   }
 }
 
@@ -286,7 +286,7 @@ function formatKanbanStatus(status?: string | null) {
 }
 
 function formatStatusOriginal(status?: StatusProcesso | null) {
-  if (!status) return "Nao informado";
+  if (!status) return "Não informado";
   return STATUS_ORIGINAL_LABEL[status] ?? status;
 }
 
@@ -309,7 +309,7 @@ function formatTipoProcesso(tipo?: string | null) {
     case "ADMINISTRATIVO":
       return "Procedimento Administrativo";
     default:
-      return tipo || "Tipo nao informado";
+      return tipo || "Tipo não informado";
   }
 }
 
@@ -621,7 +621,7 @@ export function ProcessoDossieModal({
       setErroDocumentos("");
     } else {
       setDocumentos([]);
-      setErroDocumentos("Nao foi possivel carregar os documentos do processo.");
+      setErroDocumentos("Não foi possível carregar os documentos do processo.");
     }
 
     setLoadingDocumentos(false);
@@ -637,7 +637,7 @@ export function ProcessoDossieModal({
     try {
       await carregarDetalhe(processoId);
     } catch {
-      setErroCarregamento("Nao foi possivel carregar o dossie deste processo.");
+      setErroCarregamento("Não foi possível carregar o dossiê deste processo.");
     } finally {
       setLoading(false);
     }
@@ -665,7 +665,7 @@ export function ProcessoDossieModal({
     carregarDetalhe(processoId)
       .catch(() => {
         if (!active) return;
-        setErroCarregamento("Nao foi possivel carregar o dossie deste processo.");
+        setErroCarregamento("Não foi possível carregar o dossiê deste processo.");
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -692,9 +692,9 @@ export function ProcessoDossieModal({
   const advogadosResumo =
     detalhe?.advogados && detalhe.advogados.length > 0
       ? detalhe.advogados.map((advogado) => advogado.nome).join(", ")
-      : detalhe?.advogadoNome || "Nao informado";
+      : detalhe?.advogadoNome || "Não informado";
   const foroResumo =
-    detalhe?.foro || [detalhe?.vara, detalhe?.tribunal].filter(Boolean).join(" / ") || detalhe?.unidadeNome || "Foro nao informado";
+    detalhe?.foro || [detalhe?.vara, detalhe?.tribunal].filter(Boolean).join(" / ") || detalhe?.unidadeNome || "Foro não informado";
   const tipoAcaoResumo = detalhe?.tipoAcao || formatTipoProcesso(detalhe?.tipo);
   const previewKind = documentoPreview ? getDocumentoPreviewKind(documentoPreview.tipo) : "unsupported";
 
@@ -757,7 +757,7 @@ export function ProcessoDossieModal({
         setDocumentoPreviewText(preview.text);
       } catch (error) {
         console.error("Erro ao preparar preview do documento:", error);
-        setDocumentoPreviewErro("Nao foi possivel preparar a visualizacao deste arquivo.");
+        setDocumentoPreviewErro("Não foi possível preparar a visualização deste arquivo.");
       } finally {
         setDocumentoPreviewLoading(false);
       }
@@ -814,7 +814,7 @@ export function ProcessoDossieModal({
       document.body.removeChild(anchor);
     } catch (error) {
       console.error("Erro ao baixar documento:", error);
-      toast.error("Nao foi possivel baixar o documento.");
+      toast.error("Não foi possível baixar o documento.");
     }
   }, []);
 
@@ -849,7 +849,7 @@ export function ProcessoDossieModal({
       });
       toast.success("Andamento registado com sucesso.");
     } catch {
-      toast.error("Nao foi possivel registar o andamento manual.");
+      toast.error("Não foi possível registrar o andamento manual.");
     } finally {
       setRegistrandoAndamento(false);
     }
@@ -870,7 +870,7 @@ export function ProcessoDossieModal({
         <SheetContent side="right" className="w-full border-l border-border bg-background p-0 sm:max-w-[1280px]">
           <SheetHeader className="sr-only">
             <SheetTitle>Dossie do processo</SheetTitle>
-            <SheetDescription>Visao consolidada do processo com resumo, partes, historico, prazos e documentos.</SheetDescription>
+            <SheetDescription>Visão consolidada do processo com resumo, partes, histórico, prazos e documentos.</SheetDescription>
           </SheetHeader>
 
           {loading ? (
@@ -902,13 +902,13 @@ export function ProcessoDossieModal({
                       <span className="font-mono text-2xl font-bold tracking-tight text-foreground">{maskNpu(detalhe.npu)}</span>
                     </div>
 
-                    <p className="mt-3 text-lg text-foreground">{detalhe.titulo || "Titulo nao informado"}</p>
+                    <p className="mt-3 text-lg text-foreground">{detalhe.titulo || "Título não informado"}</p>
 
                     <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                       <InfoMetric
                         icon={Scale}
                         label="Acao / Foro"
-                        value={[tipoAcaoResumo || "Acao nao informada", foroResumo || "Foro nao informado"].filter(Boolean).join(" / ")}
+                        value={[tipoAcaoResumo || "Ação não informada", foroResumo || "Foro não informado"].filter(Boolean).join(" / ")}
                       />
                       <InfoMetric
                         icon={Clock3}
@@ -990,14 +990,14 @@ export function ProcessoDossieModal({
                               </div>
                             </CardHeader>
                             <CardContent className="grid gap-5 sm:grid-cols-2">
-                              <SummaryField label="Acao" value={tipoAcaoResumo || "Nao informada"} />
+                              <SummaryField label="Acao" value={tipoAcaoResumo || "Não informada"} />
                               <SummaryField label="Numero / NPU" value={maskNpu(detalhe.npu || detalhe.numero)} />
                               <SummaryField label="Foro / Juizo" value={foroResumo} />
                               <SummaryField label="Valor da causa" value={formatCurrency(detalhe.valorCausa)} />
                               <SummaryField label="Caso" value={detalhe.casoTitulo || "Sem caso vinculado"} />
                               <SummaryField
                                 label="Distribuido em"
-                                value={detalhe.dataDistribuicao ? formatDate(detalhe.dataDistribuicao) : "Nao informado"}
+                                value={detalhe.dataDistribuicao ? formatDate(detalhe.dataDistribuicao) : "Não informado"}
                               />
                               <SummaryField
                                 label="Ultima movimentacao"
@@ -1007,7 +1007,7 @@ export function ProcessoDossieModal({
                                     : "Sem movimentacao registada"
                                 }
                               />
-                              <SummaryField label="Unidade" value={detalhe.unidadeNome || "Nao informada"} />
+                              <SummaryField label="Unidade" value={detalhe.unidadeNome || "Não informada"} />
                               <SummaryField label="Advogados" value={advogadosResumo} />
                             </CardContent>
                           </Card>
@@ -1053,7 +1053,7 @@ export function ProcessoDossieModal({
                                           ) : (
                                             <p className="text-sm font-medium text-foreground">{parte.nome}</p>
                                           )}
-                                          <p className="mt-1 text-xs text-muted-foreground">{parte.documento || "Documento nao informado"}</p>
+                                          <p className="mt-1 text-xs text-muted-foreground">{parte.documento || "Documento não informado"}</p>
                                         </div>
                                       );
                                     })}
@@ -1089,7 +1089,7 @@ export function ProcessoDossieModal({
                                           ) : (
                                             <p className="text-sm font-medium text-foreground">{parte.nome}</p>
                                           )}
-                                          <p className="mt-1 text-xs text-muted-foreground">{parte.documento || "Documento nao informado"}</p>
+                                          <p className="mt-1 text-xs text-muted-foreground">{parte.documento || "Documento não informado"}</p>
                                         </div>
                                       );
                                     })}
@@ -1107,7 +1107,7 @@ export function ProcessoDossieModal({
                                 </div>
                                 <div>
                                   <CardTitle className="text-lg">Ultimos Historicos</CardTitle>
-                                  <CardDescription>Movimentacoes recentes para leitura imediata logo na entrada do dossie.</CardDescription>
+                                  <CardDescription>Movimentações recentes para leitura imediata logo na entrada do dossiê.</CardDescription>
                                 </div>
                               </div>
                             </CardHeader>
@@ -1286,9 +1286,9 @@ export function ProcessoDossieModal({
                       <section className="grid gap-4 lg:grid-cols-4">
                         {[
                           { label: "Status operacional", value: formatStatusOriginal(detalhe.statusOriginal) },
-                          { label: "Distribuicao", value: detalhe.dataDistribuicao ? formatDate(detalhe.dataDistribuicao) : "Nao informada" },
-                          { label: "Unidade", value: detalhe.unidadeNome || "Nao informada" },
-                          { label: "Tribunal / Vara", value: [detalhe.tribunal, detalhe.vara].filter(Boolean).join(" / ") || "Nao informado" },
+                          { label: "Distribuicao", value: detalhe.dataDistribuicao ? formatDate(detalhe.dataDistribuicao) : "Não informada" },
+                          { label: "Unidade", value: detalhe.unidadeNome || "Não informada" },
+                          { label: "Tribunal / Vara", value: [detalhe.tribunal, detalhe.vara].filter(Boolean).join(" / ") || "Não informado" },
                         ].map((item) => (
                           <div key={item.label} className="rounded-2xl border border-border bg-card p-5">
                             <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{item.label}</p>
@@ -1375,7 +1375,7 @@ export function ProcessoDossieModal({
 
                       <section className="overflow-hidden rounded-2xl border border-border bg-card">
                         <div className="grid grid-cols-[minmax(0,1.7fr)_160px_160px] gap-4 border-b border-border bg-muted/35 px-5 py-3 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                          <span>Titulo</span>
+                          <span>Título</span>
                           <span>Data fatal</span>
                           <span>Kanban</span>
                         </div>
@@ -1390,7 +1390,7 @@ export function ProcessoDossieModal({
                                 <p className="truncate font-medium text-foreground">{prazo.titulo}</p>
                                 <p className="mt-1 text-xs text-muted-foreground">ID: {prazo.id}</p>
                               </div>
-                              <div className="text-muted-foreground">{prazo.dataFatal ? formatDate(prazo.dataFatal) : "Nao informada"}</div>
+                              <div className="text-muted-foreground">{prazo.dataFatal ? formatDate(prazo.dataFatal) : "Não informada"}</div>
                               <div>
                                 <Badge variant="outline" className="border-border bg-background text-foreground">
                                   {formatKanbanStatus(prazo.statusKanban)}
@@ -1427,7 +1427,7 @@ export function ProcessoDossieModal({
                           <span>Documento</span>
                           <span>Tipo</span>
                           <span>Upload</span>
-                          <span className="text-right">Acoes</span>
+                          <span className="text-right">Ações</span>
                         </div>
 
                         {loadingDocumentos ? (
@@ -1545,15 +1545,15 @@ export function ProcessoDossieModal({
           {clientePreview && (
             <div className="grid gap-3">
               {[
-                { label: "Documento", value: clientePreview.cpfCnpj || "Nao informado" },
-                { label: "Email", value: clientePreview.email || "Nao informado" },
-                { label: "Telefone", value: clientePreview.telefone || "Nao informado" },
+                { label: "Documento", value: clientePreview.cpfCnpj || "Não informado" },
+                { label: "Email", value: clientePreview.email || "Não informado" },
+                { label: "Telefone", value: clientePreview.telefone || "Não informado" },
                 {
                   label: "Cidade / UF",
-                  value: [clientePreview.cidade, clientePreview.estado].filter(Boolean).join(" / ") || "Nao informado",
+                  value: [clientePreview.cidade, clientePreview.estado].filter(Boolean).join(" / ") || "Não informado",
                 },
-                { label: "Advogado responsavel", value: clientePreview.advogadoResponsavel || "Nao informado" },
-                { label: "Unidade", value: clientePreview.unidadeNome || "Nao informada" },
+                { label: "Advogado responsavel", value: clientePreview.advogadoResponsavel || "Não informado" },
+                { label: "Unidade", value: clientePreview.unidadeNome || "Não informada" },
               ].map((item) => (
                 <div key={item.label} className="rounded-2xl border border-border bg-background px-4 py-3">
                   <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{item.label}</p>

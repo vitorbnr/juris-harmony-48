@@ -80,10 +80,10 @@ const tipoConfig: Record<TipoEventoJuridico, string> = {
 };
 
 const formatarDataEvento = (value?: string) => {
-  if (!value) return "Data nao informada";
+  if (!value) return "Data não informada";
 
   const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "Data nao informada";
+  if (Number.isNaN(parsed.getTime())) return "Data não informada";
 
   return parsed.toLocaleString("pt-BR", {
     day: "2-digit",
@@ -130,7 +130,7 @@ function CriarPrazoEventoModal({
 
   const salvar = async () => {
     if (!titulo.trim() || !data) {
-      toast.error("Titulo e data sao obrigatorios.");
+      toast.error("Título e data são obrigatórios.");
       return;
     }
 
@@ -149,7 +149,7 @@ function CriarPrazoEventoModal({
       onSaved();
     } catch (error) {
       console.error("Erro ao criar prazo a partir do evento:", error);
-      toast.error("Nao foi possivel criar o prazo a partir deste evento.");
+      toast.error("Não foi possível criar o prazo a partir deste evento.");
     } finally {
       setSaving(false);
     }
@@ -174,7 +174,7 @@ function CriarPrazoEventoModal({
 
           <div className="space-y-4 overflow-y-auto p-6">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">Titulo</label>
+              <label className="text-sm font-medium text-foreground">Título</label>
               <Input value={titulo} onChange={(event) => setTitulo(event.target.value)} />
             </div>
 
@@ -221,7 +221,7 @@ function CriarPrazoEventoModal({
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">Descricao</label>
+              <label className="text-sm font-medium text-foreground">Descrição</label>
               <textarea
                 className="min-h-[120px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none"
                 value={descricao}
@@ -273,7 +273,7 @@ function RegistrarPublicacaoDjenModal({
   const buscarProcessos = async () => {
     const busca = buscaProcesso.trim();
     if (!busca) {
-      toast.error("Informe um numero CNJ ou cliente para localizar o processo.");
+      toast.error("Informe um número CNJ ou cliente para localizar o processo.");
       return;
     }
 
@@ -288,7 +288,7 @@ function RegistrarPublicacaoDjenModal({
       }
     } catch (error) {
       console.error("Erro ao buscar processos para publicacao DJEN:", error);
-      toast.error("Nao foi possivel buscar processos.");
+      toast.error("Não foi possível buscar processos.");
     } finally {
       setBuscando(false);
     }
@@ -402,12 +402,12 @@ function RegistrarPublicacaoDjenModal({
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-1.5 md:col-span-2">
-                <label className="text-sm font-medium text-foreground">Titulo</label>
+                <label className="text-sm font-medium text-foreground">Título</label>
                 <Input value={titulo} onChange={(event) => setTitulo(event.target.value)} placeholder="Ex.: Publicacao DJEN - intimacao para manifestacao" />
               </div>
 
               <div className="space-y-1.5 md:col-span-2">
-                <label className="text-sm font-medium text-foreground">Descricao</label>
+                <label className="text-sm font-medium text-foreground">Descrição</label>
                 <textarea
                   className="min-h-[120px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none"
                   value={descricao}
@@ -712,7 +712,7 @@ export const InboxJuridicaView = () => {
           <option value="TODOS">Todos os status</option>
           <option value="NOVO">Novo</option>
           <option value="EM_TRIAGEM">Em triagem</option>
-          <option value="CONCLUIDO">Concluido</option>
+          <option value="CONCLUIDO">Concluído</option>
           <option value="ARQUIVADO">Arquivado</option>
         </select>
 
@@ -809,11 +809,11 @@ export const InboxJuridicaView = () => {
                   <div className="grid gap-2 text-sm text-muted-foreground md:grid-cols-2">
                     <div>
                       <span className="font-medium text-foreground">Processo:</span>{" "}
-                      {evento.processoNumero ?? "Nao vinculado"}
+                      {evento.processoNumero ?? "Não vinculado"}
                     </div>
                     <div>
                       <span className="font-medium text-foreground">Cliente:</span>{" "}
-                      {evento.clienteNome ?? "Nao identificado"}
+                      {evento.clienteNome ?? "Não identificado"}
                     </div>
                     <div>
                       <span className="font-medium text-foreground">Data do evento:</span>{" "}
@@ -821,7 +821,7 @@ export const InboxJuridicaView = () => {
                     </div>
                     <div>
                       <span className="font-medium text-foreground">Orgao julgador:</span>{" "}
-                      {evento.orgaoJulgador ?? "Nao informado"}
+                      {evento.orgaoJulgador ?? "Não informado"}
                     </div>
                     <div>
                       <span className="font-medium text-foreground">Responsavel:</span>{" "}

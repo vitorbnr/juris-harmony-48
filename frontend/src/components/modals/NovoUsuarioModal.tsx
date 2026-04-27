@@ -57,19 +57,19 @@ export function NovoUsuarioModal({ onClose, onSaved }: Props) {
     }
 
     if (form.habilitadoDomicilio && form.cpf.replace(/\D/g, "").length !== 11) {
-      toast.error("Informe um CPF valido para habilitar o usuario no Domicilio.");
+      toast.error("Informe um CPF válido para habilitar o usuário no Domicílio.");
       return;
     }
 
     setLoading(true);
     try {
       await usuariosApi.criar(form);
-      toast.success("Usuario cadastrado com sucesso.");
+      toast.success("Usuário cadastrado com sucesso.");
       onSaved?.();
       onClose();
     } catch (error: unknown) {
       const axiosErr = error as { response?: { data?: { mensagem?: string } } };
-      toast.error(axiosErr.response?.data?.mensagem || "Erro ao cadastrar usuario.");
+      toast.error(axiosErr.response?.data?.mensagem || "Erro ao cadastrar usuário.");
     } finally {
       setLoading(false);
     }
@@ -80,7 +80,7 @@ export function NovoUsuarioModal({ onClose, onSaved }: Props) {
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative mx-4 flex max-h-[90vh] w-full max-w-lg flex-col rounded-2xl border border-border bg-card shadow-2xl">
         <div className="flex items-center justify-between border-b border-border px-6 py-5">
-          <h2 className="font-heading text-lg font-semibold text-foreground">Novo Usuario</h2>
+          <h2 className="font-heading text-lg font-semibold text-foreground">Novo Usuário</h2>
           <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
             <X className="h-4 w-4" />
           </Button>
@@ -181,7 +181,7 @@ export function NovoUsuarioModal({ onClose, onSaved }: Props) {
 
         <div className="flex gap-2 border-t border-border px-6 py-4">
           <Button className="flex-1" onClick={handleSubmit} disabled={loading}>
-            {loading ? "Salvando..." : "Criar Usuario"}
+            {loading ? "Salvando..." : "Criar Usuário"}
           </Button>
           <Button variant="outline" onClick={onClose}>
             Cancelar

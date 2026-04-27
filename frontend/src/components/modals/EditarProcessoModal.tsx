@@ -281,7 +281,7 @@ export function EditarProcessoModal({ processo, onClose, onSaved }: Props) {
               </div>
 
               <div className="space-y-1.5">
-                <Label>Descricao</Label>
+                <Label>Descrição</Label>
                 <textarea
                   className="w-full px-3 py-2 rounded-md bg-secondary text-foreground text-sm resize-none border-none outline-none"
                   rows={3}

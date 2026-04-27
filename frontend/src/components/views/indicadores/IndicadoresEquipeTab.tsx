@@ -265,7 +265,7 @@ export const IndicadoresEquipeTab = () => {
         if (!ativo) return;
         setIndicadores([]);
         setSelectedUsuarioId("");
-        setError("Nao foi possivel carregar os indicadores da equipe.");
+        setError("Não foi possível carregar os indicadores da equipe.");
       })
       .finally(() => {
         if (ativo) {
@@ -473,7 +473,7 @@ export const IndicadoresEquipeTab = () => {
                       <TableHead className="text-center">Processos ativos</TableHead>
                       <TableHead className="text-center">Prazos pendentes</TableHead>
                       <TableHead>Concluidos no prazo x atrasados</TableHead>
-                      <TableHead className="text-center">Movimentacoes</TableHead>
+                      <TableHead className="text-center">Movimentações</TableHead>
                     </TableRow>
                   </TableHeader>
 
@@ -634,7 +634,7 @@ export const IndicadoresEquipeTab = () => {
 
                   <div className="mt-5 space-y-3 text-sm">
                     <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
-                      <span className="text-muted-foreground">Movimentacoes no periodo</span>
+                      <span className="text-muted-foreground">Movimentações no período</span>
                       <span className="font-semibold text-foreground">
                         {formatNumber(responsavelSelecionado.movimentacoesRegistadas)}
                       </span>

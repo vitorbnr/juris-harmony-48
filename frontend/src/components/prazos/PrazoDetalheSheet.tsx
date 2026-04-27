@@ -70,14 +70,14 @@ function canOperatePrazo(prazo: Prazo, userId?: string, userRole?: string) {
 }
 
 function formatDate(date?: string | null) {
-  if (!date) return "Nao informado";
+  if (!date) return "Não informado";
   const parsed = new Date(`${date}T00:00:00`);
   if (Number.isNaN(parsed.getTime())) return date;
   return parsed.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
 }
 
 function formatDateTime(dateTime?: string | null) {
-  if (!dateTime) return "Nao informado";
+  if (!dateTime) return "Não informado";
   const parsed = new Date(dateTime);
   if (Number.isNaN(parsed.getTime())) return dateTime;
   return parsed.toLocaleString("pt-BR", {
@@ -103,7 +103,7 @@ function formatEventoTipo(tipo?: string | null) {
     case "MOVIMENTACAO":
       return "Movimentacao";
     default:
-      return tipo || "Nao informado";
+      return tipo || "Não informado";
   }
 }
 
@@ -118,7 +118,7 @@ function formatEventoStatus(status?: string | null) {
     case "ARQUIVADO":
       return "Arquivado";
     default:
-      return status || "Nao informado";
+      return status || "Não informado";
   }
 }
 
@@ -452,16 +452,16 @@ export function PrazoDetalheSheet({
                             <div className="mt-4 space-y-3">
                               <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
                                 <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Numero do processo</p>
-                                <p className="mt-1 text-sm font-medium text-foreground">{detalhe?.processo?.numero ?? prazo.processoNumero ?? "Nao vinculado"}</p>
+                                <p className="mt-1 text-sm font-medium text-foreground">{detalhe?.processo?.numero ?? prazo.processoNumero ?? "Não vinculado"}</p>
                               </div>
                               <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
                                 <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Cliente</p>
-                                <p className="mt-1 text-sm font-medium text-foreground">{detalhe?.processo?.clienteNome ?? prazo.clienteNome ?? "Nao informado"}</p>
+                                <p className="mt-1 text-sm font-medium text-foreground">{detalhe?.processo?.clienteNome ?? prazo.clienteNome ?? "Não informado"}</p>
                               </div>
                               <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
                                 <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Tribunal / Vara</p>
                                 <p className="mt-1 text-sm font-medium text-foreground">
-                                  {[detalhe?.processo?.tribunal, detalhe?.processo?.vara].filter(Boolean).join(" • ") || "Nao informado"}
+                                  {[detalhe?.processo?.tribunal, detalhe?.processo?.vara].filter(Boolean).join(" • ") || "Não informado"}
                                 </p>
                               </div>
                             </div>
@@ -582,7 +582,7 @@ export function PrazoDetalheSheet({
                                 ].map((item) => (
                                   <div key={item.label} className="rounded-2xl border border-border/70 bg-card px-4 py-3">
                                     <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{item.label}</p>
-                                    <p className="mt-1 text-sm font-medium text-foreground">{item.value || "Nao informado"}</p>
+                                    <p className="mt-1 text-sm font-medium text-foreground">{item.value || "Não informado"}</p>
                                   </div>
                                 ))}
                               </div>
@@ -617,9 +617,9 @@ export function PrazoDetalheSheet({
                             {[
                               { label: "Alerta interno", value: formatAlerta(prazo.alertaValor, prazo.alertaUnidade) },
                               { label: "Data inicial", value: formatDate(prazo.data) },
-                              { label: "Data final", value: prazo.dataFim ? formatDate(prazo.dataFim) : "Nao informado" },
+                              { label: "Data final", value: prazo.dataFim ? formatDate(prazo.dataFim) : "Não informado" },
                               { label: "Horario", value: prazo.diaInteiro ? "Dia inteiro" : prazo.hora ? prazo.hora.slice(0, 5) : "Sem horario" },
-                              { label: "Horario final", value: prazo.horaFim ? prazo.horaFim.slice(0, 5) : "Nao informado" },
+                              { label: "Horario final", value: prazo.horaFim ? prazo.horaFim.slice(0, 5) : "Não informado" },
                             ].map((item) => (
                               <div key={item.label} className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
                                 <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{item.label}</p>
@@ -637,13 +637,13 @@ export function PrazoDetalheSheet({
                           <div className="mt-4 space-y-3">
                             {[
                               { label: "Etiqueta", value: prazo.etiqueta || "Sem etiqueta" },
-                              { label: "Modalidade", value: prazo.modalidade || "Nao informada" },
-                              { label: "Local", value: prazo.local || "Nao informado" },
-                              { label: "Sala", value: prazo.sala || "Nao informada" },
+                              { label: "Modalidade", value: prazo.modalidade || "Não informada" },
+                              { label: "Local", value: prazo.local || "Não informado" },
+                              { label: "Sala", value: prazo.sala || "Não informada" },
                               { label: "Vinculo", value: prazo.vinculoTipo || "Sem vinculo complementar" },
-                              { label: "Unidade", value: detalhe.unidadeNome || "Nao informada" },
+                              { label: "Unidade", value: detalhe.unidadeNome || "Não informada" },
                               { label: "Criado em", value: formatDateTime(detalhe.criadoEm) },
-                              { label: "Criado por", value: detalhe.criadoPorNome || "Nao identificado" },
+                              { label: "Criado por", value: detalhe.criadoPorNome || "Não identificado" },
                             ].map((item) => (
                               <div key={item.label} className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
                                 <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{item.label}</p>

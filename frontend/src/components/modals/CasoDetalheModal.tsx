@@ -56,7 +56,7 @@ const acessoConfig: Record<AcessoCaso, AcessoMeta> = {
 };
 
 function formatDateTime(value?: string | null) {
-  if (!value) return "Nao informado";
+  if (!value) return "Não informado";
 
   const parsed = new Date(value.length <= 10 ? `${value}T00:00:00` : value);
   if (Number.isNaN(parsed.getTime())) return value;

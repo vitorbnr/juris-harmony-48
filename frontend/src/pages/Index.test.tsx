@@ -73,7 +73,7 @@ vi.mock("@/components/views/ProcessosView", () => ({
 }));
 
 vi.mock("@/components/views/PublicacoesView", () => ({
-  PublicacoesView: () => <div data-testid="publicacoes-view">View de Publicacoes</div>,
+  PublicacoesView: () => <div data-testid="publicacoes-view">View de Publicações</div>,
 }));
 
 vi.mock("@/components/views/DocumentosView", () => ({
@@ -85,7 +85,7 @@ vi.mock("@/components/views/IndicadoresView", () => ({
 }));
 
 vi.mock("@/components/views/ConfiguracoesView", () => ({
-  ConfiguracoesView: () => <div data-testid="configuracoes-view">View de Configuracoes</div>,
+  ConfiguracoesView: () => <div data-testid="configuracoes-view">View de Configurações</div>,
 }));
 
 vi.mock("@/lib/api", () => ({

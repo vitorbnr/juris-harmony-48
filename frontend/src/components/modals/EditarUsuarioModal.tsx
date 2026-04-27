@@ -75,7 +75,7 @@ export function EditarUsuarioModal({ usuarioId, onClose, onSaved }: Props) {
     }
 
     if (form.habilitadoDomicilio && form.cpf.replace(/\D/g, "").length !== 11) {
-      toast.error("Informe um CPF valido para habilitar o usuario no Domicilio.");
+      toast.error("Informe um CPF válido para habilitar o usuário no Domicílio.");
       return;
     }
 

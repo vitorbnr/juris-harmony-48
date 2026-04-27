@@ -35,7 +35,7 @@ import type { Usuario } from "@/types";
 const AMBIENTE_VALUE = "__AMBIENTE__";
 
 const formatarDataHora = (valor?: string | null) => {
-  if (!valor) return "Nao informado";
+  if (!valor) return "Não informado";
   const data = new Date(valor);
   if (Number.isNaN(data.getTime())) return valor;
   return data.toLocaleString("pt-BR");
@@ -263,7 +263,7 @@ export function IntegracoesTab() {
             <p className="font-medium text-foreground">Config tecnica</p>
             <div className="mt-2 space-y-1">
               <p>Base URL: {datajud.baseUrl ?? "Nao configurada"}</p>
-              <p>Cron atual: {datajud.cron ?? "Nao informado"}</p>
+              <p>Cron atual: {datajud.cron ?? "Não informado"}</p>
               <p>Janela de defasagem: {datajud.staleHours ?? 4} hora(s)</p>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -363,7 +363,7 @@ export function IntegracoesTab() {
               <p>Origem efetiva do CPF: {traduzirOrigem(config.origemOnBehalfOf)}</p>
               <p>CPF efetivo: {config.onBehalfOfMascarado ?? "Nao resolvido"}</p>
               <p>Origem do tenantId: {config.tenantIdOrigem === "CONFIGURADO" ? "Variavel de ambiente" : "API /eu"}</p>
-              <p>Cron atual: {config.cron ?? "Nao informado"}</p>
+              <p>Cron atual: {config.cron ?? "Não informado"}</p>
               <p>Janela de sync: {config.lookbackDays ?? 1} dia(s)</p>
             </div>
           </div>

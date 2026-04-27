@@ -124,7 +124,7 @@ export const ProcessosPorAreaChart = ({ data = [], loading = false }: Props) => 
                   Maior frente
                 </p>
                 <p className="mt-1 truncate text-base font-semibold text-foreground">
-                  {areaPrincipal?.area ?? "Nao informado"}
+                  {areaPrincipal?.area ?? "Não informado"}
                 </p>
                 <p className="mt-2 text-xs text-muted-foreground">
                   {areaPrincipal?.quantidade.toLocaleString("pt-BR") ?? "0"} processos nesta área

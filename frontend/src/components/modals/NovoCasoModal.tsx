@@ -348,7 +348,7 @@ export function NovoCasoModal({
                   name="descricao"
                   render={({ field }) => (
                     <FormItem className="space-y-1.5">
-                      <FormLabel>Descricao</FormLabel>
+                      <FormLabel>Descrição</FormLabel>
                       <FormControl>
                         <Textarea
                           {...field}

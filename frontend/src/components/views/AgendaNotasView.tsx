@@ -215,7 +215,7 @@ function AgendaPrazoCard({
       onPrazoAtualizado(prazoAtualizado);
       toast.success(`Atividade movida para ${etapaLabel[etapa]}.`);
     } catch {
-      toast.error("Nao foi possivel atualizar o andamento desta atividade.");
+      toast.error("Não foi possível atualizar o andamento desta atividade.");
     } finally {
       setLoading(false);
     }
@@ -280,7 +280,7 @@ function AgendaPrazoCard({
                     disabled={loading}
                     onClick={(event) => event.stopPropagation()}
                   >
-                    <span className="sr-only">Mais acoes</span>
+                    <span className="sr-only">Mais ações</span>
                     <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -408,7 +408,7 @@ export const AgendaNotasView = () => {
       })
       .catch(() => {
         setPrazos([]);
-        toast.error("Nao foi possivel carregar a agenda de prazos.");
+        toast.error("Não foi possível carregar a agenda de prazos.");
       })
       .finally(() => setLoadingAgenda(false));
   }, [range.fim, range.inicio, unidadeSelecionada]);
@@ -437,7 +437,7 @@ export const AgendaNotasView = () => {
       .catch(() => {
         if (!active) return;
         setSaveStatus("error");
-        toast.error("Nao foi possivel carregar a sua nota pessoal.");
+        toast.error("Não foi possível carregar a sua nota pessoal.");
       })
       .finally(() => {
         if (active) setNotaHydrated(true);
@@ -556,7 +556,7 @@ export const AgendaNotasView = () => {
                 <SelectItem value="tarefa_interna">Tarefas</SelectItem>
                 <SelectItem value="prazo_processual">Prazos</SelectItem>
                 <SelectItem value="reuniao">Eventos</SelectItem>
-                <SelectItem value="audiencia">Audiencias</SelectItem>
+                <SelectItem value="audiencia">Audiências</SelectItem>
               </SelectContent>
             </Select>
           </div>

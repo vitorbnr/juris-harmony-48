@@ -66,13 +66,13 @@ const metricasIniciais: PublicacaoMetricas = {
 };
 
 const formatarDataPublicacao = (value?: string | null) => {
-  if (!value) return "Data nao informada";
+  if (!value) return "Data não informada";
 
   try {
     return format(parseISO(value), "dd 'de' MMM yyyy 'as' HH:mm", { locale: ptBR });
   } catch {
     const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return "Data nao informada";
+    if (Number.isNaN(parsed.getTime())) return "Data não informada";
     return parsed.toLocaleString("pt-BR", {
       day: "2-digit",
       month: "2-digit",
@@ -108,7 +108,7 @@ const isHoje = (value?: string | null) => {
 };
 
 const formatarAcaoSugerida = (value?: string | null) => {
-  if (!value) return "Sem sugestao";
+  if (!value) return "Sem sugestão";
 
   const labels: Record<string, string> = {
     CRIAR_PRAZO: "Criar prazo",
@@ -123,12 +123,12 @@ const formatarAcaoSugerida = (value?: string | null) => {
 const formatarLadoProcessual = (value?: string | null) => {
   const labels: Record<string, string> = {
     PARTE_AUTORA: "Parte autora",
-    PARTE_RE: "Parte re",
+    PARTE_RE: "Parte ré",
     TERCEIRO: "Terceiro",
     INDEFINIDO: "Indefinido",
   };
 
-  return value ? labels[value] ?? value : "Nao identificado";
+  return value ? labels[value] ?? value : "Não identificado";
 };
 
 const prioridadeConfig = (score = 0) => {
@@ -147,7 +147,7 @@ const prioridadeConfig = (score = 0) => {
   }
 
   return {
-    label: "Baixa urgencia",
+    label: "Baixa urgência",
     className: "border-border bg-muted text-muted-foreground",
   };
 };
@@ -196,7 +196,7 @@ function VincularProcessoDialog({
   const buscarProcessos = useCallback(async () => {
     const termo = busca.trim();
     if (!termo) {
-      toast.error("Informe um numero CNJ ou cliente para localizar o processo.");
+      toast.error("Informe um número CNJ ou cliente para localizar o processo.");
       return;
     }
 
@@ -212,7 +212,7 @@ function VincularProcessoDialog({
       }
     } catch (error) {
       console.error("Erro ao buscar processos para vinculo de publicacao:", error);
-      toast.error("Nao foi possivel buscar processos.");
+      toast.error("Não foi possível buscar processos.");
     } finally {
       setBuscando(false);
     }
@@ -233,12 +233,12 @@ function VincularProcessoDialog({
     setSalvando(true);
     try {
       await publicacoesApi.vincularProcesso(publicacao.id, processoSelecionadoId);
-      toast.success("Processo vinculado a publicacao.");
+      toast.success("Processo vinculado à publicação.");
       onOpenChange(false);
       await onLinked();
     } catch (error) {
       console.error("Erro ao vincular processo a publicacao:", error);
-      toast.error("Nao foi possivel vincular o processo.");
+      toast.error("Não foi possível vincular o processo.");
     } finally {
       setSalvando(false);
     }
@@ -259,7 +259,7 @@ function VincularProcessoDialog({
             <Input
               value={busca}
               onChange={(event) => setBusca(event.target.value)}
-              placeholder="Digite numero CNJ, cliente ou termo do processo"
+              placeholder="Digite número CNJ, cliente ou termo do processo"
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
                   event.preventDefault();
@@ -275,7 +275,7 @@ function VincularProcessoDialog({
           <div className="max-h-[360px] space-y-2 overflow-y-auto rounded-2xl border border-border bg-background/50 p-3">
             {resultados.length === 0 ? (
               <div className="flex min-h-[140px] items-center justify-center text-center text-sm text-muted-foreground">
-                {buscando ? "Buscando processos..." : "Nenhum processo carregado para vinculacao."}
+                {buscando ? "Buscando processos..." : "Nenhum processo carregado para vinculação."}
               </div>
             ) : (
               resultados.map((processo) => {
@@ -299,7 +299,7 @@ function VincularProcessoDialog({
                       </Badge>
                     </div>
                     <p className="mt-2 text-sm font-medium text-foreground">
-                      {processo.clienteNome ?? "Cliente nao informado"}
+                      {processo.clienteNome ?? "Cliente não informado"}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {processo.tribunal} {processo.vara ? ` - ${processo.vara}` : ""}
@@ -370,11 +370,11 @@ function CriarPrazoPublicacaoDialog({
 
   const salvar = async () => {
     if (!publicacao?.id || !publicacao.processoId) {
-      toast.error("Vincule a publicacao a um processo antes de criar o prazo.");
+      toast.error("Vincule a publicação a um processo antes de criar o prazo.");
       return;
     }
     if (!titulo.trim() || !data) {
-      toast.error("Titulo e data sao obrigatorios.");
+      toast.error("Título e data são obrigatórios.");
       return;
     }
 
@@ -391,12 +391,12 @@ function CriarPrazoPublicacaoDialog({
       });
 
       await publicacoesApi.atualizarStatus(publicacao.id, "TRATADA");
-      toast.success("Prazo criado e publicacao marcada como tratada.");
+      toast.success("Prazo criado e publicação marcada como tratada.");
       onOpenChange(false);
       await onSaved();
     } catch (error) {
       console.error("Erro ao criar prazo a partir da publicacao:", error);
-      toast.error("Nao foi possivel criar o prazo.");
+      toast.error("Não foi possível criar o prazo.");
     } finally {
       setSalvando(false);
     }
@@ -414,7 +414,7 @@ function CriarPrazoPublicacaoDialog({
 
         <div className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-foreground">Titulo</label>
+            <label className="text-sm font-medium text-foreground">Título</label>
             <Input value={titulo} onChange={(event) => setTitulo(event.target.value)} />
           </div>
 
@@ -432,7 +432,7 @@ function CriarPrazoPublicacaoDialog({
           <PrazoDateCalculator dataInicial={data} onAplicarData={setData} />
 
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-foreground">Descricao</label>
+            <label className="text-sm font-medium text-foreground">Descrição</label>
             <Textarea
               className="min-h-[140px]"
               value={descricao}
@@ -489,7 +489,7 @@ export const PublicacoesView = () => {
       console.error("Erro ao carregar publicacoes:", error);
       setPublicacoes([]);
       setMetricas(metricasIniciais);
-      toast.error("Nao foi possivel carregar a mesa de publicacoes.");
+      toast.error("Não foi possível carregar a mesa de publicações.");
     } finally {
       setLoading(false);
     }
@@ -540,7 +540,7 @@ export const PublicacoesView = () => {
       await carregarDados();
     } catch (error) {
       console.error("Erro ao atualizar status da publicacao:", error);
-      toast.error("Nao foi possivel atualizar o status da publicacao.");
+      toast.error("Não foi possível atualizar o status da publicação.");
     } finally {
       setActionLoadingId(null);
     }
@@ -549,7 +549,7 @@ export const PublicacoesView = () => {
   const abrirModalPrazo = () => {
     if (!publicacaoSelecionada) return;
     if (!publicacaoSelecionada.processoId) {
-      toast.error("Vincule a publicacao a um processo antes de criar o prazo.");
+      toast.error("Vincule a publicação a um processo antes de criar o prazo.");
       return;
     }
     setAbrirPrazo(true);
@@ -557,7 +557,7 @@ export const PublicacoesView = () => {
 
   const cardsMetricas = [
     {
-      title: "Nao tratadas de hoje",
+      title: "Não tratadas de hoje",
       value: metricas.naoTratadasHoje,
       className: "text-foreground",
       active:
@@ -599,7 +599,7 @@ export const PublicacoesView = () => {
       },
     },
     {
-      title: "Nao tratadas",
+      title: "Não tratadas",
       value: metricas.naoTratadas,
       className: "text-amber-300",
       active:
@@ -617,7 +617,7 @@ export const PublicacoesView = () => {
   const filaFilters = [
     { key: "TODAS" as const, label: "Fila completa" },
     { key: "PRAZO_SUSPEITO" as const, label: `Prazo suspeito (${metricas.prazoSuspeito})` },
-    { key: "SEM_VINCULO" as const, label: `Sem vinculo (${metricas.semVinculo})` },
+    { key: "SEM_VINCULO" as const, label: `Sem vínculo (${metricas.semVinculo})` },
   ];
 
   const statusFilters = [
@@ -634,7 +634,7 @@ export const PublicacoesView = () => {
           <div>
             <div className="flex items-center gap-2">
               <Newspaper className="h-4 w-4 text-primary" />
-              <h4 className="text-sm font-semibold text-foreground">Fila de publicacoes</h4>
+              <h4 className="text-sm font-semibold text-foreground">Fila de publicações</h4>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
               A fila fica focada no trabalho pendente; os filtros globais ficam concentrados no topo.
@@ -652,7 +652,7 @@ export const PublicacoesView = () => {
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
           <Inbox className="h-10 w-10 text-muted-foreground/35" />
           <div className="space-y-1">
-            <p className="text-sm font-medium text-foreground">Nenhuma publicacao encontrada</p>
+            <p className="text-sm font-medium text-foreground">Nenhuma publicação encontrada</p>
             <p className="text-sm text-muted-foreground">
               Verifique os filtros selecionados.
             </p>
@@ -715,7 +715,7 @@ export const PublicacoesView = () => {
                   </div>
 
                   <p className="mt-3 font-mono text-xs text-foreground/85">
-                    {publicacao.npu ?? "NPU nao informado"}
+                    {publicacao.npu ?? "NPU não informado"}
                   </p>
 
                   <p className="mt-3 line-clamp-2 text-sm leading-6 text-muted-foreground">
@@ -754,7 +754,7 @@ export const PublicacoesView = () => {
                 </div>
 
                 <p className="font-mono text-sm text-foreground">
-                  {detalheSelecionado.npu ?? "NPU nao informado"}
+                  {detalheSelecionado.npu ?? "NPU não informado"}
                 </p>
 
                 <div className="flex flex-wrap gap-2">
@@ -799,7 +799,7 @@ export const PublicacoesView = () => {
 
                     <p className="mt-4 text-sm leading-7 text-foreground/90">
                       {detalheSelecionado.resumoOperacional ??
-                        "Infra pronta para resumo assistido. Nesta fase a IA ainda nao executa, mas o modelo de dados e a UI ja estao preparados."}
+                        "Infra pronta para resumo assistido. Nesta fase a IA ainda não executa, mas o modelo de dados e a UI já estão preparados."}
                     </p>
 
                     {detalheSelecionado.justificativaPrioridade ? (
@@ -840,7 +840,7 @@ export const PublicacoesView = () => {
 
                     <div className="mt-4 space-y-3">
                       <div className="rounded-xl border border-border bg-background/70 p-4">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Acao sugerida</p>
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Ação sugerida</p>
                         <p className="mt-1 text-sm font-medium text-foreground">
                           {formatarAcaoSugerida(detalheSelecionado.iaAcaoSugerida)}
                         </p>
@@ -852,7 +852,7 @@ export const PublicacoesView = () => {
                           <p className="mt-1 text-sm font-medium text-foreground">
                             {detalheSelecionado.iaPrazoSugeridoDias
                               ? `${detalheSelecionado.iaPrazoSugeridoDias} dia(s)`
-                              : "Nao sugerido"}
+                              : "Não sugerido"}
                           </p>
                         </div>
                         <div className="rounded-xl border border-border bg-background/70 p-4">
@@ -865,7 +865,7 @@ export const PublicacoesView = () => {
 
                       <div className="rounded-xl border border-border bg-background/70 p-4">
                         <div className="flex items-center justify-between gap-3">
-                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Confianca</p>
+                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Confiança</p>
                           <span className="text-sm font-medium text-foreground">
                             {detalheSelecionado.iaConfianca ?? 0}%
                           </span>
@@ -877,7 +877,7 @@ export const PublicacoesView = () => {
                         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Trecho relevante</p>
                         <p className="mt-2 text-sm leading-6 text-foreground/85">
                           {detalheSelecionado.iaTrechosRelevantes ??
-                            "Quando a IA entrar, os trechos de apoio devem aparecer aqui para o advogado entender o motivo da sugestao."}
+                            "Quando a IA entrar, os trechos de apoio devem aparecer aqui para o advogado entender o motivo da sugestão."}
                         </p>
                       </div>
                     </div>
@@ -895,9 +895,9 @@ export const PublicacoesView = () => {
                       </div>
 
                       <div className="rounded-xl border border-border bg-card/60 p-4">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Vinculo de processo</p>
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Vínculo de processo</p>
                         <p className="mt-1 text-sm font-medium text-foreground">
-                          {detalheSelecionado.processoNumero ?? "Nao vinculado"}
+                          {detalheSelecionado.processoNumero ?? "Não vinculado"}
                         </p>
                       </div>
 
@@ -941,7 +941,7 @@ export const PublicacoesView = () => {
                         void atualizarStatus(
                           detalheSelecionado,
                           "TRATADA",
-                          "Publicacao arquivada como tratada.",
+                          "Publicação arquivada como tratada.",
                         )
                       }
                       disabled={actionLoading}
@@ -956,7 +956,7 @@ export const PublicacoesView = () => {
                         void atualizarStatus(
                           detalheSelecionado,
                           "DESCARTADA",
-                          "Publicacao descartada.",
+                          "Publicação descartada.",
                         )
                       }
                       disabled={actionLoading}
@@ -972,7 +972,7 @@ export const PublicacoesView = () => {
                       void atualizarStatus(
                         detalheSelecionado,
                         "PENDENTE",
-                        "Publicacao reaberta para triagem.",
+                        "Publicação reaberta para triagem.",
                       )
                     }
                     disabled={actionLoading}
@@ -1007,7 +1007,7 @@ export const PublicacoesView = () => {
       <div className="flex min-h-full flex-col gap-6 p-6 md:h-full md:min-h-0 md:overflow-hidden md:p-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h3 className="font-heading text-2xl font-semibold text-foreground">Publicacoes</h3>
+            <h3 className="font-heading text-2xl font-semibold text-foreground">Publicações</h3>
             <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
               Mesa de triagem pensada para advogados acostumados ao Astrea, com menos cliques, leitura confortavel e base pronta para IA explicavel.
             </p>

@@ -118,10 +118,10 @@ function PrazoCard({
     setLoading(true);
     try {
       await prazosApi.excluir(prazo.id);
-      toast.success("Prazo excluido com sucesso.");
+      toast.success("Prazo excluído com sucesso.");
       onAtualizar();
     } catch {
-      toast.error("Nao foi possivel excluir este item.");
+      toast.error("Não foi possível excluir este item.");
     } finally {
       setLoading(false);
     }
@@ -278,7 +278,7 @@ function TarefaKanbanCard({
       await prazosApi.atualizarEtapaKanban(prazo.id, etapa.toUpperCase());
       onAtualizar();
     } catch {
-      toast.error("Nao foi possivel mover a tarefa.");
+      toast.error("Não foi possível mover a tarefa.");
     } finally {
       setLoading(false);
     }

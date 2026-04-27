@@ -431,33 +431,33 @@ export const QuickActions = () => {
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <div className="rounded-xl border border-border/70 bg-background/40 p-3.5">
                       <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Numero CNJ</p>
-                      <p className="mt-1 text-sm font-semibold text-foreground">{npuResultado.numeroCnj ?? "Nao informado"}</p>
+                      <p className="mt-1 text-sm font-semibold text-foreground">{npuResultado.numeroCnj ?? "Não informado"}</p>
                     </div>
                     <div className="rounded-xl border border-border/70 bg-background/40 p-3.5">
                       <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Tribunal</p>
-                      <p className="mt-1 text-sm font-semibold text-foreground">{npuResultado.tribunal ?? "Nao informado"}</p>
+                      <p className="mt-1 text-sm font-semibold text-foreground">{npuResultado.tribunal ?? "Não informado"}</p>
                     </div>
                     <div className="rounded-xl border border-border/70 bg-background/40 p-3.5">
                       <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Classe</p>
-                      <p className="mt-1 text-sm font-semibold text-foreground">{npuResultado.classe ?? "Nao informado"}</p>
+                      <p className="mt-1 text-sm font-semibold text-foreground">{npuResultado.classe ?? "Não informado"}</p>
                     </div>
                     <div className="rounded-xl border border-border/70 bg-background/40 p-3.5">
                       <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Orgao julgador</p>
-                      <p className="mt-1 text-sm font-semibold text-foreground">{npuResultado.orgaoJulgador ?? "Nao informado"}</p>
+                      <p className="mt-1 text-sm font-semibold text-foreground">{npuResultado.orgaoJulgador ?? "Não informado"}</p>
                     </div>
                     <div className="rounded-xl border border-border/70 bg-background/40 p-3.5">
                       <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Distribuicao</p>
-                      <p className="mt-1 text-sm font-semibold text-foreground">{npuResultado.dataDistribuicao ?? "Nao informado"}</p>
+                      <p className="mt-1 text-sm font-semibold text-foreground">{npuResultado.dataDistribuicao ?? "Não informado"}</p>
                     </div>
                     <div className="rounded-xl border border-border/70 bg-background/40 p-3.5">
                       <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Valor da causa</p>
-                      <p className="mt-1 text-sm font-semibold text-foreground">{npuResultado.valorCausa ?? "Nao informado"}</p>
+                      <p className="mt-1 text-sm font-semibold text-foreground">{npuResultado.valorCausa ?? "Não informado"}</p>
                     </div>
                   </div>
 
                   <div className="rounded-xl border border-border/70 bg-background/40 p-3.5">
                     <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Assunto</p>
-                    <p className="mt-1 text-sm text-foreground">{npuResultado.assunto ?? "Nao informado"}</p>
+                    <p className="mt-1 text-sm text-foreground">{npuResultado.assunto ?? "Não informado"}</p>
                   </div>
 
                   <div className="space-y-3">

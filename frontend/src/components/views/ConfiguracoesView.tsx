@@ -157,7 +157,7 @@ function TabPerfil() {
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="domicilio">Operacao Domicilio</Label>
-          <Input id="domicilio" defaultValue={user.habilitadoDomicilio ? "Habilitado" : "Nao habilitado"} disabled />
+          <Input id="domicilio" defaultValue={user.habilitadoDomicilio ? "Habilitado" : "Não habilitado"} disabled />
         </div>
       </div>
 

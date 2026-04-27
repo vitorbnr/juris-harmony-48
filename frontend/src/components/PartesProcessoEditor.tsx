@@ -29,7 +29,7 @@ type Props = {
 const tiposParte = [
   { value: "PESSOA_FISICA", label: "Pessoa fisica" },
   { value: "PESSOA_JURIDICA", label: "Pessoa juridica" },
-  { value: "NAO_IDENTIFICADO", label: "Nao identificado" },
+  { value: "NAO_IDENTIFICADO", label: "Não identificado" },
 ];
 
 const polosParte = [
