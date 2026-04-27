@@ -545,7 +545,7 @@ export const InboxJuridicaView = () => {
   const atualizarStatus = async (id: string, status: StatusEventoJuridico) => {
     try {
       const atualizado = await eventosJuridicosApi.atualizarStatus(id, status);
-      setEventos((current) => current.map((evento) => (evento.id === id ? atualizado : evento)));
+      setEventos((current) => current.map((evento) => (evento.id === id ? (atualizado as unknown as EventoJuridico) : evento)));
       toast.success("Status do evento atualizado.");
     } catch (error) {
       console.error("Erro ao atualizar status do evento juridico:", error);
@@ -579,7 +579,7 @@ export const InboxJuridicaView = () => {
     setAssumindoId(id);
     try {
       const atualizado = await eventosJuridicosApi.assumir(id);
-      setEventos((current) => current.map((evento) => (evento.id === id ? atualizado : evento)));
+      setEventos((current) => current.map((evento) => (evento.id === id ? (atualizado as unknown as EventoJuridico) : evento)));
       toast.success("Item assumido com sucesso.");
     } catch (error) {
       console.error("Erro ao assumir evento:", error);
@@ -604,7 +604,7 @@ export const InboxJuridicaView = () => {
         eventoId,
         responsavelSelecionadoPorEvento[eventoId] || null,
       );
-      setEventos((current) => current.map((evento) => (evento.id === eventoId ? atualizado : evento)));
+      setEventos((current) => current.map((evento) => (evento.id === eventoId ? (atualizado as unknown as EventoJuridico) : evento)));
       setEventoEmAtribuicao(null);
       toast.success(
         atualizado.responsavelNome
@@ -657,7 +657,7 @@ export const InboxJuridicaView = () => {
     setVinculandoProcessoId(eventoId);
     try {
       const atualizado = await eventosJuridicosApi.vincularProcesso(eventoId, processoId);
-      setEventos((current) => current.map((evento) => (evento.id === eventoId ? atualizado : evento)));
+      setEventos((current) => current.map((evento) => (evento.id === eventoId ? (atualizado as unknown as EventoJuridico) : evento)));
       setEventoEmVinculo(null);
       toast.success("Evento vinculado ao processo com sucesso.");
     } catch (error) {
