@@ -16,4 +16,5 @@ public class PublicacaoMetricasResponse {
     private long naoTratadas;
     private long prazoSuspeito;
     private long semVinculo;
+    private long semResponsavel;
 }

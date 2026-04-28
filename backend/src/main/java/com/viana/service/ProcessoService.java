@@ -81,6 +81,7 @@ public class ProcessoService {
     private final NotificacaoService notificacaoService;
     private final EventoJuridicoService eventoJuridicoService;
     private final ProcessoDistribuicaoService processoDistribuicaoService;
+    private final PublicacaoService publicacaoService;
 
     @Value("${app.sync.datajud.stale-hours:4}")
     private long datajudStaleHours;
@@ -387,6 +388,12 @@ public class ProcessoService {
                     .orgaoJulgador(movimento.getOrgaoJulgador())
                     .dataHoraOriginal(parseLocalDateTime(movimento.getDataHora()))
                     .build());
+
+            try {
+                publicacaoService.ingestarDatajudMovimentacao(processo, movimento);
+            } catch (Exception ignored) {
+                // A movimentacao do processo nao deve falhar por causa da fila de publicacoes.
+            }
 
             chavesExistentes.add(movimento.getChaveExterna());
         }

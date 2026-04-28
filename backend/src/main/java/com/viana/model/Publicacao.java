@@ -1,6 +1,7 @@
 package com.viana.model;
 
 import com.viana.model.enums.LadoProcessualPublicacao;
+import com.viana.model.enums.StatusFluxoPublicacao;
 import com.viana.model.enums.StatusTratamento;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -57,6 +58,54 @@ public class Publicacao {
     @JoinColumn(name = "processo_id")
     private Processo processo;
 
+    @Column(length = 30)
+    private String fonte;
+
+    @Column(name = "identificador_externo", length = 180)
+    private String identificadorExterno;
+
+    @Column(name = "captada_em_nome", length = 180)
+    private String captadaEmNome;
+
+    @Column(name = "oab_monitorada", length = 30)
+    private String oabMonitorada;
+
+    @Column(name = "hash_deduplicacao", length = 120)
+    private String hashDeduplicacao;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status_fluxo", nullable = false, length = 30)
+    @Builder.Default
+    private StatusFluxoPublicacao statusFluxo = StatusFluxoPublicacao.RECEBIDA;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "responsavel_processo_id")
+    private Usuario responsavelProcesso;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "atribuida_para_usuario_id")
+    private Usuario atribuidaPara;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assumida_por_usuario_id")
+    private Usuario assumidaPor;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tratada_por_usuario_id")
+    private Usuario tratadaPor;
+
+    @Column(name = "data_atribuicao")
+    private LocalDateTime dataAtribuicao;
+
+    @Column(name = "data_assuncao")
+    private LocalDateTime dataAssuncao;
+
+    @Column(name = "data_tratamento")
+    private LocalDateTime dataTratamento;
+
+    @Column(name = "motivo_descarte", length = 255)
+    private String motivoDescarte;
+
     @Column(name = "data_criacao", nullable = false, updatable = false)
     @Builder.Default
     private LocalDateTime dataCriacao = LocalDateTime.now();
@@ -103,6 +152,9 @@ public class Publicacao {
         }
         if (dataAtualizacao == null) {
             dataAtualizacao = agora;
+        }
+        if (statusFluxo == null) {
+            statusFluxo = StatusFluxoPublicacao.RECEBIDA;
         }
     }
 

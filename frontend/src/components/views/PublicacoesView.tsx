@@ -5,6 +5,7 @@ import {
   CalendarClock,
   CheckCircle2,
   CircleOff,
+  History,
   Inbox,
   Link2,
   Loader2,
@@ -14,6 +15,9 @@ import {
   ShieldAlert,
   Sparkles,
   Trash2,
+  UserCheck,
+  UserPlus,
+  WandSparkles,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -44,17 +48,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
-import { prazosApi, processosApi, publicacoesApi } from "@/services/api";
-import type { Processo } from "@/types";
+import { prazosApi, processosApi, publicacoesApi, usuariosApi } from "@/services/api";
+import type { Processo, Usuario } from "@/types";
 import type {
   Publicacao,
+  PublicacaoHistorico,
   PublicacaoMetricas,
   StatusTratamentoPublicacao,
 } from "@/types/publicacoes";
 import { toast } from "sonner";
 
 type FiltroStatus = StatusTratamentoPublicacao | "TODAS";
-type FiltroFila = "TODAS" | "PRAZO_SUSPEITO" | "SEM_VINCULO";
+type FiltroFila = "TODAS" | "MINHAS" | "PRAZO_SUSPEITO" | "SEM_VINCULO" | "SEM_RESPONSAVEL";
 
 const metricasIniciais: PublicacaoMetricas = {
   naoTratadasHoje: 0,
@@ -63,6 +68,7 @@ const metricasIniciais: PublicacaoMetricas = {
   naoTratadas: 0,
   prazoSuspeito: 0,
   semVinculo: 0,
+  semResponsavel: 0,
 };
 
 const formatarDataPublicacao = (value?: string | null) => {
@@ -129,6 +135,34 @@ const formatarLadoProcessual = (value?: string | null) => {
   };
 
   return value ? labels[value] ?? value : "Não identificado";
+};
+
+const formatarStatusFluxo = (value?: string | null) => {
+  const labels: Record<string, string> = {
+    RECEBIDA: "Recebida",
+    SEM_VINCULO: "Sem vinculo",
+    SEM_RESPONSAVEL: "Sem responsavel",
+    ATRIBUIDA: "Atribuida",
+    EM_TRATAMENTO: "Em tratamento",
+    TRATADA: "Tratada",
+    DESCARTADA: "Descartada",
+  };
+
+  return value ? labels[value] ?? value.replaceAll("_", " ") : "Nao classificada";
+};
+
+const formatarAcaoHistorico = (value?: string | null) => {
+  const labels: Record<string, string> = {
+    CAPTURADA: "Capturada",
+    VINCULADA_PROCESSO: "Processo vinculado",
+    ATRIBUIDA: "Atribuida",
+    ASSUMIDA: "Assumida",
+    STATUS_ALTERADO: "Status alterado",
+    IA_REPROCESSADA: "IA reprocessada",
+    REABERTA: "Reaberta",
+  };
+
+  return value ? labels[value] ?? value.replaceAll("_", " ") : "Evento registrado";
 };
 
 const prioridadeConfig = (score = 0) => {
@@ -456,12 +490,541 @@ function CriarPrazoPublicacaoDialog({
   );
 }
 
+function AtribuirPublicacaoDialog({
+  open,
+  onOpenChange,
+  publicacao,
+  onAssigned,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  publicacao: Publicacao | null;
+  onAssigned: () => Promise<void> | void;
+}) {
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [usuarioId, setUsuarioId] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setUsuarioId(publicacao?.atribuidaParaUsuarioId ?? "");
+    setLoading(true);
+
+    usuariosApi.listar()
+      .then((data) => {
+        const items = data?.content ?? data;
+        const lista = Array.isArray(items) ? items : [];
+        setUsuarios(
+          lista.filter((usuario: Usuario) =>
+            usuario.ativo && ["ADMINISTRADOR", "ADVOGADO"].includes(String(usuario.papel)),
+          ),
+        );
+      })
+      .catch((error) => {
+        console.error("Erro ao carregar usuarios para atribuicao de publicacao:", error);
+        toast.error("Nao foi possivel carregar os responsaveis.");
+      })
+      .finally(() => setLoading(false));
+  }, [open, publicacao?.atribuidaParaUsuarioId]);
+
+  const atribuir = async () => {
+    if (!publicacao?.id || !usuarioId) {
+      toast.error("Selecione um responsavel para a publicacao.");
+      return;
+    }
+
+    setSalvando(true);
+    try {
+      await publicacoesApi.atribuir(publicacao.id, usuarioId);
+      toast.success("Publicacao atribuida para tratamento.");
+      onOpenChange(false);
+      await onAssigned();
+    } catch (error) {
+      console.error("Erro ao atribuir publicacao:", error);
+      toast.error("Nao foi possivel atribuir a publicacao.");
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Atribuir publicacao</DialogTitle>
+          <DialogDescription>
+            Direcione a publicacao para o advogado que deve tratar o evento.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <Select value={usuarioId} onValueChange={setUsuarioId} disabled={loading}>
+            <SelectTrigger>
+              <SelectValue placeholder={loading ? "Carregando responsaveis..." : "Selecione um responsavel"} />
+            </SelectTrigger>
+            <SelectContent>
+              {usuarios.map((usuario) => (
+                <SelectItem key={usuario.id} value={usuario.id}>
+                  {usuario.nome} {usuario.oab ? `- OAB ${usuario.oab}` : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <div className="rounded-2xl border border-border bg-background/60 p-4 text-sm text-muted-foreground">
+            A atribuicao fica registrada no historico e tambem permite filtrar depois por "Minhas".
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Cancelar
+          </Button>
+          <Button type="button" onClick={() => void atribuir()} disabled={salvando || loading || !usuarioId}>
+            {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+            Atribuir
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/*
+function FontesMonitoradasDialog({
+  open,
+  onOpenChange,
+  onChanged,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onChanged: () => Promise<void> | void;
+}) {
+  const [fontes, setFontes] = useState<PublicacaoFonteMonitorada[]>([]);
+  const [diariosOficiais, setDiariosOficiais] = useState<PublicacaoDiarioOficial[]>([]);
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [alterandoId, setAlterandoId] = useState<string | null>(null);
+  const [tipo, setTipo] = useState<TipoFontePublicacaoMonitorada>("OAB");
+  const [nomeExibicao, setNomeExibicao] = useState("");
+  const [valorMonitorado, setValorMonitorado] = useState("");
+  const [uf, setUf] = useState("");
+  const [destinatarioId, setDestinatarioId] = useState("");
+  const [abrangencia, setAbrangencia] = useState<AbrangenciaFonteMonitorada>("DJEN_TODOS");
+  const [observacao, setObservacao] = useState("");
+
+  const carregarFontes = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [fontesData, diariosData, usuariosData] = await Promise.all([
+        publicacoesApi.listarFontesMonitoradas(),
+        publicacoesApi.listarDiariosOficiais({ apenasSemScraping: false }),
+        usuariosApi.listar(),
+      ]);
+      const usuariosItems = usuariosData?.content ?? usuariosData;
+      setFontes(Array.isArray(fontesData) ? fontesData : []);
+      setDiariosOficiais(Array.isArray(diariosData) ? diariosData : []);
+      setUsuarios(
+        Array.isArray(usuariosItems)
+          ? usuariosItems.filter((usuario: Usuario) =>
+            usuario.ativo && ["ADMINISTRADOR", "ADVOGADO"].includes(String(usuario.papel)),
+          )
+          : [],
+      );
+    } catch (error) {
+      console.error("Erro ao carregar fontes monitoradas:", error);
+      setFontes([]);
+      setDiariosOficiais([]);
+      setUsuarios([]);
+      toast.error("Nao foi possivel carregar as fontes monitoradas.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (open) {
+      void carregarFontes();
+    }
+  }, [carregarFontes, open]);
+
+  const limparFormulario = () => {
+    setNomeExibicao("");
+    setValorMonitorado("");
+    setUf("");
+    setDestinatarioId("");
+    setAbrangencia("DJEN_TODOS");
+    setObservacao("");
+  };
+
+  const resolverDiariosSelecionados = () => {
+    const djenOficiais = diariosOficiais.filter((diario) => diario.grupo === "DJEN" && !diario.requerScraping);
+
+    if (abrangencia === "DJEN_SUPERIORES") {
+      return djenOficiais.filter((diario) => !diario.uf).map((diario) => diario.codigo);
+    }
+
+    if (abrangencia === "DJEN_UF_SUPERIORES") {
+      const ufFiltro = uf.trim().toUpperCase();
+      return djenOficiais
+        .filter((diario) => !diario.uf || diario.uf === ufFiltro)
+        .map((diario) => diario.codigo);
+    }
+
+    return djenOficiais.map((diario) => diario.codigo);
+  };
+
+  const criarFonte = async () => {
+    const nome = nomeExibicao.trim();
+    const valor = valorMonitorado.trim();
+    const ufNormalizada = uf.trim().toUpperCase();
+
+    if (!nome || !valor) {
+      toast.error("Informe o nome de exibicao e o valor monitorado.");
+      return;
+    }
+
+    if (tipo === "OAB" && ufNormalizada.length !== 2) {
+      toast.error("Para OAB, informe a UF com 2 letras.");
+      return;
+    }
+
+    if (abrangencia === "DJEN_UF_SUPERIORES" && ufNormalizada.length !== 2) {
+      toast.error("Informe a UF para usar a cobertura por estado.");
+      return;
+    }
+
+    if (!destinatarioId) {
+      toast.error("Selecione quem recebe as publicacoes quando nao houver vinculo automatico.");
+      return;
+    }
+
+    const diariosCodigos = resolverDiariosSelecionados();
+    if (diariosCodigos.length === 0) {
+      toast.error("Nenhum diario oficial sem scraping foi encontrado para esta abrangencia.");
+      return;
+    }
+
+    setSalvando(true);
+    try {
+      await publicacoesApi.criarFonteMonitorada({
+        tipo,
+        nomeExibicao: nome,
+        valorMonitorado: valor,
+        uf: ufNormalizada || null,
+        observacao: observacao.trim() || null,
+        destinatariosIds: [destinatarioId],
+        diariosCodigos,
+      });
+      toast.success("Fonte monitorada cadastrada.");
+      limparFormulario();
+      await carregarFontes();
+      await onChanged();
+    } catch (error) {
+      console.error("Erro ao criar fonte monitorada:", error);
+      toast.error("Nao foi possivel cadastrar a fonte monitorada.");
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const alternarFonte = async (fonte: PublicacaoFonteMonitorada, ativo: boolean) => {
+    setAlterandoId(fonte.id);
+    try {
+      const atualizada = await publicacoesApi.alterarAtivoFonteMonitorada(fonte.id, ativo);
+      setFontes((atuais) => atuais.map((item) => (item.id === atualizada.id ? atualizada : item)));
+      await onChanged();
+    } catch (error) {
+      console.error("Erro ao alterar fonte monitorada:", error);
+      toast.error("Nao foi possivel alterar a fonte monitorada.");
+    } finally {
+      setAlterandoId(null);
+    }
+  };
+
+  const fontesAtivas = fontes.filter((fonte) => fonte.ativo).length;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[86vh] max-w-5xl overflow-hidden">
+        <DialogHeader>
+          <DialogTitle>Fontes monitoradas</DialogTitle>
+          <DialogDescription>
+            Cadastre os nomes, OABs, CPFs ou CNPJs que representam o escritorio. O DJEN usa esta lista para filtrar publicacoes localmente.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid min-h-0 gap-4 lg:grid-cols-[360px_minmax(0,1fr)]">
+          <div className="max-h-[66vh] overflow-y-auto rounded-2xl border border-border bg-background/50 p-4">
+            <div className="mb-4">
+              <p className="text-sm font-semibold text-foreground">Nova fonte</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                Use entradas separadas para nome do fundador, nome do escritorio, OAB principal e CNPJ.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label>Tipo</Label>
+                <Select value={tipo} onValueChange={(value) => setTipo(value as TipoFontePublicacaoMonitorada)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tiposFontePublicacao.map((item) => (
+                      <SelectItem key={item} value={item}>
+                        {formatarTipoFonte(item)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Nome de exibicao</Label>
+                <Input
+                  value={nomeExibicao}
+                  onChange={(event) => setNomeExibicao(event.target.value)}
+                  placeholder="Ex.: Fundador - OAB BA"
+                />
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-[1fr_88px]">
+                <div className="space-y-1.5">
+                  <Label>Valor monitorado</Label>
+                  <Input
+                    value={valorMonitorado}
+                    onChange={(event) => setValorMonitorado(event.target.value)}
+                    placeholder={tipo === "OAB" ? "Ex.: 12345" : "Nome, CPF ou CNPJ"}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>UF</Label>
+                  <Input
+                    value={uf}
+                    onChange={(event) => setUf(event.target.value.toUpperCase().slice(0, 2))}
+                    placeholder="BA"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Quem recebe</Label>
+                <Select value={destinatarioId} onValueChange={setDestinatarioId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o responsavel padrao" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {usuarios.map((usuario) => (
+                      <SelectItem key={usuario.id} value={usuario.id}>
+                        {usuario.nome} {usuario.oab ? `- OAB ${usuario.oab}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs leading-5 text-muted-foreground">
+                  Se o processo for vinculado, o responsavel do processo prevalece. Este campo e o fallback.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Diarios oficiais monitorados</Label>
+                <Select
+                  value={abrangencia}
+                  onValueChange={(value) => setAbrangencia(value as AbrangenciaFonteMonitorada)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="DJEN_TODOS">DJEN: todos os estados e superiores</SelectItem>
+                    <SelectItem value="DJEN_UF_SUPERIORES">DJEN: UF informada e superiores</SelectItem>
+                    <SelectItem value="DJEN_SUPERIORES">DJEN: somente superiores</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs leading-5 text-muted-foreground">
+                  Apenas fontes oficiais sem scraping entram no fluxo automatico.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Observacao interna</Label>
+                <Textarea
+                  value={observacao}
+                  onChange={(event) => setObservacao(event.target.value)}
+                  placeholder="Ex.: nome usado nas publicacoes do escritorio"
+                  className="min-h-[92px]"
+                />
+              </div>
+
+              <Button type="button" className="w-full" onClick={() => void criarFonte()} disabled={salvando}>
+                {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                Cadastrar fonte
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex min-h-0 flex-col rounded-2xl border border-border bg-background/40">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Fontes em uso</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {fontesAtivas} ativa(s) de {fontes.length} cadastrada(s). {diariosOficiais.filter((diario) => !diario.requerScraping).length} canais oficiais sem scraping no catalogo.
+                </p>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={() => void carregarFontes()} disabled={loading}>
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+                Atualizar
+              </Button>
+            </div>
+
+            <ScrollArea className="min-h-[360px] flex-1">
+              {loading ? (
+                <div className="space-y-3 p-4">
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <div key={index} className="rounded-2xl border border-border bg-card/50 p-4">
+                      <Skeleton className="h-5 w-40" />
+                      <Skeleton className="mt-3 h-4 w-3/4" />
+                      <Skeleton className="mt-3 h-4 w-1/2" />
+                    </div>
+                  ))}
+                </div>
+              ) : fontes.length === 0 ? (
+                <div className="flex min-h-[360px] items-center justify-center px-6 text-center">
+                  <div className="space-y-2">
+                    <Settings2 className="mx-auto h-9 w-9 text-muted-foreground/35" />
+                    <p className="text-sm font-medium text-foreground">Nenhuma fonte monitorada</p>
+                    <p className="text-sm text-muted-foreground">
+                      Cadastre OAB, nome ou CNPJ para a captura encontrar publicacoes do escritorio.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3 p-4">
+                  {fontes.map((fonte) => (
+                    <div
+                      key={fonte.id}
+                      className={cn(
+                        "rounded-2xl border p-4 transition-colors",
+                        fonte.ativo
+                          ? "border-primary/20 bg-primary/5"
+                          : "border-border bg-card/40 opacity-75",
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
+                              {formatarTipoFonte(fonte.tipo)}
+                            </Badge>
+                            {fonte.uf ? (
+                              <Badge variant="outline" className="rounded-full">
+                                {fonte.uf}
+                              </Badge>
+                            ) : null}
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "rounded-full",
+                                fonte.ativo
+                                  ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-300"
+                                  : "border-border bg-muted text-muted-foreground",
+                              )}
+                            >
+                              {fonte.ativo ? "Ativa" : "Pausada"}
+                            </Badge>
+                          </div>
+
+                          <p className="mt-3 truncate text-sm font-semibold text-foreground">
+                            {fonte.nomeExibicao}
+                          </p>
+                          <p className="mt-1 font-mono text-xs text-muted-foreground">
+                            {fonte.valorMonitorado}
+                          </p>
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            Quem recebe:{" "}
+                            <span className="text-foreground/85">
+                              {fonte.destinatarios?.length
+                                ? fonte.destinatarios.map((destinatario) => destinatario.nome).join(", ")
+                                : "Sem fallback definido"}
+                            </span>
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Diarios:{" "}
+                            <span className="text-foreground/85">
+                              {fonte.abrangenciaResumo ?? "Sem diarios vinculados"}
+                            </span>
+                          </p>
+                          {fonte.observacao ? (
+                            <p className="mt-3 text-xs leading-5 text-muted-foreground">
+                              {fonte.observacao}
+                            </p>
+                          ) : null}
+                        </div>
+
+                        <div className="flex shrink-0 items-center gap-2">
+                          {alterandoId === fonte.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                          ) : null}
+                          <Switch
+                            checked={fonte.ativo}
+                            disabled={alterandoId === fonte.id}
+                            onCheckedChange={(checked) => void alternarFonte(fonte, checked)}
+                          />
+                        </div>
+                      </div>
+                      {fonte.diariosMonitorados?.length ? (
+                        <details className="mt-4 rounded-xl border border-border bg-background/50 px-3 py-2">
+                          <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+                            Visualizar lista de diarios monitorados
+                          </summary>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {fonte.diariosMonitorados.map((diario) => (
+                              <Badge
+                                key={diario.id}
+                                variant="outline"
+                                className={cn(
+                                  "rounded-full",
+                                  diario.requerScraping
+                                    ? "border-rose-500/20 bg-rose-500/10 text-rose-300"
+                                    : "border-emerald-500/20 bg-emerald-500/10 text-emerald-300",
+                                )}
+                              >
+                                {diario.codigo}{diario.uf ? `/${diario.uf}` : ""}
+                              </Badge>
+                            ))}
+                          </div>
+                        </details>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Fechar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+*/
+
 export const PublicacoesView = () => {
   const isMobile = useIsMobile();
   const [publicacoes, setPublicacoes] = useState<Publicacao[]>([]);
+  const [historico, setHistorico] = useState<PublicacaoHistorico[]>([]);
   const [metricas, setMetricas] = useState<PublicacaoMetricas>(metricasIniciais);
   const [publicacaoSelecionada, setPublicacaoSelecionada] = useState<Publicacao | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingHistorico, setLoadingHistorico] = useState(false);
   const [busca, setBusca] = useState("");
   const [buscaAplicada, setBuscaAplicada] = useState("");
   const [statusFiltro, setStatusFiltro] = useState<FiltroStatus>("PENDENTE");
@@ -470,6 +1033,7 @@ export const PublicacoesView = () => {
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [abrirVinculo, setAbrirVinculo] = useState(false);
   const [abrirPrazo, setAbrirPrazo] = useState(false);
+  const [abrirAtribuicao, setAbrirAtribuicao] = useState(false);
 
   const carregarDados = useCallback(async () => {
     setLoading(true);
@@ -479,6 +1043,8 @@ export const PublicacoesView = () => {
           status: statusFiltro === "TODAS" ? undefined : statusFiltro,
           busca: buscaAplicada || undefined,
           somenteRiscoPrazo: filaFiltro === "PRAZO_SUSPEITO" ? true : undefined,
+          statusFluxo: filaFiltro === "SEM_RESPONSAVEL" ? "SEM_RESPONSAVEL" : undefined,
+          minhas: filaFiltro === "MINHAS" ? true : undefined,
         }),
         publicacoesApi.metricas(),
       ]);
@@ -495,6 +1061,19 @@ export const PublicacoesView = () => {
     }
   }, [buscaAplicada, filaFiltro, statusFiltro]);
 
+  const carregarHistoricoPublicacao = useCallback(async (publicacaoId: string) => {
+    setLoadingHistorico(true);
+    try {
+      const data = await publicacoesApi.historico(publicacaoId);
+      setHistorico(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Erro ao carregar historico da publicacao:", error);
+      setHistorico([]);
+    } finally {
+      setLoadingHistorico(false);
+    }
+  }, []);
+
   useEffect(() => {
     void carregarDados();
   }, [carregarDados]);
@@ -502,6 +1081,7 @@ export const PublicacoesView = () => {
   const publicacoesFiltradas = useMemo(() => {
     return publicacoes.filter((publicacao) => {
       if (filaFiltro === "SEM_VINCULO" && publicacao.processoId) return false;
+      if (filaFiltro === "SEM_RESPONSAVEL" && publicacao.statusFluxo !== "SEM_RESPONSAVEL") return false;
       if (filaFiltro === "PRAZO_SUSPEITO" && !publicacao.riscoPrazo) return false;
       if (apenasHoje && !isHoje(publicacao.dataPublicacao)) return false;
       return true;
@@ -515,6 +1095,15 @@ export const PublicacoesView = () => {
       return publicacoesFiltradas.find((item) => item.id === atual.id) ?? publicacoesFiltradas[0];
     });
   }, [publicacoesFiltradas]);
+
+  useEffect(() => {
+    if (!publicacaoSelecionada?.id) {
+      setHistorico([]);
+      return;
+    }
+
+    void carregarHistoricoPublicacao(publicacaoSelecionada.id);
+  }, [carregarHistoricoPublicacao, publicacaoSelecionada?.id]);
 
   const aplicarBusca = () => {
     setBuscaAplicada(busca.trim());
@@ -538,6 +1127,7 @@ export const PublicacoesView = () => {
       await publicacoesApi.atualizarStatus(publicacao.id, status);
       toast.success(successMessage);
       await carregarDados();
+      await carregarHistoricoPublicacao(publicacao.id);
     } catch (error) {
       console.error("Erro ao atualizar status da publicacao:", error);
       toast.error("Não foi possível atualizar o status da publicação.");
@@ -553,6 +1143,40 @@ export const PublicacoesView = () => {
       return;
     }
     setAbrirPrazo(true);
+  };
+
+  const assumirPublicacao = async () => {
+    if (!publicacaoSelecionada) return;
+
+    setActionLoadingId(publicacaoSelecionada.id);
+    try {
+      await publicacoesApi.assumir(publicacaoSelecionada.id);
+      toast.success("Publicacao assumida para tratamento.");
+      await carregarDados();
+      await carregarHistoricoPublicacao(publicacaoSelecionada.id);
+    } catch (error) {
+      console.error("Erro ao assumir publicacao:", error);
+      toast.error("Nao foi possivel assumir a publicacao.");
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const reprocessarTriagem = async () => {
+    if (!publicacaoSelecionada) return;
+
+    setActionLoadingId(publicacaoSelecionada.id);
+    try {
+      await publicacoesApi.reprocessarIa(publicacaoSelecionada.id);
+      toast.success("Triagem inteligente reprocessada.");
+      await carregarDados();
+      await carregarHistoricoPublicacao(publicacaoSelecionada.id);
+    } catch (error) {
+      console.error("Erro ao reprocessar triagem de publicacao:", error);
+      toast.error("Nao foi possivel reprocessar a triagem.");
+    } finally {
+      setActionLoadingId(null);
+    }
   };
 
   const cardsMetricas = [
@@ -616,8 +1240,10 @@ export const PublicacoesView = () => {
 
   const filaFilters = [
     { key: "TODAS" as const, label: "Fila completa" },
+    { key: "MINHAS" as const, label: "Minhas publicacoes" },
     { key: "PRAZO_SUSPEITO" as const, label: `Prazo suspeito (${metricas.prazoSuspeito})` },
     { key: "SEM_VINCULO" as const, label: `Sem vínculo (${metricas.semVinculo})` },
+    { key: "SEM_RESPONSAVEL" as const, label: `Sem responsavel (${metricas.semResponsavel})` },
   ];
 
   const statusFilters = [
@@ -747,6 +1373,9 @@ export const PublicacoesView = () => {
                   </Badge>
                   <Badge variant="outline" className="rounded-full">
                     {detalheSelecionado.statusTratamento}
+                  </Badge>
+                  <Badge variant="outline" className="rounded-full border-primary/20 bg-primary/5 text-primary">
+                    {formatarStatusFluxo(detalheSelecionado.statusFluxo)}
                   </Badge>
                   <Badge variant="outline" className={prioridadeSelecionada.className}>
                     {prioridadeSelecionada.label}
@@ -884,7 +1513,10 @@ export const PublicacoesView = () => {
                   </div>
 
                   <div className="rounded-2xl border border-border bg-background/40 p-5">
-                    <p className="text-sm font-semibold text-foreground">Sinais de triagem</p>
+                    <div className="flex items-center gap-2">
+                      <History className="h-4 w-4 text-primary" />
+                      <p className="text-sm font-semibold text-foreground">Roteamento e historico</p>
+                    </div>
 
                     <div className="mt-4 space-y-3">
                       <div className="rounded-xl border border-border bg-card/60 p-4">
@@ -904,9 +1536,62 @@ export const PublicacoesView = () => {
                       <div className="rounded-xl border border-border bg-card/60 p-4">
                         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Status da fila</p>
                         <p className="mt-1 text-sm font-medium text-foreground">
-                          {detalheSelecionado.statusTratamento}
+                          {formatarStatusFluxo(detalheSelecionado.statusFluxo)}
                         </p>
                       </div>
+
+                      <div className="rounded-xl border border-border bg-card/60 p-4">
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Captada em nome de</p>
+                        <p className="mt-1 text-sm font-medium text-foreground">
+                          {detalheSelecionado.captadaEmNome ?? detalheSelecionado.oabMonitorada ?? "Nao informado"}
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl border border-border bg-card/60 p-4">
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Responsavel</p>
+                        <p className="mt-1 text-sm font-medium text-foreground">
+                          {detalheSelecionado.assumidaPorUsuarioNome ??
+                            detalheSelecionado.atribuidaParaUsuarioNome ??
+                            detalheSelecionado.responsavelProcessoNome ??
+                            "Sem responsavel definido"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 rounded-xl border border-border bg-card/60 p-4">
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Ultimos eventos</p>
+                      {loadingHistorico ? (
+                        <div className="mt-3 space-y-2">
+                          <Skeleton className="h-4 w-full" />
+                          <Skeleton className="h-4 w-3/4" />
+                        </div>
+                      ) : historico.length === 0 ? (
+                        <p className="mt-2 text-sm text-muted-foreground">Nenhum evento registrado ainda.</p>
+                      ) : (
+                        <div className="mt-3 space-y-3">
+                          {historico.slice(0, 5).map((evento) => (
+                            <div key={evento.id} className="border-l border-primary/35 pl-3">
+                              <div className="flex items-center justify-between gap-3">
+                                <p className="text-sm font-medium text-foreground">
+                                  {formatarAcaoHistorico(evento.acao)}
+                                </p>
+                                <span className="shrink-0 text-[10px] text-muted-foreground">
+                                  {formatarDataCurta(evento.criadoEm)}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                                {evento.observacao ?? "Evento sem observacao."}
+                              </p>
+                              {evento.usuarioNome || evento.usuarioDestinoNome ? (
+                                <p className="mt-1 text-[11px] text-muted-foreground">
+                                  {evento.usuarioNome ?? "Sistema"}
+                                  {evento.usuarioDestinoNome ? ` -> ${evento.usuarioDestinoNome}` : ""}
+                                </p>
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -923,6 +1608,30 @@ export const PublicacoesView = () => {
               <div className="flex flex-wrap gap-2">
                 {detalheSelecionado.statusTratamento === "PENDENTE" ? (
                   <>
+                    <Button
+                      variant="outline"
+                      onClick={() => void assumirPublicacao()}
+                      disabled={actionLoading}
+                    >
+                      {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserCheck className="h-4 w-4" />}
+                      Assumir
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setAbrirAtribuicao(true)}
+                      disabled={actionLoading}
+                    >
+                      <UserPlus className="h-4 w-4" />
+                      Atribuir
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => void reprocessarTriagem()}
+                      disabled={actionLoading}
+                    >
+                      <WandSparkles className="h-4 w-4" />
+                      Reprocessar IA
+                    </Button>
                     <Button onClick={abrirModalPrazo} disabled={actionLoading}>
                       <CalendarClock className="h-4 w-4" />
                       Criar Prazo
@@ -1159,6 +1868,17 @@ export const PublicacoesView = () => {
         onOpenChange={setAbrirPrazo}
         publicacao={publicacaoSelecionada}
         onSaved={carregarDados}
+      />
+      <AtribuirPublicacaoDialog
+        open={abrirAtribuicao}
+        onOpenChange={setAbrirAtribuicao}
+        publicacao={publicacaoSelecionada}
+        onAssigned={async () => {
+          await carregarDados();
+          if (publicacaoSelecionada?.id) {
+            await carregarHistoricoPublicacao(publicacaoSelecionada.id);
+          }
+        }}
       />
     </>
   );

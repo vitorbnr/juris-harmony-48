@@ -1,16 +1,30 @@
 package com.viana.controller;
 
 import com.viana.dto.request.AtualizarStatusPublicacaoRequest;
+import com.viana.dto.request.AtribuirPublicacaoRequest;
+import com.viana.dto.request.IngestarPublicacaoRequest;
 import com.viana.dto.request.VincularProcessoPublicacaoRequest;
+import com.viana.dto.response.PublicacaoCapturaExecucaoResponse;
+import com.viana.dto.response.PublicacaoDjenSyncResponse;
+import com.viana.dto.response.PublicacaoDouSyncResponse;
+import com.viana.dto.response.PublicacaoHistoricoResponse;
 import com.viana.dto.response.PublicacaoMetricasResponse;
+import com.viana.dto.response.PublicacaoMonitoramentoResponse;
 import com.viana.dto.response.PublicacaoResponse;
+import com.viana.service.PublicacaoCapturaExecucaoService;
+import com.viana.service.PublicacaoDjenColetaService;
+import com.viana.service.PublicacaoDouColetaService;
+import com.viana.service.PublicacaoMonitoramentoService;
 import com.viana.service.PublicacaoService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -26,38 +40,123 @@ import java.util.UUID;
 public class PublicacaoController {
 
     private final PublicacaoService publicacaoService;
+    private final PublicacaoMonitoramentoService publicacaoMonitoramentoService;
+    private final PublicacaoDjenColetaService publicacaoDjenColetaService;
+    private final PublicacaoDouColetaService publicacaoDouColetaService;
+    private final PublicacaoCapturaExecucaoService publicacaoCapturaExecucaoService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO', 'SECRETARIA')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO')")
     public ResponseEntity<List<PublicacaoResponse>> listar(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String busca,
-            @RequestParam(required = false) Boolean somenteRiscoPrazo
+            @RequestParam(required = false) Boolean somenteRiscoPrazo,
+            @RequestParam(required = false) String statusFluxo,
+            @RequestParam(required = false) Boolean minhas,
+            Authentication authentication
     ) {
-        return ResponseEntity.ok(publicacaoService.listar(status, busca, somenteRiscoPrazo));
+        return ResponseEntity.ok(publicacaoService.listar(
+                status,
+                busca,
+                somenteRiscoPrazo,
+                statusFluxo,
+                minhas,
+                authentication.getName()
+        ));
     }
 
     @GetMapping("/stats")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO', 'SECRETARIA')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO')")
     public ResponseEntity<PublicacaoMetricasResponse> buscarMetricas() {
         return ResponseEntity.ok(publicacaoService.buscarMetricas());
     }
 
+    @GetMapping("/monitoramento")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO')")
+    public ResponseEntity<PublicacaoMonitoramentoResponse> buscarMonitoramento() {
+        return ResponseEntity.ok(publicacaoMonitoramentoService.buscarStatus());
+    }
+
+    @GetMapping("/capturas")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO')")
+    public ResponseEntity<List<PublicacaoCapturaExecucaoResponse>> listarCapturas(
+            @RequestParam(required = false, defaultValue = "10") Integer size
+    ) {
+        return ResponseEntity.ok(publicacaoCapturaExecucaoService.listarRecentes(size));
+    }
+
+    @PostMapping("/coleta/djen")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    public ResponseEntity<PublicacaoDjenSyncResponse> coletarDjen() {
+        return ResponseEntity.ok(publicacaoDjenColetaService.sincronizar(true));
+    }
+
+    @PostMapping("/coleta/dou")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    public ResponseEntity<PublicacaoDouSyncResponse> coletarDou() {
+        return ResponseEntity.ok(publicacaoDouColetaService.sincronizar(true));
+    }
+
+    @GetMapping("/{id}/historico")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO')")
+    public ResponseEntity<List<PublicacaoHistoricoResponse>> listarHistorico(@PathVariable UUID id) {
+        return ResponseEntity.ok(publicacaoService.listarHistorico(id));
+    }
+
+    @PostMapping("/ingestao")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO')")
+    public ResponseEntity<PublicacaoResponse> ingestar(
+            @Valid @RequestBody IngestarPublicacaoRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(publicacaoService.ingestar(request, authentication.getName()));
+    }
+
     @PutMapping("/{id}/status")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO', 'SECRETARIA')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO')")
     public ResponseEntity<PublicacaoResponse> atualizarStatus(
             @PathVariable UUID id,
-            @Valid @RequestBody AtualizarStatusPublicacaoRequest request
+            @Valid @RequestBody AtualizarStatusPublicacaoRequest request,
+            Authentication authentication
     ) {
-        return ResponseEntity.ok(publicacaoService.atualizarStatus(id, request.getStatus()));
+        return ResponseEntity.ok(publicacaoService.atualizarStatus(id, request.getStatus(), authentication.getName()));
     }
 
     @PutMapping("/{id}/vincular-processo")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO', 'SECRETARIA')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO')")
     public ResponseEntity<PublicacaoResponse> vincularProcesso(
             @PathVariable UUID id,
-            @Valid @RequestBody VincularProcessoPublicacaoRequest request
+            @Valid @RequestBody VincularProcessoPublicacaoRequest request,
+            Authentication authentication
     ) {
-        return ResponseEntity.ok(publicacaoService.vincularProcesso(id, request.getProcessoId()));
+        return ResponseEntity.ok(publicacaoService.vincularProcesso(id, request.getProcessoId(), authentication.getName()));
+    }
+
+    @PatchMapping("/{id}/atribuir")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO')")
+    public ResponseEntity<PublicacaoResponse> atribuir(
+            @PathVariable UUID id,
+            @Valid @RequestBody AtribuirPublicacaoRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(publicacaoService.atribuir(id, request.getUsuarioId(), authentication.getName()));
+    }
+
+    @PatchMapping("/{id}/assumir")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO')")
+    public ResponseEntity<PublicacaoResponse> assumir(
+            @PathVariable UUID id,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(publicacaoService.assumir(id, authentication.getName()));
+    }
+
+    @PostMapping("/{id}/ia/reprocessar")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO')")
+    public ResponseEntity<PublicacaoResponse> reprocessarTriagemInteligente(
+            @PathVariable UUID id,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(publicacaoService.reprocessarTriagemInteligente(id, authentication.getName()));
     }
 }

@@ -1,5 +1,15 @@
 import api from "@/lib/api";
-import type { Publicacao, PublicacaoMetricas } from "@/types/publicacoes";
+import type {
+  Publicacao,
+  PublicacaoCapturaExecucao,
+  PublicacaoDjenSync,
+  PublicacaoDiarioOficial,
+  PublicacaoDouSync,
+  PublicacaoFonteMonitorada,
+  PublicacaoHistorico,
+  PublicacaoMetricas,
+  PublicacaoMonitoramento,
+} from "@/types/publicacoes";
 import type {
   Atendimento,
   Caso,
@@ -576,17 +586,92 @@ export const eventosJuridicosApi = {
 };
 
 export const publicacoesApi = {
-  listar: (params?: { status?: string; busca?: string; somenteRiscoPrazo?: boolean }) =>
+  listar: (params?: {
+    status?: string;
+    busca?: string;
+    somenteRiscoPrazo?: boolean;
+    statusFluxo?: string;
+    minhas?: boolean;
+  }) =>
     api.get("/publicacoes", { params: cleanParams(params) }).then(r => r.data as Publicacao[]),
 
   metricas: () =>
     api.get("/publicacoes/stats").then(r => r.data as PublicacaoMetricas),
+
+  monitoramento: () =>
+    api.get("/publicacoes/monitoramento").then(r => r.data as PublicacaoMonitoramento),
+
+  capturasRecentes: (params?: { size?: number }) =>
+    api.get("/publicacoes/capturas", { params: cleanParams(params) })
+      .then(r => r.data as PublicacaoCapturaExecucao[]),
+
+  coletarDjen: () =>
+    api.post("/publicacoes/coleta/djen").then(r => r.data as PublicacaoDjenSync),
+
+  coletarDou: () =>
+    api.post("/publicacoes/coleta/dou").then(r => r.data as PublicacaoDouSync),
 
   atualizarStatus: (id: string, status: string) =>
     api.put(`/publicacoes/${id}/status`, { status }).then(r => r.data as Publicacao),
 
   vincularProcesso: (id: string, processoId: string) =>
     api.put(`/publicacoes/${id}/vincular-processo`, { processoId }).then(r => r.data as Publicacao),
+
+  atribuir: (id: string, usuarioId: string) =>
+    api.patch(`/publicacoes/${id}/atribuir`, { usuarioId }).then(r => r.data as Publicacao),
+
+  assumir: (id: string) =>
+    api.patch(`/publicacoes/${id}/assumir`).then(r => r.data as Publicacao),
+
+  reprocessarIa: (id: string) =>
+    api.post(`/publicacoes/${id}/ia/reprocessar`).then(r => r.data as Publicacao),
+
+  historico: (id: string) =>
+    api.get(`/publicacoes/${id}/historico`).then(r => r.data as PublicacaoHistorico[]),
+
+  ingestar: (data: {
+    npu?: string | null;
+    tribunalOrigem: string;
+    teor: string;
+    dataPublicacao: string;
+    fonte?: string | null;
+    identificadorExterno?: string | null;
+    captadaEmNome?: string | null;
+    oabMonitorada?: string | null;
+    hashDeduplicacao?: string | null;
+  }) => api.post("/publicacoes/ingestao", data).then(r => r.data as Publicacao),
+
+  listarFontesMonitoradas: (params?: { apenasAtivas?: boolean }) =>
+    api.get("/publicacoes/fontes-monitoradas", { params: cleanParams(params) })
+      .then(r => r.data as PublicacaoFonteMonitorada[]),
+
+  criarFonteMonitorada: (data: {
+    tipo: string;
+    nomeExibicao: string;
+    valorMonitorado: string;
+    uf?: string | null;
+    observacao?: string | null;
+    destinatariosIds?: string[];
+    diariosCodigos?: string[];
+  }) => api.post("/publicacoes/fontes-monitoradas", data).then(r => r.data as PublicacaoFonteMonitorada),
+
+  atualizarFonteMonitorada: (id: string, data: {
+    tipo: string;
+    nomeExibicao: string;
+    valorMonitorado: string;
+    uf?: string | null;
+    observacao?: string | null;
+    destinatariosIds?: string[];
+    diariosCodigos?: string[];
+  }) => api.put(`/publicacoes/fontes-monitoradas/${id}`, data).then(r => r.data as PublicacaoFonteMonitorada),
+
+  alterarAtivoFonteMonitorada: (id: string, ativo: boolean) =>
+    api.patch(`/publicacoes/fontes-monitoradas/${id}/ativo`, { ativo })
+      .then(r => r.data as PublicacaoFonteMonitorada),
+
+  listarDiariosOficiais: (params?: { apenasSemScraping?: boolean; uf?: string }) =>
+    api.get("/publicacoes/diarios-oficiais", { params: cleanParams(params) })
+      .then(r => r.data as PublicacaoDiarioOficial[]),
 };
 
 export const integracoesApi = {

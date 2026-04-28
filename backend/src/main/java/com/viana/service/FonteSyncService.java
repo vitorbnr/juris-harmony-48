@@ -78,6 +78,64 @@ public class FonteSyncService {
         fonteSyncRepository.save(fonteSync);
     }
 
+    @Transactional
+    public void registrarSucessoDjen(String tribunal, int publicacoesImportadas, String mensagem) {
+        FonteSync fonteSync = getOrCreateDjenTribunal(tribunal);
+        LocalDateTime now = LocalDateTime.now();
+
+        fonteSync.setStatus(StatusIntegracao.SUCESSO);
+        fonteSync.setUltimoSyncEm(now);
+        fonteSync.setUltimoSucessoEm(now);
+        fonteSync.setProximoSyncEm(now.plusDays(1));
+        fonteSync.setTentativas(0);
+        fonteSync.setUltimaMensagem(buildMensagem(mensagem, publicacoesImportadas).replace("movimentacoes", "publicacoes"));
+
+        fonteSyncRepository.save(fonteSync);
+    }
+
+    @Transactional
+    public void registrarErroDjen(String tribunal, String mensagem) {
+        FonteSync fonteSync = getOrCreateDjenTribunal(tribunal);
+        LocalDateTime now = LocalDateTime.now();
+
+        fonteSync.setStatus(StatusIntegracao.ERRO);
+        fonteSync.setUltimoSyncEm(now);
+        fonteSync.setProximoSyncEm(now.plusHours(12));
+        fonteSync.setTentativas(fonteSync.getTentativas() + 1);
+        fonteSync.setUltimaMensagem(mensagem);
+
+        fonteSyncRepository.save(fonteSync);
+    }
+
+    @Transactional
+    public void registrarSucessoDou(String secao, int publicacoesImportadas, String mensagem) {
+        FonteSync fonteSync = getOrCreateDouSecao(secao);
+        LocalDateTime now = LocalDateTime.now();
+
+        fonteSync.setStatus(StatusIntegracao.SUCESSO);
+        fonteSync.setUltimoSyncEm(now);
+        fonteSync.setUltimoSucessoEm(now);
+        fonteSync.setProximoSyncEm(now.plusDays(1));
+        fonteSync.setTentativas(0);
+        fonteSync.setUltimaMensagem(buildMensagem(mensagem, publicacoesImportadas).replace("movimentacoes", "publicacoes"));
+
+        fonteSyncRepository.save(fonteSync);
+    }
+
+    @Transactional
+    public void registrarErroDou(String secao, String mensagem) {
+        FonteSync fonteSync = getOrCreateDouSecao(secao);
+        LocalDateTime now = LocalDateTime.now();
+
+        fonteSync.setStatus(StatusIntegracao.ERRO);
+        fonteSync.setUltimoSyncEm(now);
+        fonteSync.setProximoSyncEm(now.plusHours(12));
+        fonteSync.setTentativas(fonteSync.getTentativas() + 1);
+        fonteSync.setUltimaMensagem(mensagem);
+
+        fonteSyncRepository.save(fonteSync);
+    }
+
     private FonteSync getOrCreateDatajudProcesso(Processo processo) {
         return fonteSyncRepository
                 .findByFonteAndReferenciaTipoAndReferenciaId(
@@ -103,6 +161,40 @@ public class FonteSyncService {
                 )
                 .orElseGet(() -> FonteSync.builder()
                         .fonte(FonteIntegracao.DOMICILIO)
+                        .referenciaTipo(TipoReferenciaIntegracao.INSTITUICAO)
+                        .referenciaId(referenciaId)
+                        .referenciaExterna(referencia)
+                        .build());
+    }
+
+    private FonteSync getOrCreateDjenTribunal(String tribunal) {
+        String referencia = tribunal == null || tribunal.isBlank() ? "DJEN" : tribunal.trim().toUpperCase();
+        UUID referenciaId = UUID.nameUUIDFromBytes(("DJEN:" + referencia).getBytes(StandardCharsets.UTF_8));
+        return fonteSyncRepository
+                .findByFonteAndReferenciaTipoAndReferenciaId(
+                        FonteIntegracao.DJEN,
+                        TipoReferenciaIntegracao.INSTITUICAO,
+                        referenciaId
+                )
+                .orElseGet(() -> FonteSync.builder()
+                        .fonte(FonteIntegracao.DJEN)
+                        .referenciaTipo(TipoReferenciaIntegracao.INSTITUICAO)
+                        .referenciaId(referenciaId)
+                        .referenciaExterna(referencia)
+                        .build());
+    }
+
+    private FonteSync getOrCreateDouSecao(String secao) {
+        String referencia = secao == null || secao.isBlank() ? "DOU" : secao.trim().toUpperCase();
+        UUID referenciaId = UUID.nameUUIDFromBytes(("DOU:" + referencia).getBytes(StandardCharsets.UTF_8));
+        return fonteSyncRepository
+                .findByFonteAndReferenciaTipoAndReferenciaId(
+                        FonteIntegracao.DOU,
+                        TipoReferenciaIntegracao.INSTITUICAO,
+                        referenciaId
+                )
+                .orElseGet(() -> FonteSync.builder()
+                        .fonte(FonteIntegracao.DOU)
                         .referenciaTipo(TipoReferenciaIntegracao.INSTITUICAO)
                         .referenciaId(referenciaId)
                         .referenciaExterna(referencia)

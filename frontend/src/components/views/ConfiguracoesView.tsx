@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { User, Building2, Users, Plus, Activity, Check, Save, Pencil, UserX, UserCheck, Link2 } from "lucide-react";
+import { User, Building2, Users, Plus, Activity, Check, Save, Pencil, UserX, UserCheck, Link2, Newspaper } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +11,7 @@ import { usuariosApi, logsApi } from "@/services/api";
 import { NovoUsuarioModal } from "@/components/modals/NovoUsuarioModal";
 import { EditarUsuarioModal } from "@/components/modals/EditarUsuarioModal";
 import { IntegracoesTab } from "@/components/views/configuracoes/IntegracoesTab";
+import { PublicacoesAdminTab } from "@/components/views/configuracoes/PublicacoesAdminTab";
 import type { UserRole } from "@/types";
 
 // --- INTERFACES ADICIONADAS ---
@@ -39,11 +40,12 @@ interface LogAcesso {
 }
 // ------------------------------
 
-type Aba = "perfil" | "integracoes" | "equipe" | "logs";
+type Aba = "perfil" | "integracoes" | "publicacoes" | "equipe" | "logs";
 
 const abas: { id: Aba; label: string; icon: React.ElementType }[] = [
   { id: "perfil",       label: "Perfil",       icon: User },
   { id: "integracoes",  label: "Integracoes",  icon: Link2 },
+  { id: "publicacoes",  label: "Publicacoes",  icon: Newspaper },
   { id: "equipe",       label: "Equipe",       icon: Users },
   { id: "logs",         label: "Logs de Acesso", icon: Activity },
 ];
@@ -396,7 +398,7 @@ export const ConfiguracoesView = () => {
       {/* Conflito de CSS resolvido aqui: Removido o '-mb-px' que brigava com o 'mb-8' */}
       <div className="flex gap-1 mb-8 border-b border-border pb-0">
         {abas
-          .filter(aba => (aba.id === "integracoes" || aba.id === "equipe" || aba.id === "logs") ? user?.papel === "ADMINISTRADOR" : true)
+          .filter(aba => (aba.id === "integracoes" || aba.id === "publicacoes" || aba.id === "equipe" || aba.id === "logs") ? user?.papel === "ADMINISTRADOR" : true)
           .map(a => {
           const Icon = a.icon;
           return (
@@ -420,6 +422,7 @@ export const ConfiguracoesView = () => {
       <div>
         {abaAtiva === "perfil"       && <TabPerfil />}
         {abaAtiva === "integracoes"  && <IntegracoesTab />}
+        {abaAtiva === "publicacoes"  && user?.papel === "ADMINISTRADOR" && <PublicacoesAdminTab />}
         {abaAtiva === "equipe"       && <TabEquipe />}
         {abaAtiva === "logs"         && <TabLogs />}
       </div>
