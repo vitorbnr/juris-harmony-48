@@ -495,9 +495,11 @@ export const AgendaNotasView = () => {
   );
 
   const diasDoMes = useMemo(() => buildMonthDays(referencia), [referencia]);
-  const diasDaSemana = modo === "semanal"
-    ? Array.from({ length: 7 }, (_, index) => addDays(range.inicio, index))
-    : [];
+  const diasDaSemana = useMemo(() => {
+    return modo === "semanal"
+      ? Array.from({ length: 7 }, (_, index) => addDays(range.inicio, index))
+      : [];
+  }, [modo, range.inicio]);
   const dataSelecionadaAtiva = useMemo(() => {
     if (!dataSelecionada) {
       return modo === "semanal" ? diasDaSemana[0] : undefined;
