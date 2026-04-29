@@ -61,6 +61,11 @@ public class PublicacaoCapturaExecucaoService {
 
     @Transactional
     public void concluirErro(UUID id, String mensagem) {
+        concluirErro(id, mensagem, null, null, null);
+    }
+
+    @Transactional
+    public void concluirErro(UUID id, String mensagem, String erroTipo, Integer erroCodigoHttp, String erroDetalhe) {
         PublicacaoCapturaExecucao execucao = repository.findById(id).orElse(null);
         if (execucao == null) {
             return;
@@ -68,6 +73,9 @@ public class PublicacaoCapturaExecucaoService {
 
         execucao.setFalhas(1);
         execucao.setMensagem(mensagem);
+        execucao.setErroTipo(limitar(erroTipo, 80));
+        execucao.setErroCodigoHttp(erroCodigoHttp);
+        execucao.setErroDetalhe(limitar(erroDetalhe, 2000));
         execucao.finalizar(StatusIntegracao.ERRO);
         repository.save(execucao);
     }
@@ -85,6 +93,8 @@ public class PublicacaoCapturaExecucaoService {
                 .publicacoesImportadas(execucao.getPublicacoesImportadas())
                 .falhas(execucao.getFalhas())
                 .mensagem(execucao.getMensagem())
+                .erroTipo(execucao.getErroTipo())
+                .erroCodigoHttp(execucao.getErroCodigoHttp())
                 .iniciadoEm(execucao.getIniciadoEm() != null ? execucao.getIniciadoEm().toString() : null)
                 .finalizadoEm(execucao.getFinalizadoEm() != null ? execucao.getFinalizadoEm().toString() : null)
                 .duracaoMs(execucao.getDuracaoMs())
@@ -96,5 +106,13 @@ public class PublicacaoCapturaExecucaoService {
             return "NAO_INFORMADO";
         }
         return value.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private String limitar(String value, int max) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.length() <= max ? trimmed : trimmed.substring(0, max);
     }
 }

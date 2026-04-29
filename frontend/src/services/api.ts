@@ -4,7 +4,6 @@ import type {
   PublicacaoCapturaExecucao,
   PublicacaoDjenSync,
   PublicacaoDiarioOficial,
-  PublicacaoDouSync,
   PublicacaoFonteMonitorada,
   PublicacaoHistorico,
   PublicacaoMetricas,
@@ -605,17 +604,63 @@ export const publicacoesApi = {
     api.get("/publicacoes/capturas", { params: cleanParams(params) })
       .then(r => r.data as PublicacaoCapturaExecucao[]),
 
-  coletarDjen: () =>
-    api.post("/publicacoes/coleta/djen").then(r => r.data as PublicacaoDjenSync),
+  coletarDjen: (params?: { tribunal?: string; data?: string; cadernoTipo?: string }) =>
+    api.post("/publicacoes/coleta/djen", null, { params: cleanParams(params) })
+      .then(r => r.data as PublicacaoDjenSync),
 
-  coletarDou: () =>
-    api.post("/publicacoes/coleta/dou").then(r => r.data as PublicacaoDouSync),
+    atualizarStatus: (id: string, status: string) =>
+      api.put(`/publicacoes/${id}/status`, { status }).then(r => r.data as Publicacao),
 
-  atualizarStatus: (id: string, status: string) =>
-    api.put(`/publicacoes/${id}/status`, { status }).then(r => r.data as Publicacao),
+    descartar: (id: string, motivo: string) =>
+      api.patch(`/publicacoes/${id}/descartar`, { motivo }).then(r => r.data as Publicacao),
 
-  vincularProcesso: (id: string, processoId: string) =>
-    api.put(`/publicacoes/${id}/vincular-processo`, { processoId }).then(r => r.data as Publicacao),
+    criarTarefa: (id: string, data: {
+      titulo: string;
+      data: string;
+      hora?: string | null;
+      prioridade?: string | null;
+      etapa?: string | null;
+      advogadoId?: string | null;
+      descricao?: string | null;
+    }) => api.post(`/publicacoes/${id}/tarefas`, data).then(r => r.data as {
+      publicacao: Publicacao;
+      atividade: Prazo;
+      eventoJuridicoId?: string | null;
+      mensagem?: string | null;
+    }),
+
+    criarPrazo: (id: string, data: {
+      titulo: string;
+      data: string;
+      hora?: string | null;
+      prioridade?: string | null;
+      etapa?: string | null;
+      advogadoId?: string | null;
+      descricao?: string | null;
+    }) => api.post(`/publicacoes/${id}/prazos`, data).then(r => r.data as {
+      publicacao: Publicacao;
+      atividade: Prazo;
+      eventoJuridicoId?: string | null;
+      mensagem?: string | null;
+    }),
+
+    criarAudiencia: (id: string, data: {
+      titulo: string;
+      data: string;
+      hora?: string | null;
+      prioridade?: string | null;
+      etapa?: string | null;
+      advogadoId?: string | null;
+      descricao?: string | null;
+    }) => api.post(`/publicacoes/${id}/audiencias`, data).then(r => r.data as {
+      publicacao: Publicacao;
+      atividade: Prazo;
+      eventoJuridicoId?: string | null;
+      mensagem?: string | null;
+    }),
+
+    vincularProcesso: (id: string, processoId: string) =>
+      api.put(`/publicacoes/${id}/vincular-processo`, { processoId }).then(r => r.data as Publicacao),
 
   atribuir: (id: string, usuarioId: string) =>
     api.patch(`/publicacoes/${id}/atribuir`, { usuarioId }).then(r => r.data as Publicacao),

@@ -42,6 +42,10 @@ public class EventoJuridico {
     private Processo processo;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "publicacao_id")
+    private Publicacao publicacao;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "responsavel_id")
     private Usuario responsavel;
 

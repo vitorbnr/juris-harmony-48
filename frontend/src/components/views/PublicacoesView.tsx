@@ -48,7 +48,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
-import { prazosApi, processosApi, publicacoesApi, usuariosApi } from "@/services/api";
+import { processosApi, publicacoesApi, usuariosApi } from "@/services/api";
 import type { Processo, Usuario } from "@/types";
 import type {
   Publicacao,
@@ -60,6 +60,7 @@ import { toast } from "sonner";
 
 type FiltroStatus = StatusTratamentoPublicacao | "TODAS";
 type FiltroFila = "TODAS" | "MINHAS" | "PRAZO_SUSPEITO" | "SEM_VINCULO" | "SEM_RESPONSAVEL";
+type ModoAtividadePublicacao = "TAREFA" | "PRAZO" | "AUDIENCIA";
 
 const metricasIniciais: PublicacaoMetricas = {
   naoTratadasHoje: 0,
@@ -158,6 +159,10 @@ const formatarAcaoHistorico = (value?: string | null) => {
     ATRIBUIDA: "Atribuida",
     ASSUMIDA: "Assumida",
     STATUS_ALTERADO: "Status alterado",
+    DESCARTADA: "Descartada",
+    TAREFA_CRIADA: "Tarefa criada",
+    PRAZO_CRIADO: "Prazo criado",
+    AUDIENCIA_CRIADA: "Audiencia criada",
     IA_REPROCESSADA: "IA reprocessada",
     REABERTA: "Reaberta",
   };
@@ -359,15 +364,17 @@ function VincularProcessoDialog({
   );
 }
 
-function CriarPrazoPublicacaoDialog({
+function CriarAtividadePublicacaoDialog({
   open,
   onOpenChange,
   publicacao,
+  modo,
   onSaved,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   publicacao: Publicacao | null;
+  modo: ModoAtividadePublicacao;
   onSaved: () => Promise<void> | void;
 }) {
   const [titulo, setTitulo] = useState("");
@@ -382,11 +389,12 @@ function CriarPrazoPublicacaoDialog({
     const dataInicial = publicacao.dataPublicacao
       ? new Date(publicacao.dataPublicacao).toISOString().slice(0, 10)
       : new Date().toISOString().slice(0, 10);
+    const label = modo === "AUDIENCIA" ? "Audiencia" : modo === "TAREFA" ? "Tarefa" : "Prazo";
 
     setTitulo(
       publicacao.npu
-        ? `Prazo derivado da publicacao ${publicacao.npu}`
-        : "Prazo derivado de publicacao oficial",
+        ? `${label} derivado da publicacao ${publicacao.npu}`
+        : `${label} derivado de publicacao oficial`,
     );
     setData(dataInicial);
     setHora("");
@@ -400,11 +408,11 @@ function CriarPrazoPublicacaoDialog({
         .filter(Boolean)
         .join("\n\n"),
     );
-  }, [open, publicacao]);
+  }, [modo, open, publicacao]);
 
   const salvar = async () => {
     if (!publicacao?.id || !publicacao.processoId) {
-      toast.error("Vincule a publicação a um processo antes de criar o prazo.");
+      toast.error("Vincule a publicacao a um processo antes de criar a atividade.");
       return;
     }
     if (!titulo.trim() || !data) {
@@ -414,35 +422,43 @@ function CriarPrazoPublicacaoDialog({
 
     setSalvando(true);
     try {
-      await prazosApi.criar({
+      const payload = {
         titulo: titulo.trim(),
         data,
         hora: hora || null,
-        tipo: "prazo_processual",
-        prioridade: publicacao.riscoPrazo ? "alta" : "media",
-        processoId: publicacao.processoId,
+        prioridade: publicacao.riscoPrazo ? "ALTA" : "MEDIA",
         descricao: descricao.trim() || null,
-      });
+      };
 
-      await publicacoesApi.atualizarStatus(publicacao.id, "TRATADA");
-      toast.success("Prazo criado e publicação marcada como tratada.");
+      if (modo === "TAREFA") {
+        await publicacoesApi.criarTarefa(publicacao.id, payload);
+      } else if (modo === "AUDIENCIA") {
+        await publicacoesApi.criarAudiencia(publicacao.id, payload);
+      } else {
+        await publicacoesApi.criarPrazo(publicacao.id, payload);
+      }
+
+      const label = modo === "AUDIENCIA" ? "Audiencia" : modo === "TAREFA" ? "Tarefa" : "Prazo";
+      toast.success(`${label} criado(a) e publicacao marcada como tratada.`);
       onOpenChange(false);
       await onSaved();
     } catch (error) {
-      console.error("Erro ao criar prazo a partir da publicacao:", error);
-      toast.error("Não foi possível criar o prazo.");
+      console.error("Erro ao criar atividade a partir da publicacao:", error);
+      toast.error("Nao foi possivel criar a atividade.");
     } finally {
       setSalvando(false);
     }
   };
 
+  const tituloDialog = modo === "AUDIENCIA" ? "Criar audiencia" : modo === "TAREFA" ? "Criar tarefa" : "Criar prazo";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Criar prazo</DialogTitle>
+          <DialogTitle>{tituloDialog}</DialogTitle>
           <DialogDescription>
-            O prazo sera criado manualmente a partir da publicacao selecionada.
+            A atividade sera criada a partir da publicacao selecionada e marcada como tratada.
           </DialogDescription>
         </DialogHeader>
 
@@ -482,7 +498,79 @@ function CriarPrazoPublicacaoDialog({
           </Button>
           <Button type="button" onClick={() => void salvar()} disabled={salvando}>
             {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarClock className="h-4 w-4" />}
-            Criar prazo
+            {tituloDialog}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DescartarPublicacaoDialog({
+  open,
+  onOpenChange,
+  publicacao,
+  onDiscarded,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  publicacao: Publicacao | null;
+  onDiscarded: () => Promise<void> | void;
+}) {
+  const [motivo, setMotivo] = useState("");
+  const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setMotivo("");
+    }
+  }, [open]);
+
+  const descartar = async () => {
+    if (!publicacao?.id) return;
+    if (!motivo.trim()) {
+      toast.error("Informe o motivo do descarte.");
+      return;
+    }
+
+    setSalvando(true);
+    try {
+      await publicacoesApi.descartar(publicacao.id, motivo.trim());
+      toast.success("Publicacao descartada com motivo registrado.");
+      onOpenChange(false);
+      await onDiscarded();
+    } catch (error) {
+      console.error("Erro ao descartar publicacao:", error);
+      toast.error("Nao foi possivel descartar a publicacao.");
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Descartar publicacao</DialogTitle>
+          <DialogDescription>
+            Registre o motivo para manter rastreabilidade operacional.
+          </DialogDescription>
+        </DialogHeader>
+
+        <Textarea
+          value={motivo}
+          onChange={(event) => setMotivo(event.target.value)}
+          className="min-h-[120px]"
+          placeholder="Ex.: publicacao sem relacao com o escritorio, falso positivo, duplicidade operacional..."
+        />
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Cancelar
+          </Button>
+          <Button type="button" variant="destructive" onClick={() => void descartar()} disabled={salvando || !motivo.trim()}>
+            {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+            Descartar
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -1032,8 +1120,10 @@ export const PublicacoesView = () => {
   const [apenasHoje, setApenasHoje] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [abrirVinculo, setAbrirVinculo] = useState(false);
-  const [abrirPrazo, setAbrirPrazo] = useState(false);
+  const [abrirAtividade, setAbrirAtividade] = useState(false);
+  const [modoAtividade, setModoAtividade] = useState<ModoAtividadePublicacao>("PRAZO");
   const [abrirAtribuicao, setAbrirAtribuicao] = useState(false);
+  const [abrirDescarte, setAbrirDescarte] = useState(false);
 
   const carregarDados = useCallback(async () => {
     setLoading(true);
@@ -1136,13 +1226,14 @@ export const PublicacoesView = () => {
     }
   };
 
-  const abrirModalPrazo = () => {
+  const abrirModalAtividade = (modo: ModoAtividadePublicacao) => {
     if (!publicacaoSelecionada) return;
     if (!publicacaoSelecionada.processoId) {
-      toast.error("Vincule a publicação a um processo antes de criar o prazo.");
+      toast.error("Vincule a publicacao a um processo antes de criar a atividade.");
       return;
     }
-    setAbrirPrazo(true);
+    setModoAtividade(modo);
+    setAbrirAtividade(true);
   };
 
   const assumirPublicacao = async () => {
@@ -1632,9 +1723,17 @@ export const PublicacoesView = () => {
                       <WandSparkles className="h-4 w-4" />
                       Reprocessar IA
                     </Button>
-                    <Button onClick={abrirModalPrazo} disabled={actionLoading}>
+                    <Button variant="outline" onClick={() => abrirModalAtividade("TAREFA")} disabled={actionLoading}>
+                      <CheckCircle2 className="h-4 w-4" />
+                      Criar Tarefa
+                    </Button>
+                    <Button onClick={() => abrirModalAtividade("PRAZO")} disabled={actionLoading}>
                       <CalendarClock className="h-4 w-4" />
                       Criar Prazo
+                    </Button>
+                    <Button variant="outline" onClick={() => abrirModalAtividade("AUDIENCIA")} disabled={actionLoading}>
+                      <CalendarClock className="h-4 w-4" />
+                      Criar Audiencia
                     </Button>
                     <Button
                       variant="outline"
@@ -1661,13 +1760,7 @@ export const PublicacoesView = () => {
                     <Button
                       variant="ghost"
                       className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                      onClick={() =>
-                        void atualizarStatus(
-                          detalheSelecionado,
-                          "DESCARTADA",
-                          "Publicação descartada.",
-                        )
-                      }
+                      onClick={() => setAbrirDescarte(true)}
                       disabled={actionLoading}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -1863,11 +1956,23 @@ export const PublicacoesView = () => {
         publicacao={publicacaoSelecionada}
         onLinked={carregarDados}
       />
-      <CriarPrazoPublicacaoDialog
-        open={abrirPrazo}
-        onOpenChange={setAbrirPrazo}
+      <CriarAtividadePublicacaoDialog
+        open={abrirAtividade}
+        onOpenChange={setAbrirAtividade}
         publicacao={publicacaoSelecionada}
+        modo={modoAtividade}
         onSaved={carregarDados}
+      />
+      <DescartarPublicacaoDialog
+        open={abrirDescarte}
+        onOpenChange={setAbrirDescarte}
+        publicacao={publicacaoSelecionada}
+        onDiscarded={async () => {
+          await carregarDados();
+          if (publicacaoSelecionada?.id) {
+            await carregarHistoricoPublicacao(publicacaoSelecionada.id);
+          }
+        }}
       />
       <AtribuirPublicacaoDialog
         open={abrirAtribuicao}

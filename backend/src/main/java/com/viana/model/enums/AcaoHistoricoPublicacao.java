@@ -6,6 +6,10 @@ public enum AcaoHistoricoPublicacao {
     ATRIBUIDA,
     ASSUMIDA,
     STATUS_ALTERADO,
+    DESCARTADA,
+    TAREFA_CRIADA,
+    PRAZO_CRIADO,
+    AUDIENCIA_CRIADA,
     IA_REPROCESSADA,
     REABERTA
 }

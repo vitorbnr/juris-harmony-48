@@ -20,5 +20,6 @@ public class PublicacaoDjenSyncResponse {
     private int publicacoesLidas;
     private int publicacoesImportadas;
     private int falhas;
+    private boolean emExecucao;
     private String mensagem;
 }

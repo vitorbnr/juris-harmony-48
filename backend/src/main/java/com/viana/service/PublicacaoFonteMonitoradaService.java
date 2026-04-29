@@ -11,14 +11,12 @@ import com.viana.model.PublicacaoDiarioOficial;
 import com.viana.model.PublicacaoFonteMonitorada;
 import com.viana.model.Usuario;
 import com.viana.model.enums.EstrategiaColetaPublicacao;
-import com.viana.model.enums.GrupoDiarioOficialPublicacao;
 import com.viana.model.enums.StatusDiarioOficialPublicacao;
 import com.viana.model.enums.TipoFontePublicacaoMonitorada;
 import com.viana.repository.PublicacaoDiarioOficialRepository;
 import com.viana.repository.PublicacaoFonteMonitoradaRepository;
 import com.viana.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,12 +34,6 @@ public class PublicacaoFonteMonitoradaService {
     private final PublicacaoFonteMonitoradaRepository repository;
     private final UsuarioRepository usuarioRepository;
     private final PublicacaoDiarioOficialRepository diarioOficialRepository;
-
-    @Value("${api.inlabs.email:}")
-    private String inlabsEmail;
-
-    @Value("${api.inlabs.password:}")
-    private String inlabsPassword;
 
     @Transactional(readOnly = true)
     public List<PublicacaoFonteMonitoradaResponse> listar(Boolean apenasAtivas) {
@@ -233,8 +225,7 @@ public class PublicacaoFonteMonitoradaService {
         return Boolean.TRUE.equals(diario.getAtivo())
                 && !Boolean.TRUE.equals(diario.getRequerScraping())
                 && diario.getStatus() != StatusDiarioOficialPublicacao.NAO_SUPORTADO
-                && (diario.getEstrategiaColeta() == EstrategiaColetaPublicacao.CADERNO_DJEN
-                || isDouInlabsColetavel(diario));
+                && diario.getEstrategiaColeta() == EstrategiaColetaPublicacao.CADERNO_DJEN;
     }
 
     private String resolverStatusCapturaDiario(PublicacaoDiarioOficial diario) {
@@ -250,24 +241,10 @@ public class PublicacaoFonteMonitoradaService {
         if (diario.getEstrategiaColeta() == EstrategiaColetaPublicacao.CADERNO_DJEN) {
             return "COLETOR_ATIVO";
         }
-        if (isDouInlabsColetavel(diario)) {
-            return "COLETOR_ATIVO";
-        }
         if (diario.getEstrategiaColeta() == EstrategiaColetaPublicacao.DADOS_ABERTOS) {
             return "PREPARADO_PARA_CONECTOR";
         }
         return "SOMENTE_CATALOGO";
-    }
-
-    private boolean isDouInlabsColetavel(PublicacaoDiarioOficial diario) {
-        return diario.getGrupo() == GrupoDiarioOficialPublicacao.DOU
-                && diario.getEstrategiaColeta() == EstrategiaColetaPublicacao.DADOS_ABERTOS
-                && isConfigured(inlabsEmail)
-                && isConfigured(inlabsPassword);
-    }
-
-    private boolean isConfigured(String value) {
-        return value != null && !value.isBlank();
     }
 
     private String resolverAbrangenciaResumo(Set<PublicacaoDiarioOficial> diarios) {

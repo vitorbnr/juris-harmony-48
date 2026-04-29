@@ -42,7 +42,6 @@ import type {
   PublicacaoCapturaExecucao,
   PublicacaoDjenSync,
   PublicacaoDiarioOficial,
-  PublicacaoDouSync,
   PublicacaoFonteMonitorada,
   PublicacaoMonitoramento,
   TipoFontePublicacaoMonitorada,
@@ -90,6 +89,11 @@ const ufLabels: Record<string, string> = {
 };
 
 const ufsFederativas = Object.keys(ufLabels);
+
+function formatarDataInput(date = new Date()) {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 10);
+}
 
 function fonteTipoTabela(tipo: TipoFontePublicacaoMonitorada) {
   return tipo === "NOME" ? "PE" : tipo;
@@ -326,7 +330,7 @@ export function PublicacoesAdminTab() {
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [coletandoDjen, setColetandoDjen] = useState(false);
-  const [coletandoDou, setColetandoDou] = useState(false);
+  const [coletandoReplayDjen, setColetandoReplayDjen] = useState(false);
   const [alterandoId, setAlterandoId] = useState<string | null>(null);
   const [fonteEdicaoId, setFonteEdicaoId] = useState<string | null>(null);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
@@ -335,7 +339,8 @@ export function PublicacoesAdminTab() {
   const [diariosDialogFonte, setDiariosDialogFonte] = useState<PublicacaoFonteMonitorada | null>(null);
   const [mostrarCatalogoDialog, setMostrarCatalogoDialog] = useState(false);
   const [ultimoResultadoDjen, setUltimoResultadoDjen] = useState<PublicacaoDjenSync | null>(null);
-  const [ultimoResultadoDou, setUltimoResultadoDou] = useState<PublicacaoDouSync | null>(null);
+  const [replayTribunal, setReplayTribunal] = useState("");
+  const [replayData, setReplayData] = useState(formatarDataInput());
 
   const [tipo, setTipo] = useState<TipoFontePublicacaoMonitorada>("NOME");
   const [nomeExibicao, setNomeExibicao] = useState("");
@@ -404,7 +409,23 @@ export function PublicacoesAdminTab() {
   const fontesAtivas = fontes.filter((fonte) => fonte.ativo).length;
   const vagasRestantes = Math.max(0, LIMITE_PESQUISAS - fontesAtivas);
   const djenStatus = monitoramento?.djen?.status;
-  const douStatus = monitoramento?.dou?.status;
+  const capturasResumo = {
+    total: capturasRecentes.length,
+    sucesso: capturasRecentes.filter((captura) => captura.status === "SUCESSO").length,
+    falhas: capturasRecentes.filter((captura) => captura.status === "ERRO").length,
+    semCaderno: capturasRecentes.filter((captura) =>
+      (captura.mensagem ?? "").toLowerCase().includes("sem caderno"),
+    ).length,
+    semMatch: capturasRecentes.filter((captura) =>
+      (captura.mensagem ?? "").toLowerCase().includes("nenhuma publicacao bateu"),
+    ).length,
+  };
+
+  useEffect(() => {
+    if (!replayTribunal && diariosColetaveisAgora.length > 0) {
+      setReplayTribunal(diariosColetaveisAgora[0].codigo);
+    }
+  }, [diariosColetaveisAgora, replayTribunal]);
 
   const limparFormulario = () => {
     setFonteEdicaoId(null);
@@ -511,35 +532,39 @@ export function PublicacoesAdminTab() {
     }
   };
 
-  const coletarDjen = async () => {
-    setColetandoDjen(true);
+  const coletarDjen = async (params?: { tribunal?: string; data?: string }) => {
+    const isReplay = Boolean(params?.tribunal || params?.data);
+    if (isReplay && (!params?.tribunal || !params?.data)) {
+      toast.error("Informe tribunal e data para reprocessar o caderno DJEN.");
+      return;
+    }
+
+    if (isReplay) {
+      setColetandoReplayDjen(true);
+    } else {
+      setColetandoDjen(true);
+    }
+
     try {
-      const resultado = await publicacoesApi.coletarDjen();
+      const resultado = await publicacoesApi.coletarDjen(params);
       setUltimoResultadoDjen(resultado);
-      setUltimoResultadoDou(null);
-      toast.success(`${resultado.publicacoesImportadas ?? 0} publicacao(oes) importada(s) pelo DJEN.`);
+      if (resultado.emExecucao) {
+        toast.info(resultado.mensagem ?? "Ja existe outra captura DJEN em andamento.");
+      } else if ((resultado.falhas ?? 0) > 0) {
+        toast.warning(resultado.mensagem ?? "Captura DJEN finalizada com falhas.");
+      } else {
+        toast.success(`${resultado.publicacoesImportadas ?? 0} publicacao(oes) importada(s) pelo DJEN.`);
+      }
       await carregar();
     } catch (error) {
       console.error("Erro ao executar captura DJEN:", error);
       toast.error("Nao foi possivel executar a captura DJEN.");
     } finally {
-      setColetandoDjen(false);
-    }
-  };
-
-  const coletarDou = async () => {
-    setColetandoDou(true);
-    try {
-      const resultado = await publicacoesApi.coletarDou();
-      setUltimoResultadoDou(resultado);
-      setUltimoResultadoDjen(null);
-      toast.success(`${resultado.publicacoesImportadas ?? 0} publicacao(oes) importada(s) pelo DOU/INLABS.`);
-      await carregar();
-    } catch (error) {
-      console.error("Erro ao executar captura DOU/INLABS:", error);
-      toast.error("Nao foi possivel executar a captura DOU/INLABS.");
-    } finally {
-      setColetandoDou(false);
+      if (isReplay) {
+        setColetandoReplayDjen(false);
+      } else {
+        setColetandoDjen(false);
+      }
     }
   };
 
@@ -615,9 +640,6 @@ export function PublicacoesAdminTab() {
                   <Badge variant="outline" className={cn("rounded-full", statusFonteClassName(djenStatus))}>
                     DJEN: {formatarStatusFonte(djenStatus)}
                   </Badge>
-                  <Badge variant="outline" className={cn("rounded-full", statusFonteClassName(douStatus))}>
-                    DOU: {formatarStatusFonte(douStatus)}
-                  </Badge>
                   <Badge variant="outline" className="rounded-full">
                     {fontesAtivas} pesquisa(s) ativa(s)
                   </Badge>
@@ -630,68 +652,110 @@ export function PublicacoesAdminTab() {
                 </div>
               </div>
 
-              <div className="grid gap-2 sm:grid-cols-2 xl:min-w-[440px]">
+              <div className="grid gap-3 xl:min-w-[380px]">
                 <Button
                   type="button"
                   className="gap-2"
                   onClick={() => void coletarDjen()}
-                  disabled={coletandoDjen || fontesAtivas === 0 || diariosColetaveisAgora.length === 0}
+                  disabled={coletandoDjen || coletandoReplayDjen || fontesAtivas === 0 || diariosColetaveisAgora.length === 0}
                 >
                   {coletandoDjen ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
                   Capturar DJEN
                 </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="gap-2"
-                  onClick={() => void coletarDou()}
-                  disabled={coletandoDou || fontesAtivas === 0}
-                >
-                  {coletandoDou ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
-                  Capturar DOU
-                </Button>
+                <div className="rounded-xl border border-border bg-background/60 p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Replay operacional</p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_150px]">
+                    <Select value={replayTribunal} onValueChange={setReplayTribunal}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Tribunal" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {diariosColetaveisAgora.map((diario) => (
+                          <SelectItem key={diario.codigo} value={diario.codigo}>
+                            {diario.codigo}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      type="date"
+                      value={replayData}
+                      onChange={(event) => setReplayData(event.target.value)}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-2 w-full gap-2"
+                    onClick={() => void coletarDjen({ tribunal: replayTribunal, data: replayData })}
+                    disabled={coletandoDjen || coletandoReplayDjen || fontesAtivas === 0 || !replayTribunal || !replayData}
+                  >
+                    {coletandoReplayDjen ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+                    Reprocessar tribunal/data
+                  </Button>
+                </div>
               </div>
             </div>
 
-            {ultimoResultadoDjen || ultimoResultadoDou ? (
+            {ultimoResultadoDjen ? (
               <div className="mt-5 rounded-xl border border-border bg-background/60 p-4">
                 <div className="mb-3 flex flex-wrap gap-2">
-                  {ultimoResultadoDjen ? (
-                    <Badge variant="outline" className="rounded-full">Ultima captura: DJEN</Badge>
-                  ) : null}
-                  {ultimoResultadoDou ? (
-                    <Badge variant="outline" className="rounded-full">Ultima captura: DOU</Badge>
-                  ) : null}
+                  <Badge variant="outline" className="rounded-full">Ultima captura: DJEN</Badge>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                   <div>
                     <p className="text-xs uppercase tracking-wide text-muted-foreground">Fontes</p>
                     <p className="mt-1 text-lg font-semibold text-foreground">
-                      {ultimoResultadoDou?.secoes?.length ?? ultimoResultadoDjen?.tribunais?.length ?? 0}
+                      {ultimoResultadoDjen.tribunais?.length ?? 0}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs uppercase tracking-wide text-muted-foreground">Cadernos</p>
                     <p className="mt-1 text-lg font-semibold text-foreground">
-                      {(ultimoResultadoDou ?? ultimoResultadoDjen)?.cadernosBaixados ?? 0}/{(ultimoResultadoDou ?? ultimoResultadoDjen)?.cadernosConsultados ?? 0}
+                      {ultimoResultadoDjen.cadernosBaixados ?? 0}/{ultimoResultadoDjen.cadernosConsultados ?? 0}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs uppercase tracking-wide text-muted-foreground">Publicacoes lidas</p>
-                    <p className="mt-1 text-lg font-semibold text-foreground">{(ultimoResultadoDou ?? ultimoResultadoDjen)?.publicacoesLidas ?? 0}</p>
+                    <p className="mt-1 text-lg font-semibold text-foreground">{ultimoResultadoDjen.publicacoesLidas ?? 0}</p>
                   </div>
                   <div>
                     <p className="text-xs uppercase tracking-wide text-muted-foreground">Importadas</p>
-                    <p className="mt-1 text-lg font-semibold text-foreground">{(ultimoResultadoDou ?? ultimoResultadoDjen)?.publicacoesImportadas ?? 0}</p>
+                    <p className="mt-1 text-lg font-semibold text-foreground">{ultimoResultadoDjen.publicacoesImportadas ?? 0}</p>
                   </div>
                   <div>
                     <p className="text-xs uppercase tracking-wide text-muted-foreground">Falhas</p>
-                    <p className="mt-1 text-lg font-semibold text-foreground">{(ultimoResultadoDou ?? ultimoResultadoDjen)?.falhas ?? 0}</p>
+                    <p className="mt-1 text-lg font-semibold text-foreground">{ultimoResultadoDjen.falhas ?? 0}</p>
                   </div>
                 </div>
-                {(ultimoResultadoDou ?? ultimoResultadoDjen)?.mensagem ? (
-                  <p className="mt-3 text-xs leading-5 text-muted-foreground">{(ultimoResultadoDou ?? ultimoResultadoDjen)?.mensagem}</p>
+                {ultimoResultadoDjen.mensagem ? (
+                  <p className="mt-3 text-xs leading-5 text-muted-foreground">{ultimoResultadoDjen.mensagem}</p>
                 ) : null}
+              </div>
+            ) : null}
+
+            {capturasResumo.total > 0 ? (
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                <div className="rounded-xl border border-border bg-background/60 p-3">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Ultimas execucoes</p>
+                  <p className="mt-1 text-xl font-semibold text-foreground">{capturasResumo.total}</p>
+                </div>
+                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
+                  <p className="text-xs uppercase tracking-wide text-emerald-400">Sucesso</p>
+                  <p className="mt-1 text-xl font-semibold text-foreground">{capturasResumo.sucesso}</p>
+                </div>
+                <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-3">
+                  <p className="text-xs uppercase tracking-wide text-rose-400">Falhas</p>
+                  <p className="mt-1 text-xl font-semibold text-foreground">{capturasResumo.falhas}</p>
+                </div>
+                <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+                  <p className="text-xs uppercase tracking-wide text-amber-400">Sem caderno</p>
+                  <p className="mt-1 text-xl font-semibold text-foreground">{capturasResumo.semCaderno}</p>
+                </div>
+                <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-3">
+                  <p className="text-xs uppercase tracking-wide text-blue-400">Sem match</p>
+                  <p className="mt-1 text-xl font-semibold text-foreground">{capturasResumo.semMatch}</p>
+                </div>
               </div>
             ) : null}
 
@@ -717,6 +781,12 @@ export function PublicacoesAdminTab() {
                         <p className="truncate text-xs text-muted-foreground">
                           {captura.mensagem ?? "Execucao registrada sem mensagem."}
                         </p>
+                        {(captura.erroTipo || captura.erroCodigoHttp) ? (
+                          <p className="mt-1 text-xs text-rose-400">
+                            {captura.erroTipo ?? "Erro"}
+                            {captura.erroCodigoHttp ? ` HTTP ${captura.erroCodigoHttp}` : ""}
+                          </p>
+                        ) : null}
                         <p className="mt-1 text-xs text-muted-foreground">
                           {formatarDataHora(captura.iniciadoEm)}
                         </p>

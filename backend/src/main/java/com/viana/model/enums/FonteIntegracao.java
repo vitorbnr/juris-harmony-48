@@ -3,6 +3,5 @@ package com.viana.model.enums;
 public enum FonteIntegracao {
     DATAJUD,
     DOMICILIO,
-    DJEN,
-    DOU
+    DJEN
 }

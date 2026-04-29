@@ -11,12 +11,15 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface EventoJuridicoRepository extends JpaRepository<EventoJuridico, UUID> {
 
     boolean existsByHashDeduplicacao(String hashDeduplicacao);
+
+    Optional<EventoJuridico> findFirstByPublicacaoId(UUID publicacaoId);
 
     @Query("""
         SELECT e FROM EventoJuridico e

@@ -29,12 +29,6 @@ public class PublicacaoMonitoramentoService {
     @Value("${api.datajud.api-key:}")
     private String datajudApiKey;
 
-    @Value("${api.inlabs.email:}")
-    private String inlabsEmail;
-
-    @Value("${api.inlabs.password:}")
-    private String inlabsPassword;
-
     @Transactional(readOnly = true)
     public PublicacaoMonitoramentoResponse buscarStatus() {
         long publicacoesPendentes = publicacaoRepository.countByStatusTratamento(StatusTratamento.PENDENTE);
@@ -52,8 +46,7 @@ public class PublicacaoMonitoramentoService {
                 .publicacoesSemResponsavel(semResponsavel)
                 .datajud(buildDatajudSaude())
                 .djen(buildDjenSaude())
-                .dou(buildDouSaude())
-                .orientacaoOperacional("Monitoramento sem custo e sem scraping por padrao: DJEN por caderno oficial, DOU/INLABS por dados abertos, DataJud para processos cadastrados e Domicilio apenas na Inbox em modo seguro.")
+                .orientacaoOperacional("Monitoramento sem scraping por padrao: DJEN para publicacoes judiciais por nome/OAB, DataJud para processos cadastrados e Domicilio apenas na Inbox em modo seguro.")
                 .build();
     }
 
@@ -127,36 +120,6 @@ public class PublicacaoMonitoramentoService {
             return "PREPARADO";
         }
         return "SAUDAVEL";
-    }
-
-    private PublicacaoMonitoramentoResponse.FonteSaude buildDouSaude() {
-        FonteSync ultimoSync = fonteSyncRepository
-                .findFirstByFonteAndReferenciaTipoOrderByAtualizadoEmDesc(FonteIntegracao.DOU, TipoReferenciaIntegracao.INSTITUICAO)
-                .orElse(null);
-        long monitorados = fonteSyncRepository.countByFonteAndReferenciaTipo(FonteIntegracao.DOU, TipoReferenciaIntegracao.INSTITUICAO);
-        long saudaveis = fonteSyncRepository.countByFonteAndReferenciaTipoAndStatus(
-                FonteIntegracao.DOU,
-                TipoReferenciaIntegracao.INSTITUICAO,
-                StatusIntegracao.SUCESSO
-        );
-        long erros = fonteSyncRepository.countByFonteAndReferenciaTipoAndStatus(
-                FonteIntegracao.DOU,
-                TipoReferenciaIntegracao.INSTITUICAO,
-                StatusIntegracao.ERRO
-        );
-        boolean configurada = isConfigured(inlabsEmail) && isConfigured(inlabsPassword);
-
-        return PublicacaoMonitoramentoResponse.FonteSaude.builder()
-                .fonte("DOU")
-                .status(resolveStatusFonte(configurada, erros, ultimoSync))
-                .configurada(configurada)
-                .monitorados(monitorados)
-                .saudaveis(saudaveis)
-                .comErro(erros)
-                .ultimoSyncEm(ultimoSync != null && ultimoSync.getUltimoSyncEm() != null ? ultimoSync.getUltimoSyncEm().toString() : null)
-                .proximoSyncEm(ultimoSync != null && ultimoSync.getProximoSyncEm() != null ? ultimoSync.getProximoSyncEm().toString() : null)
-                .mensagem(ultimoSync != null ? ultimoSync.getUltimaMensagem() : "Aguardando primeira coleta DOU/INLABS.")
-                .build();
     }
 
     private String resolveStatusFonte(boolean configurada, long erros, FonteSync ultimoSync) {

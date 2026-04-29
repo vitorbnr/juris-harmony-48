@@ -4,6 +4,5 @@ public enum GrupoDiarioOficialPublicacao {
     DJEN,
     DATAJUD,
     DOMICILIO,
-    DOU,
     LEGADO
 }

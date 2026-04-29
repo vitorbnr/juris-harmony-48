@@ -21,6 +21,8 @@ public class PublicacaoCapturaExecucaoResponse {
     private Integer publicacoesImportadas;
     private Integer falhas;
     private String mensagem;
+    private String erroTipo;
+    private Integer erroCodigoHttp;
     private String iniciadoEm;
     private String finalizadoEm;
     private Long duracaoMs;

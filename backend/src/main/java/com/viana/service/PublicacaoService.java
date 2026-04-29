@@ -1,19 +1,31 @@
 package com.viana.service;
 
+import com.viana.dto.request.CriarAtividadePublicacaoRequest;
+import com.viana.dto.request.CriarPrazoEventoRequest;
+import com.viana.dto.request.DescartarPublicacaoRequest;
 import com.viana.dto.request.IngestarPublicacaoRequest;
 import com.viana.dto.response.DatajudMovimentacaoResponse;
+import com.viana.dto.response.PrazoResponse;
 import com.viana.dto.response.PublicacaoMetricasResponse;
 import com.viana.dto.response.PublicacaoHistoricoResponse;
 import com.viana.dto.response.PublicacaoResponse;
+import com.viana.dto.response.PublicacaoTratamentoResponse;
 import com.viana.exception.BusinessException;
 import com.viana.exception.ResourceNotFoundException;
+import com.viana.model.EventoJuridico;
 import com.viana.model.Processo;
 import com.viana.model.Publicacao;
 import com.viana.model.PublicacaoHistorico;
 import com.viana.model.Usuario;
 import com.viana.model.enums.AcaoHistoricoPublicacao;
+import com.viana.model.enums.FonteIntegracao;
+import com.viana.model.enums.StatusEventoJuridico;
 import com.viana.model.enums.StatusFluxoPublicacao;
 import com.viana.model.enums.StatusTratamento;
+import com.viana.model.enums.TipoNotificacao;
+import com.viana.model.enums.TipoPrazo;
+import com.viana.model.enums.TipoEventoJuridico;
+import com.viana.repository.EventoJuridicoRepository;
 import com.viana.repository.PublicacaoHistoricoRepository;
 import com.viana.repository.ProcessoRepository;
 import com.viana.repository.PublicacaoRepository;
@@ -29,8 +41,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.HexFormat;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -41,7 +55,10 @@ public class PublicacaoService {
     private final ProcessoRepository processoRepository;
     private final UsuarioRepository usuarioRepository;
     private final PublicacaoHistoricoRepository publicacaoHistoricoRepository;
+    private final EventoJuridicoRepository eventoJuridicoRepository;
     private final PublicacaoTriagemInteligenteService triagemInteligenteService;
+    private final NotificacaoService notificacaoService;
+    private final PrazoService prazoService;
 
     @Transactional(readOnly = true)
     public List<PublicacaoResponse> listar(
@@ -151,6 +168,7 @@ public class PublicacaoService {
 
         Publicacao salva = publicacaoRepository.save(publicacao);
         registrarHistorico(salva, AcaoHistoricoPublicacao.CAPTURADA, usuario, atribuidaPara, observacaoHistorico);
+        notificarNovaPublicacao(salva, request);
         return toResponse(salva);
     }
 
@@ -221,12 +239,96 @@ public class PublicacaoService {
         } else {
             publicacao.setDataTratamento(null);
             publicacao.setTratadaPor(null);
+            publicacao.setMotivoDescarte(null);
             atualizarStatusFluxoOperacional(publicacao);
         }
 
         Publicacao salva = publicacaoRepository.save(publicacao);
         registrarHistorico(salva, AcaoHistoricoPublicacao.STATUS_ALTERADO, usuario, null, "Status alterado para " + status.name());
         return toResponse(salva);
+    }
+
+    @Transactional
+    public PublicacaoResponse descartar(UUID id, DescartarPublicacaoRequest request, String usuarioEmail) {
+        Publicacao publicacao = publicacaoRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Publicacao nao encontrada"));
+        Usuario usuario = getUsuarioByEmail(usuarioEmail);
+        String motivo = normalizarObrigatorio(request.getMotivo(), "Motivo do descarte e obrigatorio.");
+        if (motivo.length() > 255) {
+            throw new BusinessException("Motivo do descarte deve ter no maximo 255 caracteres.");
+        }
+
+        publicacao.setStatusTratamento(StatusTratamento.DESCARTADA);
+        publicacao.setStatusFluxo(StatusFluxoPublicacao.DESCARTADA);
+        publicacao.setMotivoDescarte(motivo);
+        publicacao.setTratadaPor(usuario);
+        publicacao.setDataTratamento(LocalDateTime.now());
+
+        Publicacao salva = publicacaoRepository.save(publicacao);
+        registrarHistorico(salva, AcaoHistoricoPublicacao.DESCARTADA, usuario, null, "Publicacao descartada. Motivo: " + motivo);
+        return toResponse(salva);
+    }
+
+    @Transactional
+    public PublicacaoTratamentoResponse criarTarefa(UUID publicacaoId, CriarAtividadePublicacaoRequest request, String usuarioEmail) {
+        return criarAtividade(publicacaoId, request, usuarioEmail, TipoPrazo.TAREFA_INTERNA, AcaoHistoricoPublicacao.TAREFA_CRIADA, "Tarefa criada a partir da publicacao.");
+    }
+
+    @Transactional
+    public PublicacaoTratamentoResponse criarPrazo(UUID publicacaoId, CriarAtividadePublicacaoRequest request, String usuarioEmail) {
+        return criarAtividade(publicacaoId, request, usuarioEmail, TipoPrazo.PRAZO_PROCESSUAL, AcaoHistoricoPublicacao.PRAZO_CRIADO, "Prazo criado a partir da publicacao.");
+    }
+
+    @Transactional
+    public PublicacaoTratamentoResponse criarAudiencia(UUID publicacaoId, CriarAtividadePublicacaoRequest request, String usuarioEmail) {
+        return criarAtividade(publicacaoId, request, usuarioEmail, TipoPrazo.AUDIENCIA, AcaoHistoricoPublicacao.AUDIENCIA_CRIADA, "Audiencia criada a partir da publicacao.");
+    }
+
+    private PublicacaoTratamentoResponse criarAtividade(
+            UUID publicacaoId,
+            CriarAtividadePublicacaoRequest request,
+            String usuarioEmail,
+            TipoPrazo tipoPrazo,
+            AcaoHistoricoPublicacao acaoHistorico,
+            String mensagemHistorico
+    ) {
+        Publicacao publicacao = publicacaoRepository.findById(publicacaoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Publicacao nao encontrada"));
+        Usuario usuario = getUsuarioByEmail(usuarioEmail);
+
+        if (publicacao.getProcesso() == null) {
+            throw new BusinessException("Vincule a publicacao a um processo antes de criar atividade.");
+        }
+
+        EventoJuridico evento = getOrCreateEventoPublicacao(publicacao);
+        CriarPrazoEventoRequest prazoRequest = new CriarPrazoEventoRequest();
+        prazoRequest.setTitulo(normalizarObrigatorio(request.getTitulo(), "Titulo e obrigatorio."));
+        prazoRequest.setData(request.getData());
+        prazoRequest.setHora(request.getHora());
+        prazoRequest.setTipo(tipoPrazo.name());
+        prazoRequest.setPrioridade(resolverPrioridadeAtividade(request, publicacao));
+        prazoRequest.setEtapa(request.getEtapa() != null && !request.getEtapa().isBlank() ? request.getEtapa() : "A_FAZER");
+        prazoRequest.setAdvogadoId(request.getAdvogadoId());
+        prazoRequest.setDescricao(resolverDescricaoAtividade(request, publicacao, tipoPrazo));
+
+        PrazoResponse atividade = prazoService.criarAPartirDoEvento(evento.getId(), prazoRequest, usuario.getId());
+        marcarComoTratada(publicacao, usuario);
+        Publicacao salva = publicacaoRepository.save(publicacao);
+
+        registrarHistorico(
+                salva,
+                acaoHistorico,
+                usuario,
+                null,
+                mensagemHistorico + " Atividade: " + atividade.getTitulo() + "."
+        );
+
+        return PublicacaoTratamentoResponse.builder()
+                .publicacao(toResponse(salva))
+                .atividade(atividade)
+                .eventoJuridicoId(evento.getId().toString())
+                .mensagem(mensagemHistorico)
+                .build();
     }
 
     @Transactional
@@ -302,6 +404,118 @@ public class PublicacaoService {
         Publicacao salva = publicacaoRepository.save(publicacao);
         registrarHistorico(salva, AcaoHistoricoPublicacao.IA_REPROCESSADA, usuario, null, "Triagem inteligente reprocessada com explicabilidade.");
         return toResponse(salva);
+    }
+
+    private EventoJuridico getOrCreateEventoPublicacao(Publicacao publicacao) {
+        return eventoJuridicoRepository.findFirstByPublicacaoId(publicacao.getId())
+                .map(evento -> atualizarEventoComPublicacao(evento, publicacao))
+                .orElseGet(() -> eventoJuridicoRepository.save(EventoJuridico.builder()
+                        .publicacao(publicacao)
+                        .processo(publicacao.getProcesso())
+                        .responsavel(resolverResponsavelPublicacao(publicacao))
+                        .fonte(resolverFonteEvento(publicacao))
+                        .tipo(TipoEventoJuridico.PUBLICACAO)
+                        .status(StatusEventoJuridico.EM_TRIAGEM)
+                        .titulo(buildTituloEventoPublicacao(publicacao))
+                        .descricao(buildDescricaoEventoPublicacao(publicacao))
+                        .orgaoJulgador(publicacao.getTribunalOrigem())
+                        .referenciaExterna(publicacao.getIdentificadorExterno())
+                        .destinatario(publicacao.getCaptadaEmNome())
+                        .hashDeduplicacao("PUBLICACAO:" + publicacao.getId())
+                        .dataEvento(publicacao.getDataPublicacao())
+                        .build()));
+    }
+
+    private EventoJuridico atualizarEventoComPublicacao(EventoJuridico evento, Publicacao publicacao) {
+        boolean changed = false;
+        if (evento.getProcesso() == null && publicacao.getProcesso() != null) {
+            evento.setProcesso(publicacao.getProcesso());
+            changed = true;
+        }
+        if (evento.getResponsavel() == null && resolverResponsavelPublicacao(publicacao) != null) {
+            evento.setResponsavel(resolverResponsavelPublicacao(publicacao));
+            changed = true;
+        }
+        if (evento.getStatus() == StatusEventoJuridico.NOVO) {
+            evento.setStatus(StatusEventoJuridico.EM_TRIAGEM);
+            changed = true;
+        }
+        return changed ? eventoJuridicoRepository.save(evento) : evento;
+    }
+
+    private Usuario resolverResponsavelPublicacao(Publicacao publicacao) {
+        if (publicacao.getAtribuidaPara() != null) {
+            return publicacao.getAtribuidaPara();
+        }
+        if (publicacao.getAssumidaPor() != null) {
+            return publicacao.getAssumidaPor();
+        }
+        return publicacao.getResponsavelProcesso();
+    }
+
+    private FonteIntegracao resolverFonteEvento(Publicacao publicacao) {
+        String fonte = publicacao.getFonte();
+        if (fonte == null || fonte.isBlank()) {
+            return FonteIntegracao.DJEN;
+        }
+        try {
+            return FonteIntegracao.valueOf(fonte.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ignored) {
+            return FonteIntegracao.DJEN;
+        }
+    }
+
+    private String buildTituloEventoPublicacao(Publicacao publicacao) {
+        String processo = publicacao.getNpu() != null && !publicacao.getNpu().isBlank()
+                ? " - " + publicacao.getNpu()
+                : "";
+        String titulo = "Publicacao " + publicacao.getTribunalOrigem() + processo;
+        return titulo.length() <= 255 ? titulo : titulo.substring(0, 255);
+    }
+
+    private String buildDescricaoEventoPublicacao(Publicacao publicacao) {
+        String resumo = publicacao.getResumoOperacional() != null && !publicacao.getResumoOperacional().isBlank()
+                ? publicacao.getResumoOperacional()
+                : publicacao.getTeor();
+        return resumo != null ? resumo : "Publicacao importada para tratamento operacional.";
+    }
+
+    private String resolverPrioridadeAtividade(CriarAtividadePublicacaoRequest request, Publicacao publicacao) {
+        if (request.getPrioridade() != null && !request.getPrioridade().isBlank()) {
+            return request.getPrioridade();
+        }
+        return publicacao.isRiscoPrazo() ? "ALTA" : "MEDIA";
+    }
+
+    private String resolverDescricaoAtividade(CriarAtividadePublicacaoRequest request, Publicacao publicacao, TipoPrazo tipoPrazo) {
+        if (request.getDescricao() != null && !request.getDescricao().isBlank()) {
+            return request.getDescricao();
+        }
+
+        String tipo = switch (tipoPrazo) {
+            case AUDIENCIA -> "Audiencia criada a partir de publicacao.";
+            case TAREFA_INTERNA -> "Tarefa criada a partir de publicacao.";
+            case PRAZO_PROCESSUAL -> "Prazo criado a partir de publicacao.";
+            case REUNIAO -> "Atividade criada a partir de publicacao.";
+        };
+        String resumo = publicacao.getResumoOperacional() != null && !publicacao.getResumoOperacional().isBlank()
+                ? publicacao.getResumoOperacional()
+                : publicacao.getTeor();
+        return limitarTexto(tipo + "\n\n" + (resumo != null ? resumo : ""), 3900);
+    }
+
+    private void marcarComoTratada(Publicacao publicacao, Usuario usuario) {
+        publicacao.setStatusTratamento(StatusTratamento.TRATADA);
+        publicacao.setStatusFluxo(StatusFluxoPublicacao.TRATADA);
+        publicacao.setTratadaPor(usuario);
+        publicacao.setDataTratamento(LocalDateTime.now());
+    }
+
+    private String limitarTexto(String value, int max) {
+        if (value == null || value.length() <= max) {
+            return value;
+        }
+        return value.substring(0, max);
     }
 
     @Transactional(readOnly = true)
@@ -562,6 +776,50 @@ public class PublicacaoService {
                 .usuarioDestino(destino)
                 .observacao(observacao)
                 .build());
+    }
+
+    private void notificarNovaPublicacao(Publicacao publicacao, IngestarPublicacaoRequest request) {
+        Set<UUID> destinatariosIds = new LinkedHashSet<>();
+        if (request.getDestinatariosNotificacaoIds() != null) {
+            request.getDestinatariosNotificacaoIds().stream()
+                    .filter(id -> id != null)
+                    .forEach(destinatariosIds::add);
+        }
+        if (publicacao.getAtribuidaPara() != null && publicacao.getAtribuidaPara().getId() != null) {
+            destinatariosIds.add(publicacao.getAtribuidaPara().getId());
+        }
+        if (publicacao.getResponsavelProcesso() != null && publicacao.getResponsavelProcesso().getId() != null) {
+            destinatariosIds.add(publicacao.getResponsavelProcesso().getId());
+        }
+        if (destinatariosIds.isEmpty()) {
+            return;
+        }
+
+        String descricao = construirDescricaoNotificacao(publicacao);
+        String chaveBase = "publicacao:" + publicacao.getId();
+        for (UUID destinatarioId : destinatariosIds) {
+            notificacaoService.criarNotificacao(
+                    destinatarioId,
+                    "Nova publicacao capturada",
+                    descricao,
+                    TipoNotificacao.SISTEMA,
+                    "publicacoes",
+                    chaveBase + ":" + destinatarioId,
+                    "PUBLICACAO",
+                    publicacao.getId()
+            );
+        }
+    }
+
+    private String construirDescricaoNotificacao(Publicacao publicacao) {
+        String numero = publicacao.getNpu() != null && !publicacao.getNpu().isBlank()
+                ? publicacao.getNpu()
+                : "sem processo vinculado";
+        String captadaEmNome = publicacao.getCaptadaEmNome() != null && !publicacao.getCaptadaEmNome().isBlank()
+                ? " Captada em nome de " + publicacao.getCaptadaEmNome() + "."
+                : "";
+        return "Uma publicacao foi encontrada em " + publicacao.getTribunalOrigem()
+                + ". Processo: " + numero + "." + captadaEmNome;
     }
 
     private String toId(Usuario usuario) {

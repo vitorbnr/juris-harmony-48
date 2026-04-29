@@ -1,7 +1,7 @@
 export type StatusTratamentoPublicacao = "PENDENTE" | "TRATADA" | "DESCARTADA";
 export type LadoProcessualPublicacao = "PARTE_AUTORA" | "PARTE_RE" | "TERCEIRO" | "INDEFINIDO";
 export type TipoFontePublicacaoMonitorada = "NOME" | "OAB" | "CPF" | "CNPJ";
-export type GrupoDiarioOficialPublicacao = "DJEN" | "DATAJUD" | "DOMICILIO" | "DOU" | "LEGADO";
+export type GrupoDiarioOficialPublicacao = "DJEN" | "DATAJUD" | "DOMICILIO" | "LEGADO";
 export type StatusDiarioOficialPublicacao = "SUPORTADO" | "PREPARADO" | "NAO_SUPORTADO";
 export type StatusFluxoPublicacao =
   | "RECEBIDA"
@@ -114,6 +114,8 @@ export interface PublicacaoCapturaExecucao {
   publicacoesImportadas?: number | null;
   falhas?: number | null;
   mensagem?: string | null;
+  erroTipo?: string | null;
+  erroCodigoHttp?: number | null;
   iniciadoEm?: string | null;
   finalizadoEm?: string | null;
   duracaoMs?: number | null;
@@ -127,7 +129,6 @@ export interface PublicacaoMonitoramento {
   publicacoesSemResponsavel: number;
   datajud?: PublicacaoFonteSaude | null;
   djen?: PublicacaoFonteSaude | null;
-  dou?: PublicacaoFonteSaude | null;
   orientacaoOperacional?: string | null;
 }
 
@@ -140,19 +141,7 @@ export interface PublicacaoDjenSync {
   publicacoesLidas: number;
   publicacoesImportadas: number;
   falhas: number;
-  mensagem?: string | null;
-}
-
-export interface PublicacaoDouSync {
-  enabled: boolean;
-  configurada: boolean;
-  secoes: string[];
-  diasAvaliados: number;
-  cadernosConsultados: number;
-  cadernosBaixados: number;
-  publicacoesLidas: number;
-  publicacoesImportadas: number;
-  falhas: number;
+  emExecucao?: boolean;
   mensagem?: string | null;
 }
 

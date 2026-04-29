@@ -73,6 +73,15 @@ public class PublicacaoCapturaExecucao {
     @Column(columnDefinition = "TEXT")
     private String mensagem;
 
+    @Column(name = "erro_tipo", length = 80)
+    private String erroTipo;
+
+    @Column(name = "erro_codigo_http")
+    private Integer erroCodigoHttp;
+
+    @Column(name = "erro_detalhe", columnDefinition = "TEXT")
+    private String erroDetalhe;
+
     @Column(name = "iniciado_em", nullable = false, updatable = false)
     @Builder.Default
     private LocalDateTime iniciadoEm = LocalDateTime.now();

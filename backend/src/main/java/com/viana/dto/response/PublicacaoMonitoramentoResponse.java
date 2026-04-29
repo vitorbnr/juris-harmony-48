@@ -17,7 +17,6 @@ public class PublicacaoMonitoramentoResponse {
     private long publicacoesSemResponsavel;
     private FonteSaude datajud;
     private FonteSaude djen;
-    private FonteSaude dou;
     private String orientacaoOperacional;
 
     @Data
