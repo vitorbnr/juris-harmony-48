@@ -49,6 +49,32 @@ export interface Publicacao {
   iaConfianca?: number | null;
   iaTrechosRelevantes?: string | null;
   ladoProcessualEstimado?: LadoProcessualPublicacao | null;
+  atividadesVinculadas?: PublicacaoAtividade[];
+}
+
+export interface PublicacaoAtividade {
+  id: string;
+  titulo: string;
+  tipo?: string | null;
+  data?: string | null;
+  hora?: string | null;
+  prioridade?: string | null;
+  etapa?: string | null;
+  concluido?: boolean | null;
+  advogadoId?: string | null;
+  advogadoNome?: string | null;
+  eventoJuridicoId?: string | null;
+}
+
+export interface PublicacaoPage {
+  content: Publicacao[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+  first?: boolean;
+  last?: boolean;
+  empty?: boolean;
 }
 
 export interface PublicacaoHistorico {
@@ -129,7 +155,54 @@ export interface PublicacaoMonitoramento {
   publicacoesSemResponsavel: number;
   datajud?: PublicacaoFonteSaude | null;
   djen?: PublicacaoFonteSaude | null;
+  djenSla?: PublicacaoCapturaSlaResumo | null;
+  djenDiarios?: PublicacaoCapturaDiarioSaude[];
+  djenHistorico?: PublicacaoCapturaHistoricoDia[];
   orientacaoOperacional?: string | null;
+}
+
+export interface PublicacaoCapturaSlaResumo {
+  total: number;
+  saudaveis: number;
+  atrasados: number;
+  comErro: number;
+  semCaderno: number;
+  semMatch: number;
+  nuncaExecutados: number;
+  slaHoras: number;
+  status?: string | null;
+}
+
+export interface PublicacaoCapturaDiarioSaude {
+  codigo: string;
+  nome: string;
+  uf?: string | null;
+  status: string;
+  ultimoStatus?: string | null;
+  dataReferencia?: string | null;
+  ultimoSyncEm?: string | null;
+  horasDesdeUltimaExecucao?: number | null;
+  publicacoesLidas?: number | null;
+  publicacoesImportadas?: number | null;
+  mensagem?: string | null;
+  erroTipo?: string | null;
+  erroCodigoHttp?: number | null;
+  reprocessavel: boolean;
+}
+
+export interface PublicacaoCapturaHistoricoDia {
+  data: string;
+  totalExecucoes: number;
+  sucessos: number;
+  erros: number;
+  pendentes: number;
+  cadernosConsultados: number;
+  cadernosBaixados: number;
+  publicacoesLidas: number;
+  publicacoesImportadas: number;
+  falhas: number;
+  duracaoMediaMs?: number | null;
+  status?: string | null;
 }
 
 export interface PublicacaoDjenSync {

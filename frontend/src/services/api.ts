@@ -8,6 +8,7 @@ import type {
   PublicacaoHistorico,
   PublicacaoMetricas,
   PublicacaoMonitoramento,
+  PublicacaoPage,
 } from "@/types/publicacoes";
 import type {
   Atendimento,
@@ -19,6 +20,7 @@ import type {
   NotaPessoal,
   Prazo,
   PrazoComentario,
+  Processo,
   PrazoDetalhe,
   ProcessoDetalhe,
   TipoPeriodoIndicadoresEquipe,
@@ -590,9 +592,25 @@ export const publicacoesApi = {
     busca?: string;
     somenteRiscoPrazo?: boolean;
     statusFluxo?: string;
+    somenteHoje?: boolean;
     minhas?: boolean;
   }) =>
     api.get("/publicacoes", { params: cleanParams(params) }).then(r => r.data as Publicacao[]),
+
+  listarPaginado: (params?: {
+    status?: string;
+    busca?: string;
+    somenteRiscoPrazo?: boolean;
+    statusFluxo?: string;
+    somenteHoje?: boolean;
+    minhas?: boolean;
+    page?: number;
+    size?: number;
+  }) =>
+    api.get("/publicacoes/page", { params: cleanParams(params) }).then(r => r.data as PublicacaoPage),
+
+  buscar: (id: string) =>
+    api.get(`/publicacoes/${id}`).then(r => r.data as Publicacao),
 
   metricas: () =>
     api.get("/publicacoes/stats").then(r => r.data as PublicacaoMetricas),
@@ -604,7 +622,10 @@ export const publicacoesApi = {
     api.get("/publicacoes/capturas", { params: cleanParams(params) })
       .then(r => r.data as PublicacaoCapturaExecucao[]),
 
-  coletarDjen: (params?: { tribunal?: string; data?: string; cadernoTipo?: string }) =>
+  reprocessarCaptura: (id: string) =>
+    api.post(`/publicacoes/capturas/${id}/reprocessar`).then(r => r.data as PublicacaoDjenSync),
+
+  coletarDjen: (params?: { tribunal?: string; data?: string; dataInicio?: string; dataFim?: string; cadernoTipo?: string }) =>
     api.post("/publicacoes/coleta/djen", null, { params: cleanParams(params) })
       .then(r => r.data as PublicacaoDjenSync),
 
@@ -661,6 +682,9 @@ export const publicacoesApi = {
 
     vincularProcesso: (id: string, processoId: string) =>
       api.put(`/publicacoes/${id}/vincular-processo`, { processoId }).then(r => r.data as Publicacao),
+
+  criarProcesso: (id: string, data: Record<string, unknown>) =>
+    api.post(`/publicacoes/${id}/processo`, data).then(r => r.data as Processo),
 
   atribuir: (id: string, usuarioId: string) =>
     api.patch(`/publicacoes/${id}/atribuir`, { usuarioId }).then(r => r.data as Publicacao),

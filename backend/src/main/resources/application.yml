@@ -62,6 +62,8 @@ api:
     timeout-seconds: ${DJEN_TIMEOUT_SECONDS:60}
     retry-attempts: ${DJEN_RETRY_ATTEMPTS:3}
     retry-backoff-ms: ${DJEN_RETRY_BACKOFF_MS:1500}
+    comunicacao-page-size: ${DJEN_COMUNICACAO_PAGE_SIZE:100}
+    comunicacao-max-pages: ${DJEN_COMUNICACAO_MAX_PAGES:100}
   domicilio:
     enabled: ${DOMICILIO_ENABLED:false}
     base-url: ${DOMICILIO_BASE_URL:}
@@ -88,7 +90,15 @@ app:
       lookback-days: ${DJEN_SYNC_LOOKBACK_DAYS:3}
       tribunais: ${DJEN_TRIBUNAIS:}
       caderno-tipo: ${DJEN_CADERNO_TIPO:D}
+      comunicacao:
+        enabled: ${DJEN_COMUNICACAO_ENABLED:true}
+      caderno-fallback:
+        enabled: ${DJEN_CADERNO_FALLBACK_ENABLED:true}
+        on-empty: ${DJEN_CADERNO_FALLBACK_ON_EMPTY:false}
       lock-ttl-minutes: ${DJEN_SYNC_LOCK_TTL_MINUTES:60}
+      backfill-max-days: ${DJEN_BACKFILL_MAX_DAYS:31}
+      sla-hours: ${DJEN_SYNC_SLA_HOURS:36}
+      history-days: ${DJEN_SYNC_HISTORY_DAYS:14}
   alertas:
     prazos:
       cron: ${PRAZO_ALERTA_CRON:0 0 8,13 * * *}
@@ -96,3 +106,9 @@ app:
     integracoes:
       cron: ${INTEGRACAO_ALERTA_CRON:0 0 * * * *}
       thresholds: ${INTEGRACAO_ALERTA_THRESHOLDS:3,5,10}
+    publicacoes:
+      djen-sla:
+        enabled: ${DJEN_SLA_ALERT_ENABLED:true}
+        cron: ${DJEN_SLA_ALERT_CRON:0 15 8 * * *}
+        max-itens: ${DJEN_SLA_ALERT_MAX_ITENS:8}
+        alertar-nunca-executado: ${DJEN_SLA_ALERTAR_NUNCA_EXECUTADO:false}

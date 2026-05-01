@@ -95,6 +95,12 @@ function formatarDataInput(date = new Date()) {
   return local.toISOString().slice(0, 10);
 }
 
+function dataInicialBackfillPadrao() {
+  const date = new Date();
+  date.setDate(date.getDate() - 29);
+  return formatarDataInput(date);
+}
+
 function fonteTipoTabela(tipo: TipoFontePublicacaoMonitorada) {
   return tipo === "NOME" ? "PE" : tipo;
 }
@@ -187,6 +193,77 @@ function statusExecucaoClassName(status?: string | null) {
     return "border-rose-500/25 bg-rose-500/10 text-rose-400";
   }
   return "border-amber-500/25 bg-amber-500/10 text-amber-400";
+}
+
+function formatarStatusSla(status?: string | null) {
+  const labels: Record<string, string> = {
+    AGUARDANDO_PRIMEIRA_EXECUCAO: "Aguardando primeira execucao",
+    ATRASADO: "Atrasado",
+    COM_ERROS: "Com erros",
+    ERRO: "Erro",
+    NUNCA_EXECUTADO: "Nunca executado",
+    PARCIAL: "Parcial",
+    SAUDAVEL: "Saudavel",
+    SEM_CADERNO: "Sem caderno",
+    SEM_COLETORES: "Sem coletores",
+    SEM_MATCH: "Sem match",
+  };
+
+  return status ? labels[status] ?? status.replaceAll("_", " ") : "Nao verificado";
+}
+
+function statusSlaClassName(status?: string | null) {
+  if (status === "SAUDAVEL" || status === "SEM_CADERNO" || status === "SEM_MATCH") {
+    return "border-emerald-500/25 bg-emerald-500/10 text-emerald-400";
+  }
+  if (status === "COM_ERROS" || status === "ERRO") {
+    return "border-rose-500/25 bg-rose-500/10 text-rose-400";
+  }
+  if (status === "ATRASADO" || status === "NUNCA_EXECUTADO" || status === "PARCIAL" || status === "AGUARDANDO_PRIMEIRA_EXECUCAO") {
+    return "border-amber-500/25 bg-amber-500/10 text-amber-400";
+  }
+  return "border-border bg-muted text-muted-foreground";
+}
+
+function pesoStatusSla(status?: string | null) {
+  const pesos: Record<string, number> = {
+    ERRO: 0,
+    ATRASADO: 1,
+    NUNCA_EXECUTADO: 2,
+    SEM_CADERNO: 3,
+    SEM_MATCH: 4,
+    SAUDAVEL: 5,
+  };
+
+  return status ? pesos[status] ?? 9 : 9;
+}
+
+function formatarStatusHistoricoDjen(status?: string | null) {
+  const labels: Record<string, string> = {
+    COM_CAPTURA: "Com publicacao",
+    COM_ERROS: "Com erros",
+    EXECUTADO: "Executado",
+    PENDENTE: "Pendente",
+    SEM_EXECUCAO: "Sem execucao",
+  };
+
+  return status ? labels[status] ?? status.replaceAll("_", " ") : "Nao verificado";
+}
+
+function statusHistoricoDjenClassName(status?: string | null) {
+  if (status === "COM_CAPTURA") {
+    return "border-emerald-500/25 bg-emerald-500/10 text-emerald-400";
+  }
+  if (status === "EXECUTADO") {
+    return "border-blue-500/25 bg-blue-500/10 text-blue-400";
+  }
+  if (status === "COM_ERROS") {
+    return "border-rose-500/25 bg-rose-500/10 text-rose-400";
+  }
+  if (status === "PENDENTE") {
+    return "border-amber-500/25 bg-amber-500/10 text-amber-400";
+  }
+  return "border-border bg-muted text-muted-foreground";
 }
 
 function formatarDataHora(value?: string | null) {
@@ -331,6 +408,8 @@ export function PublicacoesAdminTab() {
   const [salvando, setSalvando] = useState(false);
   const [coletandoDjen, setColetandoDjen] = useState(false);
   const [coletandoReplayDjen, setColetandoReplayDjen] = useState(false);
+  const [coletandoBackfillDjen, setColetandoBackfillDjen] = useState(false);
+  const [reprocessandoCapturaId, setReprocessandoCapturaId] = useState<string | null>(null);
   const [alterandoId, setAlterandoId] = useState<string | null>(null);
   const [fonteEdicaoId, setFonteEdicaoId] = useState<string | null>(null);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
@@ -341,6 +420,8 @@ export function PublicacoesAdminTab() {
   const [ultimoResultadoDjen, setUltimoResultadoDjen] = useState<PublicacaoDjenSync | null>(null);
   const [replayTribunal, setReplayTribunal] = useState("");
   const [replayData, setReplayData] = useState(formatarDataInput());
+  const [backfillDataInicio, setBackfillDataInicio] = useState(dataInicialBackfillPadrao);
+  const [backfillDataFim, setBackfillDataFim] = useState(formatarDataInput());
 
   const [tipo, setTipo] = useState<TipoFontePublicacaoMonitorada>("NOME");
   const [nomeExibicao, setNomeExibicao] = useState("");
@@ -409,6 +490,13 @@ export function PublicacoesAdminTab() {
   const fontesAtivas = fontes.filter((fonte) => fonte.ativo).length;
   const vagasRestantes = Math.max(0, LIMITE_PESQUISAS - fontesAtivas);
   const djenStatus = monitoramento?.djen?.status;
+  const djenSla = monitoramento?.djenSla;
+  const djenDiariosSla = [...(monitoramento?.djenDiarios ?? [])].sort((a, b) => {
+    const peso = pesoStatusSla(a.status) - pesoStatusSla(b.status);
+    if (peso !== 0) return peso;
+    return a.codigo.localeCompare(b.codigo);
+  });
+  const djenHistorico = monitoramento?.djenHistorico ?? [];
   const capturasResumo = {
     total: capturasRecentes.length,
     sucesso: capturasRecentes.filter((captura) => captura.status === "SUCESSO").length,
@@ -532,14 +620,29 @@ export function PublicacoesAdminTab() {
     }
   };
 
-  const coletarDjen = async (params?: { tribunal?: string; data?: string }) => {
+  const coletarDjen = async (params?: { tribunal?: string; data?: string; dataInicio?: string; dataFim?: string }) => {
     const isReplay = Boolean(params?.tribunal || params?.data);
+    const isBackfill = Boolean(params?.dataInicio || params?.dataFim);
+    if (isReplay && isBackfill) {
+      toast.error("Use replay por tribunal/data ou backfill por periodo, nao ambos.");
+      return;
+    }
     if (isReplay && (!params?.tribunal || !params?.data)) {
       toast.error("Informe tribunal e data para reprocessar o caderno DJEN.");
       return;
     }
+    if (isBackfill && (!params?.dataInicio || !params?.dataFim)) {
+      toast.error("Informe data inicial e final para o backfill DJEN.");
+      return;
+    }
+    if (params?.dataInicio && params?.dataFim && params.dataInicio > params.dataFim) {
+      toast.error("A data inicial do backfill nao pode ser maior que a data final.");
+      return;
+    }
 
-    if (isReplay) {
+    if (isBackfill) {
+      setColetandoBackfillDjen(true);
+    } else if (isReplay) {
       setColetandoReplayDjen(true);
     } else {
       setColetandoDjen(true);
@@ -560,11 +663,35 @@ export function PublicacoesAdminTab() {
       console.error("Erro ao executar captura DJEN:", error);
       toast.error("Nao foi possivel executar a captura DJEN.");
     } finally {
-      if (isReplay) {
+      if (isBackfill) {
+        setColetandoBackfillDjen(false);
+      } else if (isReplay) {
         setColetandoReplayDjen(false);
       } else {
         setColetandoDjen(false);
       }
+    }
+  };
+
+  const reprocessarCaptura = async (captura: PublicacaoCapturaExecucao) => {
+    if (!captura.id) return;
+    setReprocessandoCapturaId(captura.id);
+    try {
+      const resultado = await publicacoesApi.reprocessarCaptura(captura.id);
+      setUltimoResultadoDjen(resultado);
+      if (resultado.emExecucao) {
+        toast.info(resultado.mensagem ?? "Ja existe outra captura DJEN em andamento.");
+      } else if ((resultado.falhas ?? 0) > 0) {
+        toast.warning(resultado.mensagem ?? "Reprocessamento DJEN finalizado com falhas.");
+      } else {
+        toast.success(`${resultado.publicacoesImportadas ?? 0} publicacao(oes) importada(s) no reprocessamento.`);
+      }
+      await carregar();
+    } catch (error) {
+      console.error("Erro ao reprocessar captura DJEN:", error);
+      toast.error("Nao foi possivel reprocessar a captura DJEN.");
+    } finally {
+      setReprocessandoCapturaId(null);
     }
   };
 
@@ -657,11 +784,39 @@ export function PublicacoesAdminTab() {
                   type="button"
                   className="gap-2"
                   onClick={() => void coletarDjen()}
-                  disabled={coletandoDjen || coletandoReplayDjen || fontesAtivas === 0 || diariosColetaveisAgora.length === 0}
+                  disabled={coletandoDjen || coletandoReplayDjen || coletandoBackfillDjen || fontesAtivas === 0 || diariosColetaveisAgora.length === 0}
                 >
                   {coletandoDjen ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
                   Capturar DJEN
                 </Button>
+                <div className="rounded-xl border border-border bg-primary/5 p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Descobrir carteira</p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    Busca publicacoes por OAB/nome no periodo e joga CNJs sem cadastro na fila sem vinculo.
+                  </p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <Input
+                      type="date"
+                      value={backfillDataInicio}
+                      onChange={(event) => setBackfillDataInicio(event.target.value)}
+                    />
+                    <Input
+                      type="date"
+                      value={backfillDataFim}
+                      onChange={(event) => setBackfillDataFim(event.target.value)}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="mt-2 w-full gap-2"
+                    onClick={() => void coletarDjen({ dataInicio: backfillDataInicio, dataFim: backfillDataFim })}
+                    disabled={coletandoDjen || coletandoReplayDjen || coletandoBackfillDjen || fontesAtivas === 0 || !backfillDataInicio || !backfillDataFim}
+                  >
+                    {coletandoBackfillDjen ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                    Rodar backfill do periodo
+                  </Button>
+                </div>
                 <div className="rounded-xl border border-border bg-background/60 p-3">
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Replay operacional</p>
                   <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_150px]">
@@ -688,7 +843,7 @@ export function PublicacoesAdminTab() {
                     variant="outline"
                     className="mt-2 w-full gap-2"
                     onClick={() => void coletarDjen({ tribunal: replayTribunal, data: replayData })}
-                    disabled={coletandoDjen || coletandoReplayDjen || fontesAtivas === 0 || !replayTribunal || !replayData}
+                    disabled={coletandoDjen || coletandoReplayDjen || coletandoBackfillDjen || fontesAtivas === 0 || !replayTribunal || !replayData}
                   >
                     {coletandoReplayDjen ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
                     Reprocessar tribunal/data
@@ -759,6 +914,135 @@ export function PublicacoesAdminTab() {
               </div>
             ) : null}
 
+            {djenSla ? (
+              <div className="mt-5 rounded-xl border border-border bg-background/60">
+                <div className="flex flex-col gap-3 border-b border-border px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">SLA por diario DJEN</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Considera atraso quando um coletor ativo fica mais de {djenSla.slaHoras} hora(s) sem execucao registrada.
+                    </p>
+                  </div>
+                  <Badge variant="outline" className={cn("w-fit rounded-full", statusSlaClassName(djenSla.status))}>
+                    {formatarStatusSla(djenSla.status)}
+                  </Badge>
+                </div>
+
+                <div className="grid gap-3 border-b border-border p-4 sm:grid-cols-2 lg:grid-cols-6">
+                  <div className="rounded-xl border border-border bg-card/60 p-3">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Coletores</p>
+                    <p className="mt-1 text-lg font-semibold text-foreground">{djenSla.total}</p>
+                  </div>
+                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
+                    <p className="text-xs uppercase tracking-wide text-emerald-400">Saudaveis</p>
+                    <p className="mt-1 text-lg font-semibold text-foreground">{djenSla.saudaveis}</p>
+                  </div>
+                  <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-3">
+                    <p className="text-xs uppercase tracking-wide text-rose-400">Com erro</p>
+                    <p className="mt-1 text-lg font-semibold text-foreground">{djenSla.comErro}</p>
+                  </div>
+                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+                    <p className="text-xs uppercase tracking-wide text-amber-400">Atrasados</p>
+                    <p className="mt-1 text-lg font-semibold text-foreground">{djenSla.atrasados}</p>
+                  </div>
+                  <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-3">
+                    <p className="text-xs uppercase tracking-wide text-blue-400">Sem match</p>
+                    <p className="mt-1 text-lg font-semibold text-foreground">{djenSla.semMatch}</p>
+                  </div>
+                  <div className="rounded-xl border border-border bg-card/60 p-3">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Nunca rodou</p>
+                    <p className="mt-1 text-lg font-semibold text-foreground">{djenSla.nuncaExecutados}</p>
+                  </div>
+                </div>
+
+                {djenDiariosSla.length > 0 ? (
+                  <div className="divide-y divide-border/70">
+                    {djenDiariosSla.slice(0, 12).map((diario) => (
+                      <div key={diario.codigo} className="grid gap-3 px-4 py-3 text-sm lg:grid-cols-[110px_120px_120px_1fr_140px] lg:items-center">
+                        <div>
+                          <p className="font-mono text-xs font-semibold text-foreground">{diario.codigo}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">{diario.uf ?? "Superior"}</p>
+                        </div>
+                        <Badge variant="outline" className={cn("w-fit rounded-full", statusSlaClassName(diario.status))}>
+                          {formatarStatusSla(diario.status)}
+                        </Badge>
+                        <div className="text-xs text-muted-foreground">
+                          {diario.horasDesdeUltimaExecucao != null
+                            ? `${diario.horasDesdeUltimaExecucao}h sem nova execucao`
+                            : "Sem execucao"}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-medium text-foreground">{diario.nome}</p>
+                          <p className="mt-1 truncate text-xs text-muted-foreground">
+                            {diario.mensagem ?? "Sem mensagem operacional."}
+                          </p>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {diario.publicacoesImportadas ?? 0} importada(s) de {diario.publicacoesLidas ?? 0}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="p-4 text-sm text-muted-foreground">
+                    Nenhum diario DJEN com coletor ativo foi encontrado no catalogo.
+                  </p>
+                )}
+              </div>
+            ) : null}
+
+            {djenHistorico.length > 0 ? (
+              <div className="mt-5 rounded-xl border border-border bg-background/60">
+                <div className="flex flex-col gap-3 border-b border-border px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Historico diario DJEN</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Visao agregada por data de referencia para identificar dias sem execucao, falhas e volume importado.
+                    </p>
+                  </div>
+                  <Badge variant="outline" className="w-fit rounded-full">
+                    {djenHistorico.length} dia(s)
+                  </Badge>
+                </div>
+
+                <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-7">
+                  {djenHistorico.map((dia) => (
+                    <div key={dia.data} className="rounded-xl border border-border bg-card/60 p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-mono text-xs font-semibold text-foreground">
+                          {dia.data ? dia.data.slice(5).split("-").reverse().join("/") : "S/D"}
+                        </p>
+                        <Badge
+                          variant="outline"
+                          className={cn("rounded-full px-2 py-0 text-[10px]", statusHistoricoDjenClassName(dia.status))}
+                        >
+                          {formatarStatusHistoricoDjen(dia.status)}
+                        </Badge>
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <p className="text-muted-foreground">Exec.</p>
+                          <p className="font-semibold text-foreground">{dia.totalExecucoes}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Erros</p>
+                          <p className="font-semibold text-foreground">{dia.erros}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Lidas</p>
+                          <p className="font-semibold text-foreground">{dia.publicacoesLidas}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Import.</p>
+                          <p className="font-semibold text-foreground">{dia.publicacoesImportadas}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
             {capturasRecentes.length > 0 ? (
               <div className="mt-5 rounded-xl border border-border bg-background/60">
                 <div className="border-b border-border px-4 py-3">
@@ -768,8 +1052,12 @@ export function PublicacoesAdminTab() {
                   </p>
                 </div>
                 <div className="divide-y divide-border/70">
-                  {capturasRecentes.map((captura) => (
-                    <div key={captura.id} className="grid gap-3 px-4 py-3 text-sm lg:grid-cols-[110px_130px_1fr_120px_120px] lg:items-center">
+                  {capturasRecentes.map((captura) => {
+                    const podeReprocessar = captura.fonte === "DJEN" && captura.status === "ERRO";
+                    const reprocessando = reprocessandoCapturaId === captura.id;
+
+                    return (
+                    <div key={captura.id} className="grid gap-3 px-4 py-3 text-sm lg:grid-cols-[110px_130px_1fr_120px_170px] lg:items-center">
                       <div>
                         <p className="font-mono text-xs font-semibold text-foreground">{captura.diarioCodigo ?? "N/A"}</p>
                         <p className="mt-1 text-xs text-muted-foreground">{captura.fonte ?? "Fonte"}</p>
@@ -794,11 +1082,26 @@ export function PublicacoesAdminTab() {
                       <div className="text-xs text-muted-foreground">
                         {captura.publicacoesImportadas ?? 0} importada(s) de {captura.publicacoesLidas ?? 0} lida(s)
                       </div>
-                      <Badge variant="outline" className={cn("w-fit rounded-full", statusExecucaoClassName(captura.status))}>
-                        {formatarStatusExecucao(captura.status)}
-                      </Badge>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline" className={cn("w-fit rounded-full", statusExecucaoClassName(captura.status))}>
+                          {formatarStatusExecucao(captura.status)}
+                        </Badge>
+                        {podeReprocessar ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void reprocessarCaptura(captura)}
+                            disabled={Boolean(reprocessandoCapturaId)}
+                          >
+                            {reprocessando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCcw className="h-3.5 w-3.5" />}
+                            Reprocessar
+                          </Button>
+                        ) : null}
+                      </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             ) : null}

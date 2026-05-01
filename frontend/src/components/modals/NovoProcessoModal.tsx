@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, Plus, Search, UserPlus, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 
@@ -12,13 +12,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { maskCurrency, maskProcesso, parseCurrency } from "@/lib/masks";
 import { casosApi, clientesApi, processosApi, unidadesApi, usuariosApi } from "@/services/api";
-import type { Caso, ProcessoParteFormValue } from "@/types";
+import type { Caso, Processo, ProcessoParteFormValue } from "@/types";
 import { toast } from "sonner";
 
 interface Props {
   onClose: () => void;
-  onSaved?: () => void;
+  onSaved?: (processo: Processo) => void | Promise<void>;
   initialClienteId?: string;
+  initialNumero?: string;
+  initialTribunal?: string;
+  initialDescricao?: string;
+  autoConsultarDatajud?: boolean;
+  submitProcesso?: (data: Record<string, unknown>) => Promise<Processo>;
+  submitLabel?: string;
+  successMessage?: string;
+  title?: string;
+  description?: string;
 }
 
 type ProcessoFormValues = {
@@ -115,8 +124,22 @@ function formatCurrencyFromApiValue(value: string | null): string {
   }).format(amount);
 }
 
-export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props) {
+export function NovoProcessoModal({
+  onClose,
+  onSaved,
+  initialClienteId,
+  initialNumero,
+  initialTribunal,
+  initialDescricao,
+  autoConsultarDatajud,
+  submitProcesso,
+  submitLabel = "Cadastrar Processo",
+  successMessage = "Processo cadastrado com sucesso!",
+  title = "Novo Processo",
+  description,
+}: Props) {
   const { user } = useAuth();
+  const autoDatajudExecutado = useRef(false);
   const [loading, setLoading] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [clientes, setClientes] = useState<ClienteOption[]>([]);
@@ -133,16 +156,16 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
 
   const form = useForm<ProcessoFormValues>({
     defaultValues: {
-      numero: "",
+      numero: initialNumero ? maskProcesso(initialNumero) : "",
       clienteId: initialClienteId || "",
       casoId: "",
       tipo: "CIVEL",
       vara: "",
-      tribunal: "",
+      tribunal: initialTribunal || "",
       status: "EM_ANDAMENTO",
       dataDistribuicao: new Date().toISOString().split("T")[0],
       valorCausa: "",
-      descricao: "",
+      descricao: initialDescricao || "",
       unidadeId: user?.unidadeId ?? "",
     },
   });
@@ -172,6 +195,19 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
       form.setValue("clienteId", initialClienteId, { shouldValidate: true });
     }
   }, [form, initialClienteId]);
+
+  useEffect(() => {
+    if (initialNumero) {
+      form.setValue("numero", maskProcesso(initialNumero), { shouldValidate: true });
+      autoDatajudExecutado.current = false;
+    }
+    if (initialTribunal) {
+      form.setValue("tribunal", initialTribunal, { shouldValidate: true });
+    }
+    if (initialDescricao) {
+      form.setValue("descricao", initialDescricao, { shouldValidate: true });
+    }
+  }, [form, initialDescricao, initialNumero, initialTribunal]);
 
   useEffect(() => {
     if (!clienteIdSelecionado) {
@@ -222,7 +258,7 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
     setAdvogadosSelecionados(prev => prev.filter(item => item.id !== id));
   };
 
-  const handleBuscarDatajud = async () => {
+  const handleBuscarDatajud = useCallback(async () => {
     const numeroAtual = form.getValues("numero");
     const numeroLimpo = numeroAtual.replace(/\D/g, "");
 
@@ -279,7 +315,21 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
     } finally {
       setIsSearching(false);
     }
-  };
+  }, [form]);
+
+  useEffect(() => {
+    if (!autoConsultarDatajud || autoDatajudExecutado.current) {
+      return;
+    }
+
+    const numeroLimpo = form.getValues("numero").replace(/\D/g, "");
+    if (numeroLimpo.length !== 20) {
+      return;
+    }
+
+    autoDatajudExecutado.current = true;
+    void handleBuscarDatajud();
+  }, [autoConsultarDatajud, form, handleBuscarDatajud]);
 
   const handleSubmit = form.handleSubmit(async values => {
     if (!values.numero || !values.clienteId) {
@@ -295,17 +345,20 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
 
     setLoading(true);
     try {
-      await processosApi.criar({
+      const payload = {
         ...values,
         casoId: values.casoId || null,
         advogadoIds: advogadosSelecionados.map(item => item.id),
         etiquetas,
         partes: sanitizeProcessoPartesForApi(partes),
         valorCausa: values.valorCausa ? parseCurrency(values.valorCausa) : null,
-      });
+      };
+      const processo = submitProcesso
+        ? await submitProcesso(payload)
+        : await processosApi.criar(payload);
 
-      toast.success("Processo cadastrado com sucesso!");
-      onSaved?.();
+      toast.success(successMessage);
+      await onSaved?.(processo as Processo);
       onClose();
     } catch (error: unknown) {
       const axiosErr = error as ApiErrorShape;
@@ -336,7 +389,12 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
 
       <div className="relative bg-card rounded-2xl border border-border shadow-2xl w-full max-w-xl mx-4 animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-5 border-b border-border">
-          <h2 className="font-heading text-lg font-semibold text-foreground">Novo Processo</h2>
+          <div>
+            <h2 className="font-heading text-lg font-semibold text-foreground">{title}</h2>
+            {description ? (
+              <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+            ) : null}
+          </div>
           <Button type="button" variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
             <X className="h-4 w-4" />
           </Button>
@@ -357,7 +415,7 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
                     <FormControl>
                       <Input
                         className="flex-1"
-                        placeholder=""
+                        placeholder="Ex: 0000000-00.0000.0.00.0000"
                         value={field.value}
                         onChange={event => field.onChange(maskProcesso(event.target.value))}
                       />
@@ -652,7 +710,7 @@ export function NovoProcessoModal({ onClose, onSaved, initialClienteId }: Props)
 
         <div className="px-6 py-4 border-t border-border flex gap-2">
           <Button type="submit" form="novo-processo-form" className="flex-1" disabled={loading || isSearching}>
-            {loading ? "Salvando..." : "Cadastrar Processo"}
+            {loading ? "Salvando..." : submitLabel}
           </Button>
           <Button type="button" variant="outline" onClick={onClose}>
             Cancelar

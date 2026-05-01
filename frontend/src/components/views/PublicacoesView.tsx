@@ -5,6 +5,7 @@ import {
   CalendarClock,
   CheckCircle2,
   CircleOff,
+  FilePlus2,
   History,
   Inbox,
   Link2,
@@ -23,6 +24,7 @@ import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 import { PrazoDateCalculator } from "@/components/prazos/PrazoDateCalculator";
+import { NovoProcessoModal } from "@/components/modals/NovoProcessoModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -72,6 +74,8 @@ const metricasIniciais: PublicacaoMetricas = {
   semResponsavel: 0,
 };
 
+const PUBLICACOES_PAGE_SIZE = 25;
+
 const formatarDataPublicacao = (value?: string | null) => {
   if (!value) return "Data não informada";
 
@@ -102,25 +106,16 @@ const formatarDataCurta = (value?: string | null) => {
   }
 };
 
-const isHoje = (value?: string | null) => {
-  if (!value) return false;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return false;
-  const agora = new Date();
-  return (
-    parsed.getFullYear() === agora.getFullYear() &&
-    parsed.getMonth() === agora.getMonth() &&
-    parsed.getDate() === agora.getDate()
-  );
-};
-
 const formatarAcaoSugerida = (value?: string | null) => {
   if (!value) return "Sem sugestão";
 
   const labels: Record<string, string> = {
     CRIAR_PRAZO: "Criar prazo",
+    CRIAR_AUDIENCIA: "Criar audiencia",
+    CRIAR_TAREFA: "Criar tarefa",
     VINCULAR_PROCESSO: "Vincular processo",
     APENAS_ARQUIVAR: "Apenas arquivar",
+    REVISAR_ARQUIVAR: "Revisar e arquivar",
     DESCARTAR: "Descartar",
   };
 
@@ -150,6 +145,17 @@ const formatarStatusFluxo = (value?: string | null) => {
   };
 
   return value ? labels[value] ?? value.replaceAll("_", " ") : "Nao classificada";
+};
+
+const formatarTipoAtividade = (value?: string | null) => {
+  const labels: Record<string, string> = {
+    TAREFA_INTERNA: "Tarefa",
+    PRAZO_PROCESSUAL: "Prazo",
+    AUDIENCIA: "Audiencia",
+    REUNIAO: "Reuniao",
+  };
+
+  return value ? labels[value] ?? value.replaceAll("_", " ") : "Atividade";
 };
 
 const formatarAcaoHistorico = (value?: string | null) => {
@@ -1113,43 +1119,60 @@ export const PublicacoesView = () => {
   const [publicacaoSelecionada, setPublicacaoSelecionada] = useState<Publicacao | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingHistorico, setLoadingHistorico] = useState(false);
+  const [loadingDetalhe, setLoadingDetalhe] = useState(false);
   const [busca, setBusca] = useState("");
   const [buscaAplicada, setBuscaAplicada] = useState("");
   const [statusFiltro, setStatusFiltro] = useState<FiltroStatus>("PENDENTE");
   const [filaFiltro, setFilaFiltro] = useState<FiltroFila>("TODAS");
   const [apenasHoje, setApenasHoje] = useState(false);
+  const [pagina, setPagina] = useState(0);
+  const [totalPublicacoes, setTotalPublicacoes] = useState(0);
+  const [totalPaginas, setTotalPaginas] = useState(0);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [abrirVinculo, setAbrirVinculo] = useState(false);
   const [abrirAtividade, setAbrirAtividade] = useState(false);
   const [modoAtividade, setModoAtividade] = useState<ModoAtividadePublicacao>("PRAZO");
   const [abrirAtribuicao, setAbrirAtribuicao] = useState(false);
   const [abrirDescarte, setAbrirDescarte] = useState(false);
+  const [abrirCriarProcesso, setAbrirCriarProcesso] = useState(false);
 
   const carregarDados = useCallback(async () => {
     setLoading(true);
     try {
-      const [itens, dadosMetricas] = await Promise.all([
-        publicacoesApi.listar({
+      const [paginaPublicacoes, dadosMetricas] = await Promise.all([
+        publicacoesApi.listarPaginado({
           status: statusFiltro === "TODAS" ? undefined : statusFiltro,
           busca: buscaAplicada || undefined,
           somenteRiscoPrazo: filaFiltro === "PRAZO_SUSPEITO" ? true : undefined,
-          statusFluxo: filaFiltro === "SEM_RESPONSAVEL" ? "SEM_RESPONSAVEL" : undefined,
+          statusFluxo:
+            filaFiltro === "SEM_RESPONSAVEL"
+              ? "SEM_RESPONSAVEL"
+              : filaFiltro === "SEM_VINCULO"
+                ? "SEM_VINCULO"
+                : undefined,
+          somenteHoje: apenasHoje ? true : undefined,
           minhas: filaFiltro === "MINHAS" ? true : undefined,
+          page: pagina,
+          size: PUBLICACOES_PAGE_SIZE,
         }),
         publicacoesApi.metricas(),
       ]);
 
-      setPublicacoes(Array.isArray(itens) ? itens : []);
+      setPublicacoes(Array.isArray(paginaPublicacoes?.content) ? paginaPublicacoes.content : []);
+      setTotalPublicacoes(paginaPublicacoes?.totalElements ?? 0);
+      setTotalPaginas(paginaPublicacoes?.totalPages ?? 0);
       setMetricas(dadosMetricas ?? metricasIniciais);
     } catch (error) {
       console.error("Erro ao carregar publicacoes:", error);
       setPublicacoes([]);
+      setTotalPublicacoes(0);
+      setTotalPaginas(0);
       setMetricas(metricasIniciais);
       toast.error("Não foi possível carregar a mesa de publicações.");
     } finally {
       setLoading(false);
     }
-  }, [buscaAplicada, filaFiltro, statusFiltro]);
+  }, [apenasHoje, buscaAplicada, filaFiltro, pagina, statusFiltro]);
 
   const carregarHistoricoPublicacao = useCallback(async (publicacaoId: string) => {
     setLoadingHistorico(true);
@@ -1164,19 +1187,30 @@ export const PublicacoesView = () => {
     }
   }, []);
 
+  const carregarDetalhePublicacao = useCallback(async (publicacaoId: string) => {
+    setLoadingDetalhe(true);
+    try {
+      const detalhe = await publicacoesApi.buscar(publicacaoId);
+      setPublicacaoSelecionada((atual) => (atual?.id === publicacaoId ? detalhe : atual));
+      setPublicacoes((atuais) => atuais.map((item) => (item.id === publicacaoId ? detalhe : item)));
+    } catch (error) {
+      console.error("Erro ao carregar detalhe da publicacao:", error);
+    } finally {
+      setLoadingDetalhe(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    setPagina(0);
+  }, [apenasHoje, buscaAplicada, filaFiltro, statusFiltro]);
+
   useEffect(() => {
     void carregarDados();
   }, [carregarDados]);
 
   const publicacoesFiltradas = useMemo(() => {
-    return publicacoes.filter((publicacao) => {
-      if (filaFiltro === "SEM_VINCULO" && publicacao.processoId) return false;
-      if (filaFiltro === "SEM_RESPONSAVEL" && publicacao.statusFluxo !== "SEM_RESPONSAVEL") return false;
-      if (filaFiltro === "PRAZO_SUSPEITO" && !publicacao.riscoPrazo) return false;
-      if (apenasHoje && !isHoje(publicacao.dataPublicacao)) return false;
-      return true;
-    });
-  }, [apenasHoje, filaFiltro, publicacoes]);
+    return publicacoes;
+  }, [publicacoes]);
 
   useEffect(() => {
     setPublicacaoSelecionada((atual) => {
@@ -1192,8 +1226,9 @@ export const PublicacoesView = () => {
       return;
     }
 
+    void carregarDetalhePublicacao(publicacaoSelecionada.id);
     void carregarHistoricoPublicacao(publicacaoSelecionada.id);
-  }, [carregarHistoricoPublicacao, publicacaoSelecionada?.id]);
+  }, [carregarDetalhePublicacao, carregarHistoricoPublicacao, publicacaoSelecionada?.id]);
 
   const aplicarBusca = () => {
     setBuscaAplicada(busca.trim());
@@ -1235,6 +1270,13 @@ export const PublicacoesView = () => {
     setModoAtividade(modo);
     setAbrirAtividade(true);
   };
+
+  const podeCriarProcessoAPartirPublicacao = Boolean(
+    publicacaoSelecionada?.id
+      && !publicacaoSelecionada.processoId
+      && publicacaoSelecionada.npu
+      && publicacaoSelecionada.npu.replace(/\D/g, "").length === 20,
+  );
 
   const assumirPublicacao = async () => {
     if (!publicacaoSelecionada) return;
@@ -1344,6 +1386,10 @@ export const PublicacoesView = () => {
     { key: "DESCARTADA" as const, label: "Descartadas" },
   ];
 
+  const totalPaginasNormalizado = Math.max(totalPaginas, 1);
+  const podeVoltarPagina = pagina > 0;
+  const podeAvancarPagina = pagina + 1 < totalPaginasNormalizado;
+
   const painelFila = (
     <div className="flex h-full flex-col">
       <div className="border-b border-border px-5 py-4">
@@ -1358,7 +1404,7 @@ export const PublicacoesView = () => {
             </p>
           </div>
           <Badge variant="outline" className="rounded-full px-2.5 py-1 text-[10px]">
-            {loading ? "..." : `${publicacoesFiltradas.length} item(ns)`}
+            {loading ? "..." : `${totalPublicacoes} item(ns)`}
           </Badge>
         </div>
       </div>
@@ -1376,6 +1422,7 @@ export const PublicacoesView = () => {
           </div>
         </div>
       ) : (
+        <>
         <ScrollArea className="flex-1">
           <div className="space-y-3 p-4">
             {publicacoesFiltradas.map((publicacao) => {
@@ -1443,6 +1490,32 @@ export const PublicacoesView = () => {
             })}
           </div>
         </ScrollArea>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
+          <span className="text-xs text-muted-foreground">
+            Pagina {pagina + 1} de {totalPaginasNormalizado} - {totalPublicacoes} registro(s)
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setPagina((atual) => Math.max(0, atual - 1))}
+              disabled={loading || !podeVoltarPagina}
+            >
+              Anterior
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setPagina((atual) => atual + 1)}
+              disabled={loading || !podeAvancarPagina}
+            >
+              Proxima
+            </Button>
+          </div>
+        </div>
+        </>
       )}
     </div>
   );
@@ -1471,6 +1544,12 @@ export const PublicacoesView = () => {
                   <Badge variant="outline" className={prioridadeSelecionada.className}>
                     {prioridadeSelecionada.label}
                   </Badge>
+                  {loadingDetalhe ? (
+                    <Badge variant="outline" className="rounded-full">
+                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                      Atualizando
+                    </Badge>
+                  ) : null}
                 </div>
 
                 <p className="font-mono text-sm text-foreground">
@@ -1552,10 +1631,10 @@ export const PublicacoesView = () => {
                   <div className="rounded-2xl border border-primary/15 bg-primary/5 p-5">
                     <div className="flex items-center gap-2">
                       <BrainCircuit className="h-4 w-4 text-primary" />
-                      <p className="text-sm font-semibold text-foreground">Trilho de IA preparado</p>
+                      <p className="text-sm font-semibold text-foreground">Triagem automatica local</p>
                     </div>
                     <p className="mt-2 text-xs leading-6 text-muted-foreground">
-                      Ainda sem executar modelo externo. O painel ja expone os campos que vao receber sugestao, confianca e fundamento.
+                      Regras locais analisam prazo, audiencia, urgencia e providencias sem depender de modelo externo.
                     </p>
 
                     <div className="mt-4 space-y-3">
@@ -1597,7 +1676,7 @@ export const PublicacoesView = () => {
                         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Trecho relevante</p>
                         <p className="mt-2 text-sm leading-6 text-foreground/85">
                           {detalheSelecionado.iaTrechosRelevantes ??
-                            "Quando a IA entrar, os trechos de apoio devem aparecer aqui para o advogado entender o motivo da sugestão."}
+                            "Quando houver trecho identificado, ele aparece aqui para o advogado entender o motivo da sugestao."}
                         </p>
                       </div>
                     </div>
@@ -1647,6 +1726,52 @@ export const PublicacoesView = () => {
                             "Sem responsavel definido"}
                         </p>
                       </div>
+                    </div>
+
+                    <div className="mt-5 rounded-xl border border-border bg-card/60 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Atividades criadas</p>
+                        <Badge variant="outline" className="rounded-full">
+                          {detalheSelecionado.atividadesVinculadas?.length ?? 0}
+                        </Badge>
+                      </div>
+                      {!detalheSelecionado.atividadesVinculadas?.length ? (
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          Nenhuma tarefa, prazo ou audiencia foi criado a partir desta publicacao.
+                        </p>
+                      ) : (
+                        <div className="mt-3 space-y-2">
+                          {detalheSelecionado.atividadesVinculadas.map((atividade) => (
+                            <div key={atividade.id} className="rounded-xl border border-border bg-background/70 p-3">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
+                                  {formatarTipoAtividade(atividade.tipo)}
+                                </Badge>
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    "rounded-full",
+                                    atividade.concluido
+                                      ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-300"
+                                      : "border-amber-500/20 bg-amber-500/10 text-amber-300"
+                                  )}
+                                >
+                                  {atividade.concluido ? "Concluida" : "Aberta"}
+                                </Badge>
+                              </div>
+                              <p className="mt-2 text-sm font-medium text-foreground">{atividade.titulo}</p>
+                              <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                                <CalendarClock className="h-3.5 w-3.5" />
+                                {formatarDataCurta(atividade.data)}
+                                {atividade.hora ? ` as ${atividade.hora.slice(0, 5)}` : ""}
+                              </p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {atividade.advogadoNome ? `Responsavel: ${atividade.advogadoNome}` : "Sem responsavel definido"}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     <div className="mt-5 rounded-xl border border-border bg-card/60 p-4">
@@ -1743,6 +1868,16 @@ export const PublicacoesView = () => {
                       <Link2 className="h-4 w-4" />
                       Vincular Processo
                     </Button>
+                    {podeCriarProcessoAPartirPublicacao ? (
+                      <Button
+                        variant="outline"
+                        onClick={() => setAbrirCriarProcesso(true)}
+                        disabled={actionLoading}
+                      >
+                        <FilePlus2 className="h-4 w-4" />
+                        Cadastrar Processo
+                      </Button>
+                    ) : null}
                     <Button
                       variant="secondary"
                       onClick={() =>
@@ -1985,6 +2120,24 @@ export const PublicacoesView = () => {
           }
         }}
       />
+      {abrirCriarProcesso && publicacaoSelecionada ? (
+        <NovoProcessoModal
+          onClose={() => setAbrirCriarProcesso(false)}
+          title="Cadastrar processo da publicacao"
+          description="Confirme cliente, unidade e responsaveis. O CNJ sera preenchido pela publicacao e a capa sera buscada no DataJud."
+          submitLabel="Cadastrar e vincular"
+          successMessage="Processo cadastrado e vinculado a publicacao."
+          initialNumero={publicacaoSelecionada.npu ?? ""}
+          initialTribunal={publicacaoSelecionada.tribunalOrigem ?? ""}
+          initialDescricao={publicacaoSelecionada.resumoOperacional ?? publicacaoSelecionada.teor?.slice(0, 500) ?? ""}
+          autoConsultarDatajud={Boolean(publicacaoSelecionada.npu?.replace(/\D/g, "").length === 20)}
+          submitProcesso={(data) => publicacoesApi.criarProcesso(publicacaoSelecionada.id, data)}
+          onSaved={async () => {
+            await carregarDados();
+            await carregarHistoricoPublicacao(publicacaoSelecionada.id);
+          }}
+        />
+      ) : null}
     </>
   );
 };

@@ -7,6 +7,7 @@ import com.viana.dto.request.ParteProcessoRequest;
 import com.viana.dto.request.RepresentanteParteRequest;
 import com.viana.dto.response.DatajudCapaResponse;
 import com.viana.dto.response.DatajudMovimentacaoResponse;
+import com.viana.dto.response.PublicacaoResponse;
 import com.viana.dto.response.ProcessoDetalheResponse;
 import com.viana.dto.response.ProcessoResponse;
 import com.viana.exception.BusinessException;
@@ -188,6 +189,24 @@ public class ProcessoService {
         }
 
         return toResponse(processo);
+    }
+
+    @Transactional
+    public ProcessoResponse criarAPartirPublicacao(UUID publicacaoId, CriarProcessoRequest request, String usuarioEmail) {
+        PublicacaoResponse publicacao = publicacaoService.buscar(publicacaoId);
+        if (publicacao.getProcessoId() != null) {
+            throw new BusinessException("Publicacao ja esta vinculada a um processo.");
+        }
+
+        String numeroPublicacao = normalizarNumeroProcesso(publicacao.getNpu());
+        String numeroRequest = normalizarNumeroProcesso(request.getNumero());
+        if (numeroPublicacao != null && numeroRequest != null && !numeroPublicacao.equals(numeroRequest)) {
+            throw new BusinessException("O numero do processo precisa corresponder ao CNJ capturado na publicacao.");
+        }
+
+        ProcessoResponse processo = criar(request);
+        publicacaoService.vincularProcesso(publicacaoId, UUID.fromString(processo.getId()), usuarioEmail);
+        return processo;
     }
 
     private void validarAdvogadosObrigatorios(List<UUID> ids) {
@@ -861,6 +880,14 @@ public class ProcessoService {
         }
 
         String clean = busca.replaceAll("\\D", "");
+        return clean.isBlank() ? null : clean;
+    }
+
+    private String normalizarNumeroProcesso(String numero) {
+        if (numero == null || numero.isBlank()) {
+            return null;
+        }
+        String clean = numero.replaceAll("\\D", "");
         return clean.isBlank() ? null : clean;
     }
 

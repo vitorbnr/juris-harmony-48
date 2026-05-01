@@ -78,6 +78,17 @@ public interface PrazoRepository extends JpaRepository<Prazo, UUID> {
     @Query("""
         SELECT p
         FROM Prazo p
+        LEFT JOIN FETCH p.advogado
+        JOIN FETCH p.eventoJuridico e
+        JOIN FETCH e.publicacao publicacao
+        WHERE publicacao.id IN :publicacaoIds
+        ORDER BY publicacao.id ASC, p.concluido ASC, p.data ASC, p.hora ASC, p.criadoEm DESC
+    """)
+    List<Prazo> findByEventoJuridicoPublicacaoIdInOrderByDossie(@Param("publicacaoIds") List<UUID> publicacaoIds);
+
+    @Query("""
+        SELECT p
+        FROM Prazo p
         WHERE p.processo.id = :processoId
         ORDER BY p.concluido ASC, p.data ASC, p.hora ASC, p.criadoEm DESC
     """)

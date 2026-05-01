@@ -1,6 +1,8 @@
 package com.viana.service;
 
 import com.viana.dto.response.PublicacaoCapturaExecucaoResponse;
+import com.viana.exception.BusinessException;
+import com.viana.exception.ResourceNotFoundException;
 import com.viana.model.PublicacaoCapturaExecucao;
 import com.viana.model.enums.FonteIntegracao;
 import com.viana.model.enums.StatusIntegracao;
@@ -30,6 +32,22 @@ public class PublicacaoCapturaExecucaoService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public PublicacaoCapturaExecucao buscarParaReprocessamento(UUID id) {
+        PublicacaoCapturaExecucao execucao = repository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Execucao de captura nao encontrada"));
+        if (execucao.getFonte() != FonteIntegracao.DJEN) {
+            throw new BusinessException("Somente capturas DJEN podem ser reprocessadas por este fluxo.");
+        }
+        if (execucao.getStatus() != StatusIntegracao.ERRO) {
+            throw new BusinessException("Somente capturas com erro devem ser reprocessadas por este fluxo.");
+        }
+        if (execucao.getDataReferencia() == null || execucao.getDiarioCodigo() == null || execucao.getDiarioCodigo().isBlank()) {
+            throw new BusinessException("Captura sem tribunal ou data de referencia para reprocessamento.");
+        }
+        return execucao;
+    }
+
     @Transactional
     public UUID iniciar(FonteIntegracao fonte, String diarioCodigo, LocalDate dataReferencia) {
         PublicacaoCapturaExecucao execucao = PublicacaoCapturaExecucao.builder()
@@ -45,11 +63,19 @@ public class PublicacaoCapturaExecucaoService {
 
     @Transactional
     public void concluirSucesso(UUID id, int cadernosBaixados, int publicacoesLidas, int publicacoesImportadas, String mensagem) {
+        concluirSucesso(id, null, cadernosBaixados, publicacoesLidas, publicacoesImportadas, mensagem);
+    }
+
+    @Transactional
+    public void concluirSucesso(UUID id, Integer cadernosConsultados, int cadernosBaixados, int publicacoesLidas, int publicacoesImportadas, String mensagem) {
         PublicacaoCapturaExecucao execucao = repository.findById(id).orElse(null);
         if (execucao == null) {
             return;
         }
 
+        if (cadernosConsultados != null) {
+            execucao.setCadernosConsultados(cadernosConsultados);
+        }
         execucao.setCadernosBaixados(cadernosBaixados);
         execucao.setPublicacoesLidas(publicacoesLidas);
         execucao.setPublicacoesImportadas(publicacoesImportadas);

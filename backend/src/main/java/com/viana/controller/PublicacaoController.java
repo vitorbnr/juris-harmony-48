@@ -5,6 +5,7 @@ import com.viana.dto.request.AtribuirPublicacaoRequest;
 import com.viana.dto.request.CriarAtividadePublicacaoRequest;
 import com.viana.dto.request.DescartarPublicacaoRequest;
 import com.viana.dto.request.IngestarPublicacaoRequest;
+import com.viana.dto.request.CriarProcessoRequest;
 import com.viana.dto.request.VincularProcessoPublicacaoRequest;
 import com.viana.dto.response.PublicacaoCapturaExecucaoResponse;
 import com.viana.dto.response.PublicacaoDjenSyncResponse;
@@ -13,12 +14,20 @@ import com.viana.dto.response.PublicacaoMetricasResponse;
 import com.viana.dto.response.PublicacaoMonitoramentoResponse;
 import com.viana.dto.response.PublicacaoResponse;
 import com.viana.dto.response.PublicacaoTratamentoResponse;
+import com.viana.dto.response.ProcessoResponse;
+import com.viana.exception.BusinessException;
 import com.viana.service.PublicacaoCapturaExecucaoService;
 import com.viana.service.PublicacaoDjenColetaService;
 import com.viana.service.PublicacaoMonitoramentoService;
 import com.viana.service.PublicacaoService;
+import com.viana.service.ProcessoService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -46,6 +55,7 @@ public class PublicacaoController {
     private final PublicacaoMonitoramentoService publicacaoMonitoramentoService;
     private final PublicacaoDjenColetaService publicacaoDjenColetaService;
     private final PublicacaoCapturaExecucaoService publicacaoCapturaExecucaoService;
+    private final ProcessoService processoService;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO')")
@@ -54,6 +64,7 @@ public class PublicacaoController {
             @RequestParam(required = false) String busca,
             @RequestParam(required = false) Boolean somenteRiscoPrazo,
             @RequestParam(required = false) String statusFluxo,
+            @RequestParam(required = false) Boolean somenteHoje,
             @RequestParam(required = false) Boolean minhas,
             Authentication authentication
     ) {
@@ -62,8 +73,33 @@ public class PublicacaoController {
                 busca,
                 somenteRiscoPrazo,
                 statusFluxo,
+                somenteHoje,
                 minhas,
                 authentication.getName()
+        ));
+    }
+
+    @GetMapping("/page")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO')")
+    public ResponseEntity<Page<PublicacaoResponse>> listarPaginado(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String busca,
+            @RequestParam(required = false) Boolean somenteRiscoPrazo,
+            @RequestParam(required = false) String statusFluxo,
+            @RequestParam(required = false) Boolean somenteHoje,
+            @RequestParam(required = false) Boolean minhas,
+            @PageableDefault(size = 25, sort = "dataPublicacao", direction = Sort.Direction.DESC) Pageable pageable,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(publicacaoService.listarPaginado(
+                status,
+                busca,
+                somenteRiscoPrazo,
+                statusFluxo,
+                somenteHoje,
+                minhas,
+                authentication.getName(),
+                pageable
         ));
     }
 
@@ -87,13 +123,28 @@ public class PublicacaoController {
         return ResponseEntity.ok(publicacaoCapturaExecucaoService.listarRecentes(size));
     }
 
+    @PostMapping("/capturas/{id}/reprocessar")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    public ResponseEntity<PublicacaoDjenSyncResponse> reprocessarCaptura(@PathVariable UUID id) {
+        return ResponseEntity.ok(publicacaoDjenColetaService.sincronizarReplayCaptura(id));
+    }
+
     @PostMapping("/coleta/djen")
     @PreAuthorize("hasRole('ADMINISTRADOR')")
     public ResponseEntity<PublicacaoDjenSyncResponse> coletarDjen(
             @RequestParam(required = false) String tribunal,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate data,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataInicio,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataFim,
             @RequestParam(required = false) String cadernoTipo
     ) {
+        boolean periodoSolicitado = dataInicio != null || dataFim != null;
+        if (periodoSolicitado) {
+            if ((tribunal != null && !tribunal.isBlank()) || data != null) {
+                throw new BusinessException("Use dataInicio/dataFim para backfill global ou tribunal/data para replay pontual.");
+            }
+            return ResponseEntity.ok(publicacaoDjenColetaService.sincronizarPeriodo(dataInicio, dataFim, cadernoTipo));
+        }
         if ((tribunal != null && !tribunal.isBlank()) || data != null) {
             return ResponseEntity.ok(publicacaoDjenColetaService.sincronizarReplay(tribunal, data, cadernoTipo));
         }
@@ -106,6 +157,12 @@ public class PublicacaoController {
         return ResponseEntity.ok(publicacaoService.listarHistorico(id));
     }
 
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO')")
+    public ResponseEntity<PublicacaoResponse> buscar(@PathVariable UUID id) {
+        return ResponseEntity.ok(publicacaoService.buscar(id));
+    }
+
     @PostMapping("/ingestao")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO')")
     public ResponseEntity<PublicacaoResponse> ingestar(
@@ -113,6 +170,17 @@ public class PublicacaoController {
             Authentication authentication
     ) {
         return ResponseEntity.ok(publicacaoService.ingestar(request, authentication.getName()));
+    }
+
+    @PostMapping("/{id}/processo")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO')")
+    public ResponseEntity<ProcessoResponse> criarProcessoAPartirPublicacao(
+            @PathVariable UUID id,
+            @Valid @RequestBody CriarProcessoRequest request,
+            Authentication authentication
+    ) {
+        ProcessoResponse response = processoService.criarAPartirPublicacao(id, request, authentication.getName());
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @PutMapping("/{id}/status")

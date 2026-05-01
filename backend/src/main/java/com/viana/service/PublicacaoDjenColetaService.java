@@ -3,6 +3,8 @@ package com.viana.service;
 import com.viana.dto.request.IngestarPublicacaoRequest;
 import com.viana.dto.response.PublicacaoDjenSyncResponse;
 import com.viana.exception.BusinessException;
+import com.viana.model.PublicacaoCapturaExecucao;
+import com.viana.model.PublicacaoDiarioOficial;
 import com.viana.model.PublicacaoFonteMonitorada;
 import com.viana.model.Usuario;
 import com.viana.model.enums.EstrategiaColetaPublicacao;
@@ -24,11 +26,14 @@ import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -45,6 +50,7 @@ public class PublicacaoDjenColetaService {
     private static final Pattern CNJ_DIGITOS_PATTERN = Pattern.compile("\\b\\d{20}\\b");
 
     private final DjenCadernoClientService djenCadernoClientService;
+    private final DjenComunicacaoClientService djenComunicacaoClientService;
     private final PublicacaoFonteMonitoradaRepository fonteMonitoradaRepository;
     private final PublicacaoRepository publicacaoRepository;
     private final PublicacaoService publicacaoService;
@@ -66,12 +72,25 @@ public class PublicacaoDjenColetaService {
     @Value("${app.sync.djen.caderno-tipo:D}")
     private String cadernoTipo;
 
+    @Value("${app.sync.djen.comunicacao.enabled:true}")
+    private boolean comunicacaoEnabled;
+
+    @Value("${app.sync.djen.caderno-fallback.enabled:true}")
+    private boolean cadernoFallbackEnabled;
+
+    @Value("${app.sync.djen.caderno-fallback.on-empty:false}")
+    private boolean cadernoFallbackOnEmpty;
+
     @Value("${app.sync.djen.lock-ttl-minutes:60}")
     private int lockTtlMinutes;
+
+    @Value("${app.sync.djen.backfill-max-days:31}")
+    private int backfillMaxDays;
 
     public PublicacaoDjenSyncResponse sincronizar(boolean ignorarEnabled) {
         List<PublicacaoFonteMonitorada> fontes = fonteMonitoradaRepository.findByAtivoTrueOrderByNomeExibicaoAsc();
         List<String> tribunais = parseTribunais(fontes);
+        boolean temBuscaDireta = comunicacaoEnabled && fontes.stream().anyMatch(this::permiteBuscaDiretaComunicacao);
         if (!enabled && !ignorarEnabled) {
             return PublicacaoDjenSyncResponse.builder()
                     .enabled(false)
@@ -80,11 +99,19 @@ public class PublicacaoDjenColetaService {
                     .build();
         }
 
-        if (tribunais.isEmpty() || fontes.isEmpty()) {
+        if (fontes.isEmpty()) {
             return PublicacaoDjenSyncResponse.builder()
                     .enabled(enabled)
                     .tribunais(tribunais)
-                    .mensagem("Configure ao menos um tribunal e uma fonte monitorada ativa para coletar DJEN.")
+                    .mensagem("Configure ao menos uma fonte monitorada ativa para coletar DJEN.")
+                    .build();
+        }
+
+        if (tribunais.isEmpty() && !temBuscaDireta) {
+            return PublicacaoDjenSyncResponse.builder()
+                    .enabled(enabled)
+                    .tribunais(tribunais)
+                    .mensagem("Configure ao menos um tribunal DJEN ou uma fonte NOME/OAB para busca direta no Comunica.")
                     .build();
         }
 
@@ -112,24 +139,36 @@ public class PublicacaoDjenColetaService {
         int publicacoesLidas = 0;
         int publicacoesImportadas = 0;
         int falhas = 0;
+        int importadasGlobal = 0;
+        int falhasGlobal = 0;
 
-        for (String tribunal : tribunais) {
-            int importadasTribunal = 0;
-            int falhasTribunal = 0;
-            for (int dayOffset = 0; dayOffset < diasAvaliados; dayOffset++) {
-                LocalDate data = LocalDate.now().minusDays(dayOffset);
-                ResultadoColetaCaderno resultado = coletarCaderno(tribunal, data, cadernoTipo, fontes);
+        for (int dayOffset = 0; dayOffset < diasAvaliados; dayOffset++) {
+            LocalDate data = LocalDate.now().minusDays(dayOffset);
+            ResultadoColetaCaderno resultadoGlobal = null;
+
+            if (comunicacaoEnabled) {
+                resultadoGlobal = coletarComunicacoes(null, data, cadernoTipo, fontes);
                 cadernosConsultados++;
-                cadernosBaixados += resultado.cadernosBaixados();
-                publicacoesLidas += resultado.publicacoesLidas();
-                publicacoesImportadas += resultado.publicacoesImportadas();
-                falhas += resultado.falhas();
-                falhasTribunal += resultado.falhas();
-                importadasTribunal += resultado.publicacoesImportadas();
+                cadernosBaixados += resultadoGlobal.cadernosBaixados();
+                publicacoesLidas += resultadoGlobal.publicacoesLidas();
+                publicacoesImportadas += resultadoGlobal.publicacoesImportadas();
+                falhas += resultadoGlobal.falhas();
+                falhasGlobal += resultadoGlobal.falhas();
+                importadasGlobal += resultadoGlobal.publicacoesImportadas();
             }
-            if (falhasTribunal == 0) {
-                fonteSyncService.registrarSucessoDjen(tribunal, importadasTribunal, "Coleta DJEN executada");
+
+            if (deveExecutarFallbackCaderno(resultadoGlobal, fontes) && !tribunais.isEmpty()) {
+                ResultadoAgregadoTribunais resultadoTribunais = coletarCadernosTribunais(tribunais, data, cadernoTipo, fontes);
+                cadernosConsultados += resultadoTribunais.cadernosConsultados();
+                cadernosBaixados += resultadoTribunais.resultado().cadernosBaixados();
+                publicacoesLidas += resultadoTribunais.resultado().publicacoesLidas();
+                publicacoesImportadas += resultadoTribunais.resultado().publicacoesImportadas();
+                falhas += resultadoTribunais.resultado().falhas();
             }
+        }
+
+        if (falhasGlobal == 0 && comunicacaoEnabled) {
+            fonteSyncService.registrarSucessoDjen("COMUNICA", importadasGlobal, "Coleta DJEN/Comunica global executada");
         }
 
         if (falhas > 0) {
@@ -149,17 +188,133 @@ public class PublicacaoDjenColetaService {
                 .build();
     }
 
+    public PublicacaoDjenSyncResponse sincronizarPeriodo(LocalDate dataInicio, LocalDate dataFim, String tipoCaderno) {
+        if (dataInicio == null || dataFim == null) {
+            throw new BusinessException("Data inicial e data final sao obrigatorias para backfill DJEN.");
+        }
+        if (dataInicio.isAfter(dataFim)) {
+            throw new BusinessException("Data inicial nao pode ser posterior a data final.");
+        }
+        if (dataFim.isAfter(LocalDate.now())) {
+            throw new BusinessException("Data final do backfill DJEN nao pode ser futura.");
+        }
+
+        long diasSolicitados = ChronoUnit.DAYS.between(dataInicio, dataFim) + 1;
+        int limiteDias = Math.max(1, backfillMaxDays);
+        if (diasSolicitados > limiteDias) {
+            throw new BusinessException("Backfill DJEN limitado a " + limiteDias + " dia(s) por execucao.");
+        }
+
+        List<PublicacaoFonteMonitorada> fontes = fonteMonitoradaRepository.findByAtivoTrueOrderByNomeExibicaoAsc();
+        List<String> tribunais = parseTribunais(fontes);
+        boolean temBuscaDireta = comunicacaoEnabled && fontes.stream().anyMatch(this::permiteBuscaDiretaComunicacao);
+        if (fontes.isEmpty()) {
+            return PublicacaoDjenSyncResponse.builder()
+                    .enabled(enabled)
+                    .tribunais(tribunais)
+                    .diasAvaliados((int) diasSolicitados)
+                    .mensagem("Configure ao menos uma fonte monitorada ativa para executar backfill DJEN.")
+                    .build();
+        }
+
+        if (tribunais.isEmpty() && !temBuscaDireta) {
+            return PublicacaoDjenSyncResponse.builder()
+                    .enabled(enabled)
+                    .tribunais(tribunais)
+                    .diasAvaliados((int) diasSolicitados)
+                    .mensagem("Configure ao menos um tribunal DJEN ou uma fonte NOME/OAB para busca direta no Comunica.")
+                    .build();
+        }
+
+        String caderno = tipoCaderno == null || tipoCaderno.isBlank()
+                ? cadernoTipo
+                : tipoCaderno.trim().toUpperCase(Locale.ROOT);
+
+        Optional<PublicacaoJobLockService.JobLockHandle> lock = jobLockService.tentarAdquirir(DJEN_LOCK_NAME, ttlLock());
+        if (lock.isEmpty()) {
+            return PublicacaoDjenSyncResponse.builder()
+                    .enabled(enabled)
+                    .tribunais(referenciasBackfill(tribunais))
+                    .diasAvaliados((int) diasSolicitados)
+                    .emExecucao(true)
+                    .mensagem("Backfill DJEN ignorado: ja existe outra coleta em andamento.")
+                    .build();
+        }
+
+        try {
+            int cadernosConsultados = 0;
+            int cadernosBaixados = 0;
+            int publicacoesLidas = 0;
+            int publicacoesImportadas = 0;
+            int falhas = 0;
+            int importadasGlobal = 0;
+            int falhasGlobal = 0;
+
+            for (LocalDate data = dataInicio; !data.isAfter(dataFim); data = data.plusDays(1)) {
+                ResultadoColetaCaderno resultadoGlobal = null;
+
+                if (comunicacaoEnabled) {
+                    resultadoGlobal = coletarComunicacoes(null, data, caderno, fontes);
+                    cadernosConsultados++;
+                    cadernosBaixados += resultadoGlobal.cadernosBaixados();
+                    publicacoesLidas += resultadoGlobal.publicacoesLidas();
+                    publicacoesImportadas += resultadoGlobal.publicacoesImportadas();
+                    falhas += resultadoGlobal.falhas();
+                    falhasGlobal += resultadoGlobal.falhas();
+                    importadasGlobal += resultadoGlobal.publicacoesImportadas();
+                }
+
+                if (deveExecutarFallbackCaderno(resultadoGlobal, fontes) && !tribunais.isEmpty()) {
+                    ResultadoAgregadoTribunais resultadoTribunais = coletarCadernosTribunais(tribunais, data, caderno, fontes);
+                    cadernosConsultados += resultadoTribunais.cadernosConsultados();
+                    cadernosBaixados += resultadoTribunais.resultado().cadernosBaixados();
+                    publicacoesLidas += resultadoTribunais.resultado().publicacoesLidas();
+                    publicacoesImportadas += resultadoTribunais.resultado().publicacoesImportadas();
+                    falhas += resultadoTribunais.resultado().falhas();
+                }
+            }
+
+            if (falhasGlobal == 0 && comunicacaoEnabled) {
+                fonteSyncService.registrarSucessoDjen(
+                        "COMUNICA",
+                        importadasGlobal,
+                        "Backfill DJEN/Comunica executado de " + dataInicio + " a " + dataFim
+                );
+            }
+
+            if (falhas > 0) {
+                notificarAdministradoresFalha(cadernosConsultados, falhas);
+            }
+
+            return PublicacaoDjenSyncResponse.builder()
+                    .enabled(enabled)
+                    .tribunais(referenciasBackfill(tribunais))
+                    .diasAvaliados((int) diasSolicitados)
+                    .cadernosConsultados(cadernosConsultados)
+                    .cadernosBaixados(cadernosBaixados)
+                    .publicacoesLidas(publicacoesLidas)
+                    .publicacoesImportadas(publicacoesImportadas)
+                    .falhas(falhas)
+                    .mensagem("Backfill DJEN finalizado. Publicacoes com CNJ sem processo cadastrado ficam na fila sem vinculo.")
+                    .build();
+        } finally {
+            jobLockService.liberar(lock.get());
+        }
+    }
+
     public PublicacaoDjenSyncResponse sincronizarReplay(String tribunal, LocalDate data, String tipoCaderno) {
-        String tribunalNormalizado = normalizarTribunalObrigatorio(tribunal);
         if (data == null) {
             throw new BusinessException("Data de referencia e obrigatoria para replay DJEN.");
         }
+        String tribunalNormalizado = normalizarTribunalOpcional(tribunal);
+        boolean replayGlobal = tribunalNormalizado == null || isCodigoGlobalComunicacao(tribunalNormalizado);
+        String referenciaReplay = replayGlobal ? "COMUNICA" : tribunalNormalizado;
 
         List<PublicacaoFonteMonitorada> fontes = fonteMonitoradaRepository.findByAtivoTrueOrderByNomeExibicaoAsc();
         if (fontes.isEmpty()) {
             return PublicacaoDjenSyncResponse.builder()
                     .enabled(enabled)
-                    .tribunais(List.of(tribunalNormalizado))
+                    .tribunais(List.of(referenciaReplay))
                     .diasAvaliados(1)
                     .mensagem("Configure ao menos uma fonte monitorada ativa para reprocessar DJEN.")
                     .build();
@@ -173,7 +328,7 @@ public class PublicacaoDjenColetaService {
         if (lock.isEmpty()) {
             return PublicacaoDjenSyncResponse.builder()
                     .enabled(enabled)
-                    .tribunais(List.of(tribunalNormalizado))
+                    .tribunais(List.of(referenciaReplay))
                     .diasAvaliados(1)
                     .emExecucao(true)
                     .mensagem("Replay DJEN ignorado: ja existe outra coleta em andamento.")
@@ -181,10 +336,29 @@ public class PublicacaoDjenColetaService {
         }
 
         try {
-            ResultadoColetaCaderno resultado = coletarCaderno(tribunalNormalizado, data, caderno, fontes);
+            int cadernosConsultados = 1;
+            ResultadoColetaCaderno resultado;
+            if (replayGlobal) {
+                resultado = comunicacaoEnabled
+                        ? coletarComunicacoes(null, data, caderno, fontes)
+                        : new ResultadoColetaCaderno(0, 0, 0, 0, "Busca direta DJEN/Comunica desabilitada.");
+
+                List<String> tribunaisFallback = parseTribunais(fontes);
+                if (deveExecutarFallbackCaderno(resultado, fontes) && !tribunaisFallback.isEmpty()) {
+                    ResultadoAgregadoTribunais fallback = coletarCadernosTribunais(tribunaisFallback, data, caderno, fontes);
+                    cadernosConsultados += fallback.cadernosConsultados();
+                    resultado = resultado.somar(
+                            fallback.resultado(),
+                            resultado.mensagem() + " Fallback por caderno executado no replay global."
+                    );
+                }
+            } else {
+                resultado = coletarPublicacoes(tribunalNormalizado, data, caderno, fontes);
+            }
+
             if (resultado.falhas() == 0) {
                 fonteSyncService.registrarSucessoDjen(
-                        tribunalNormalizado,
+                        referenciaReplay,
                         resultado.publicacoesImportadas(),
                         "Replay DJEN executado para " + data
                 );
@@ -192,9 +366,9 @@ public class PublicacaoDjenColetaService {
 
             return PublicacaoDjenSyncResponse.builder()
                     .enabled(enabled)
-                    .tribunais(List.of(tribunalNormalizado))
+                    .tribunais(List.of(referenciaReplay))
                     .diasAvaliados(1)
-                    .cadernosConsultados(1)
+                    .cadernosConsultados(cadernosConsultados)
                     .cadernosBaixados(resultado.cadernosBaixados())
                     .publicacoesLidas(resultado.publicacoesLidas())
                     .publicacoesImportadas(resultado.publicacoesImportadas())
@@ -204,6 +378,20 @@ public class PublicacaoDjenColetaService {
         } finally {
             jobLockService.liberar(lock.get());
         }
+    }
+
+    public PublicacaoDjenSyncResponse sincronizarReplayCaptura(UUID capturaId) {
+        PublicacaoCapturaExecucao captura = capturaExecucaoService.buscarParaReprocessamento(capturaId);
+        return sincronizarReplay(captura.getDiarioCodigo(), captura.getDataReferencia(), cadernoTipo);
+    }
+
+    private List<String> referenciasBackfill(List<String> tribunais) {
+        List<String> referencias = new ArrayList<>();
+        if (comunicacaoEnabled) {
+            referencias.add("COMUNICA");
+        }
+        referencias.addAll(tribunais);
+        return referencias.stream().distinct().toList();
     }
 
     private Duration ttlLock() {
@@ -218,6 +406,9 @@ public class PublicacaoDjenColetaService {
         if (ex instanceof DjenCadernoClientService.DjenCadernoException djenEx) {
             return djenEx.getTipo();
         }
+        if (ex instanceof DjenComunicacaoClientService.DjenComunicacaoException djenEx) {
+            return djenEx.getTipo();
+        }
         if (ex instanceof RestClientResponseException) {
             return "HTTP";
         }
@@ -228,6 +419,9 @@ public class PublicacaoDjenColetaService {
         if (ex instanceof DjenCadernoClientService.DjenCadernoException djenEx) {
             return djenEx.getCodigoHttp();
         }
+        if (ex instanceof DjenComunicacaoClientService.DjenComunicacaoException djenEx) {
+            return djenEx.getCodigoHttp();
+        }
         if (ex instanceof RestClientResponseException responseException) {
             return responseException.getStatusCode().value();
         }
@@ -236,6 +430,9 @@ public class PublicacaoDjenColetaService {
 
     private String detalheErro(Exception ex) {
         if (ex instanceof DjenCadernoClientService.DjenCadernoException djenEx) {
+            return djenEx.getDetalhe();
+        }
+        if (ex instanceof DjenComunicacaoClientService.DjenComunicacaoException djenEx) {
             return djenEx.getDetalhe();
         }
         if (ex instanceof RestClientResponseException responseException) {
@@ -266,6 +463,166 @@ public class PublicacaoDjenColetaService {
                         "PUBLICACAO_CAPTURA",
                         null
                 ));
+    }
+
+    private boolean deveExecutarFallbackCaderno(ResultadoColetaCaderno resultadoComunicacao, List<PublicacaoFonteMonitorada> fontes) {
+        if (!cadernoFallbackEnabled) {
+            return false;
+        }
+        if (!comunicacaoEnabled || resultadoComunicacao == null) {
+            return true;
+        }
+        if (resultadoComunicacao.falhas() > 0) {
+            return true;
+        }
+        if (existeFonteSemBuscaDireta(null, fontes)) {
+            return true;
+        }
+        return cadernoFallbackOnEmpty && resultadoComunicacao.publicacoesLidas() == 0;
+    }
+
+    private ResultadoAgregadoTribunais coletarCadernosTribunais(
+            List<String> tribunais,
+            LocalDate data,
+            String tipoCaderno,
+            List<PublicacaoFonteMonitorada> fontes
+    ) {
+        int cadernosConsultados = 0;
+        ResultadoColetaCaderno acumulado = new ResultadoColetaCaderno(0, 0, 0, 0, "Fallback por caderno nao executado.");
+
+        for (String tribunal : tribunais) {
+            ResultadoColetaCaderno resultado = coletarCaderno(tribunal, data, tipoCaderno, fontes);
+            cadernosConsultados++;
+            acumulado = acumulado.somar(resultado, resultado.mensagem());
+            if (resultado.falhas() == 0) {
+                fonteSyncService.registrarSucessoDjen(
+                        tribunal,
+                        resultado.publicacoesImportadas(),
+                        "Fallback por caderno DJEN executado para " + data
+                );
+            }
+        }
+
+        return new ResultadoAgregadoTribunais(cadernosConsultados, acumulado);
+    }
+
+    private ResultadoColetaCaderno coletarPublicacoes(
+            String tribunal,
+            LocalDate data,
+            String tipoCaderno,
+            List<PublicacaoFonteMonitorada> fontes
+    ) {
+        if (!comunicacaoEnabled) {
+            return coletarCaderno(tribunal, data, tipoCaderno, fontes);
+        }
+
+        ResultadoColetaCaderno resultadoComunicacao = coletarComunicacoes(tribunal, data, tipoCaderno, fontes);
+        boolean precisaFallbackPorFonte = existeFonteSemBuscaDireta(tribunal, fontes);
+        boolean precisaFallbackPorFalha = resultadoComunicacao.falhas() > 0;
+        boolean precisaFallbackPorVazio = cadernoFallbackOnEmpty && resultadoComunicacao.publicacoesLidas() == 0;
+
+        if (!cadernoFallbackEnabled || (!precisaFallbackPorFonte && !precisaFallbackPorFalha && !precisaFallbackPorVazio)) {
+            return resultadoComunicacao;
+        }
+
+        ResultadoColetaCaderno resultadoCaderno = coletarCaderno(tribunal, data, tipoCaderno, fontes);
+        String motivo = precisaFallbackPorFalha
+                ? "falha na busca direta"
+                : precisaFallbackPorFonte
+                ? "fontes sem busca direta"
+                : "busca direta sem resultado";
+        return resultadoComunicacao.somar(
+                resultadoCaderno,
+                resultadoComunicacao.mensagem() + " Fallback por caderno executado: " + motivo + ". " + resultadoCaderno.mensagem()
+        );
+    }
+
+    private ResultadoColetaCaderno coletarComunicacoes(
+            String tribunal,
+            LocalDate data,
+            String tipoCaderno,
+            List<PublicacaoFonteMonitorada> fontes
+    ) {
+        String codigoCaptura = tribunal == null || tribunal.isBlank() ? "COMUNICA" : tribunal;
+        UUID execucaoId = capturaExecucaoService.iniciar(FonteIntegracao.DJEN, codigoCaptura, data);
+        try {
+            List<PublicacaoFonteMonitorada> fontesDiretas = fontes.stream()
+                    .filter(fonte -> fonteMonitoraTribunal(fonte, tribunal))
+                    .filter(this::permiteBuscaDiretaComunicacao)
+                    .toList();
+
+            if (fontesDiretas.isEmpty()) {
+                String mensagem = "Busca direta DJEN ignorada: nenhuma fonte monitorada compativel com nome/OAB.";
+                capturaExecucaoService.concluirSucesso(execucaoId, 0, 0, 0, 0, mensagem);
+                return new ResultadoColetaCaderno(0, 0, 0, 0, mensagem);
+            }
+
+            Map<String, DjenCadernoClientService.DjenPublicacaoCapturada> publicacoesUnicas = new LinkedHashMap<>();
+            int consultasExecutadas = 0;
+            int consultasLimitadas = 0;
+
+            for (PublicacaoFonteMonitorada fonte : fontesDiretas) {
+                DjenComunicacaoClientService.ConsultaComunicacao consulta = montarConsultaComunicacao(
+                        tribunal,
+                        data,
+                        tipoCaderno,
+                        fonte
+                );
+                if (consulta == null) {
+                    continue;
+                }
+
+                DjenComunicacaoClientService.DjenComunicacaoResultado resultado =
+                        djenComunicacaoClientService.buscarComunicacoes(consulta);
+                consultasExecutadas++;
+                if (resultado.limiteDeclarado()) {
+                    consultasLimitadas++;
+                }
+                for (DjenCadernoClientService.DjenPublicacaoCapturada publicacao : resultado.publicacoes()) {
+                    publicacoesUnicas.putIfAbsent(chavePublicacaoCapturada(publicacao), publicacao);
+                }
+            }
+
+            int importadas = 0;
+            for (DjenCadernoClientService.DjenPublicacaoCapturada publicacao : publicacoesUnicas.values()) {
+                List<PublicacaoFonteMonitorada> fontesEncontradas = findMatchingFontes(publicacao, tribunal, fontes);
+                if (fontesEncontradas.isEmpty()) {
+                    continue;
+                }
+                if (ingestarPublicacaoDjen(publicacao, tribunal, fontesEncontradas)) {
+                    importadas++;
+                }
+            }
+
+            String mensagem = "Busca direta DJEN processada; consultas="
+                    + consultasExecutadas
+                    + ", publicacoes_unicas="
+                    + publicacoesUnicas.size()
+                    + ", importadas="
+                    + importadas
+                    + (consultasLimitadas > 0 ? ", consultas_limitadas=" + consultasLimitadas : "")
+                    + ".";
+            capturaExecucaoService.concluirSucesso(
+                    execucaoId,
+                    consultasExecutadas,
+                    0,
+                    publicacoesUnicas.size(),
+                    importadas,
+                    mensagem
+            );
+            return new ResultadoColetaCaderno(0, publicacoesUnicas.size(), importadas, 0, mensagem);
+        } catch (Exception ex) {
+            capturaExecucaoService.concluirErro(
+                    execucaoId,
+                    mensagemErro(ex),
+                    tipoErro(ex),
+                    codigoHttpErro(ex),
+                    detalheErro(ex)
+            );
+            fonteSyncService.registrarErroDjen(codigoCaptura, ex.getMessage());
+            log.warn("[DJEN_COMUNICACAO_SYNC] Falha ao coletar tribunal={} data={}: {}", tribunal, data, ex.getMessage());
+            return new ResultadoColetaCaderno(0, 0, 0, 1, ex.getMessage());
+        }
     }
 
     private ResultadoColetaCaderno coletarCaderno(
@@ -330,7 +687,6 @@ public class PublicacaoDjenColetaService {
             return false;
         }
 
-        PublicacaoFonteMonitorada fontePrincipal = fontesMonitoradas.getFirst();
         String tribunal = publicacao.tribunal() != null && !publicacao.tribunal().isBlank()
                 ? publicacao.tribunal()
                 : tribunalFallback;
@@ -355,9 +711,10 @@ public class PublicacaoDjenColetaService {
         request.setIdentificadorExterno(idExterno);
         request.setHashDeduplicacao(hash);
         request.setCaptadaEmNome(resumirFontesCapturadas(fontesMonitoradas));
-        if (fontePrincipal.getTipo() == TipoFontePublicacaoMonitorada.OAB) {
-            request.setOabMonitorada((fontePrincipal.getUf() != null ? fontePrincipal.getUf() : "") + fontePrincipal.getValorMonitorado());
-        }
+        fontesMonitoradas.stream()
+                .filter(fonte -> fonte.getTipo() == TipoFontePublicacaoMonitorada.OAB)
+                .findFirst()
+                .ifPresent(fonte -> request.setOabMonitorada((normalizarUf(fonte.getUf()) != null ? normalizarUf(fonte.getUf()) : "") + fonte.getValorMonitorado()));
         List<Usuario> destinatarios = coletarDestinatarios(fontesMonitoradas);
         Usuario destinatario = destinatarios.stream()
                 .filter(usuario -> Boolean.TRUE.equals(usuario.getAtivo()))
@@ -409,6 +766,62 @@ public class PublicacaoDjenColetaService {
         }
 
         return false;
+    }
+
+    private boolean permiteBuscaDiretaComunicacao(PublicacaoFonteMonitorada fonte) {
+        if (fonte == null || fonte.getTipo() == null) {
+            return false;
+        }
+        if (fonte.getTipo() == TipoFontePublicacaoMonitorada.OAB) {
+            return onlyDigits(fonte.getValorMonitorado()).length() >= 4;
+        }
+        if (fonte.getTipo() == TipoFontePublicacaoMonitorada.NOME) {
+            String nome = normalizeWords(fonte.getValorMonitorado());
+            return nome != null && nome.length() >= 5;
+        }
+        return false;
+    }
+
+    private boolean existeFonteSemBuscaDireta(String tribunal, List<PublicacaoFonteMonitorada> fontes) {
+        return fontes.stream()
+                .filter(fonte -> fonteMonitoraTribunal(fonte, tribunal))
+                .anyMatch(fonte -> !permiteBuscaDiretaComunicacao(fonte));
+    }
+
+    private DjenComunicacaoClientService.ConsultaComunicacao montarConsultaComunicacao(
+            String tribunal,
+            LocalDate data,
+            String tipoCaderno,
+            PublicacaoFonteMonitorada fonte
+    ) {
+        if (fonte.getTipo() == TipoFontePublicacaoMonitorada.OAB) {
+            String numeroOab = onlyDigits(fonte.getValorMonitorado());
+            if (numeroOab.length() < 4) {
+                return null;
+            }
+            return DjenComunicacaoClientService.ConsultaComunicacao.builder()
+                    .tribunal(tribunal)
+                    .data(data)
+                    .meio(tipoCaderno)
+                    .numeroOab(numeroOab)
+                    .ufOab(normalizarUf(fonte.getUf()))
+                    .build();
+        }
+
+        if (fonte.getTipo() == TipoFontePublicacaoMonitorada.NOME) {
+            String nome = fonte.getValorMonitorado() != null ? fonte.getValorMonitorado().trim() : null;
+            if (nome == null || nome.length() < 5) {
+                return null;
+            }
+            return DjenComunicacaoClientService.ConsultaComunicacao.builder()
+                    .tribunal(tribunal)
+                    .data(data)
+                    .meio(tipoCaderno)
+                    .nomeAdvogado(nome)
+                    .build();
+        }
+
+        return null;
     }
 
     private boolean matchesNome(String textoComEspacos, String nomeMonitorado) {
@@ -463,9 +876,7 @@ public class PublicacaoDjenColetaService {
         }
 
         return fonte.getDiariosMonitorados().stream()
-                .filter(diario -> diario.getGrupo() != null && "DJEN".equals(diario.getGrupo().name()))
-                .filter(diario -> diario.getEstrategiaColeta() == EstrategiaColetaPublicacao.CADERNO_DJEN)
-                .filter(diario -> !Boolean.TRUE.equals(diario.getRequerScraping()))
+                .filter(this::isDiarioDjenColetavel)
                 .anyMatch(diario -> tribunalNormalizado.equalsIgnoreCase(diario.getCodigo()));
     }
 
@@ -474,9 +885,7 @@ public class PublicacaoDjenColetaService {
             return fontes.stream()
                     .filter(fonte -> fonte.getDiariosMonitorados() != null)
                     .flatMap(fonte -> fonte.getDiariosMonitorados().stream())
-                    .filter(diario -> diario.getGrupo() != null && "DJEN".equals(diario.getGrupo().name()))
-                    .filter(diario -> diario.getEstrategiaColeta() == EstrategiaColetaPublicacao.CADERNO_DJEN)
-                    .filter(diario -> !Boolean.TRUE.equals(diario.getRequerScraping()))
+                    .filter(this::isDiarioDjenColetavel)
                     .map(diario -> diario.getCodigo().toUpperCase(Locale.ROOT))
                     .distinct()
                     .sorted()
@@ -489,6 +898,32 @@ public class PublicacaoDjenColetaService {
                 .map(value -> value.toUpperCase(Locale.ROOT))
                 .distinct()
                 .toList();
+    }
+
+    private boolean isDiarioDjenColetavel(PublicacaoDiarioOficial diario) {
+        if (diario == null || diario.getGrupo() == null || !"DJEN".equals(diario.getGrupo().name())) {
+            return false;
+        }
+        if (Boolean.TRUE.equals(diario.getRequerScraping())) {
+            return false;
+        }
+        return diario.getEstrategiaColeta() == EstrategiaColetaPublicacao.CADERNO_DJEN
+                || diario.getEstrategiaColeta() == EstrategiaColetaPublicacao.API_OFICIAL;
+    }
+
+    private String normalizarTribunalOpcional(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private boolean isCodigoGlobalComunicacao(String value) {
+        if (value == null || value.isBlank()) {
+            return true;
+        }
+        String codigo = value.trim().toUpperCase(Locale.ROOT);
+        return codigo.equals("COMUNICA") || codigo.equals("COMUNICA_DJEN") || codigo.equals("DJEN") || codigo.equals("NAO_INFORMADO");
     }
 
     private String normalizarTribunalObrigatorio(String value) {
@@ -575,6 +1010,19 @@ public class PublicacaoDjenColetaService {
         return DigestUtils.md5DigestAsHex(texto.getBytes(StandardCharsets.UTF_8));
     }
 
+    private String chavePublicacaoCapturada(DjenCadernoClientService.DjenPublicacaoCapturada publicacao) {
+        String idExterno = publicacao.identificadorExterno();
+        if (idExterno == null || idExterno.isBlank()) {
+            idExterno = gerarFingerprintTeor(publicacao.teor());
+        }
+        return String.join("|",
+                publicacao.tribunal() != null ? publicacao.tribunal() : "",
+                publicacao.dataPublicacao() != null ? publicacao.dataPublicacao().toString() : "",
+                publicacao.numeroProcesso() != null ? publicacao.numeroProcesso() : "",
+                idExterno
+        ).toLowerCase(Locale.ROOT);
+    }
+
     private String resumirFontesCapturadas(List<PublicacaoFonteMonitorada> fontesMonitoradas) {
         List<String> nomes = fontesMonitoradas.stream()
                 .map(PublicacaoFonteMonitorada::getNomeExibicao)
@@ -614,6 +1062,14 @@ public class PublicacaoDjenColetaService {
 
     private String onlyDigits(String value) {
         return value == null ? "" : value.replaceAll("\\D", "");
+    }
+
+    private String normalizarUf(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String uf = value.trim().toUpperCase(Locale.ROOT);
+        return uf.length() == 2 ? uf : null;
     }
 
     private String normalizeCompact(String value) {
@@ -682,6 +1138,24 @@ public class PublicacaoDjenColetaService {
             int publicacoesImportadas,
             int falhas,
             String mensagem
+    ) {
+        ResultadoColetaCaderno somar(ResultadoColetaCaderno outra, String mensagemFinal) {
+            if (outra == null) {
+                return this;
+            }
+            return new ResultadoColetaCaderno(
+                    cadernosBaixados + outra.cadernosBaixados(),
+                    publicacoesLidas + outra.publicacoesLidas(),
+                    publicacoesImportadas + outra.publicacoesImportadas(),
+                    falhas + outra.falhas(),
+                    mensagemFinal
+            );
+        }
+    }
+
+    private record ResultadoAgregadoTribunais(
+            int cadernosConsultados,
+            ResultadoColetaCaderno resultado
     ) {
     }
 }

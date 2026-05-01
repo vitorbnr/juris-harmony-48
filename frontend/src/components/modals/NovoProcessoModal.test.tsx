@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { NovoProcessoModal } from "./NovoProcessoModal";
 
-const { toast, processosApi, clientesApi, unidadesApi, usuariosApi } = vi.hoisted(() => ({
+const { toast, processosApi, clientesApi, unidadesApi, usuariosApi, casosApi } = vi.hoisted(() => ({
   toast: {
     success: vi.fn(),
     error: vi.fn(),
@@ -19,6 +19,9 @@ const { toast, processosApi, clientesApi, unidadesApi, usuariosApi } = vi.hoiste
     listar: vi.fn(),
   },
   usuariosApi: {
+    listar: vi.fn(),
+  },
+  casosApi: {
     listar: vi.fn(),
   },
 }));
@@ -37,6 +40,7 @@ vi.mock("@/services/api", () => ({
   clientesApi,
   unidadesApi,
   usuariosApi,
+  casosApi,
 }));
 
 vi.mock("sonner", () => ({
@@ -49,6 +53,7 @@ describe("NovoProcessoModal", () => {
     clientesApi.listar.mockResolvedValue({ content: [{ id: "c1", nome: "Cliente 1" }] });
     unidadesApi.listar.mockResolvedValue([{ id: "un1", nome: "Sede" }]);
     usuariosApi.listar.mockResolvedValue([{ id: "a1", nome: "Dr. Joao", papel: "ADVOGADO" }]);
+    casosApi.listar.mockResolvedValue({ content: [] });
     processosApi.criar.mockResolvedValue({ id: "p1" });
   });
 
@@ -63,10 +68,10 @@ describe("NovoProcessoModal", () => {
     fireEvent.click(screen.getByRole("button", { name: /Cadastrar Processo/i }));
 
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith("Selecione ao menos um advogado responsavel.");
+      expect(toast.error).toHaveBeenCalledWith("Selecione ao menos um advogado responsável.");
     });
 
     expect(processosApi.criar).not.toHaveBeenCalled();
-    expect(screen.getByText("Selecione ao menos um advogado responsavel.")).toBeInTheDocument();
+    expect(screen.getByText("Selecione ao menos um advogado responsável.")).toBeInTheDocument();
   });
 });

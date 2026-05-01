@@ -6,6 +6,7 @@ import com.viana.dto.request.DescartarPublicacaoRequest;
 import com.viana.dto.request.IngestarPublicacaoRequest;
 import com.viana.dto.response.DatajudMovimentacaoResponse;
 import com.viana.dto.response.PrazoResponse;
+import com.viana.dto.response.PublicacaoAtividadeResponse;
 import com.viana.dto.response.PublicacaoMetricasResponse;
 import com.viana.dto.response.PublicacaoHistoricoResponse;
 import com.viana.dto.response.PublicacaoResponse;
@@ -13,6 +14,7 @@ import com.viana.dto.response.PublicacaoTratamentoResponse;
 import com.viana.exception.BusinessException;
 import com.viana.exception.ResourceNotFoundException;
 import com.viana.model.EventoJuridico;
+import com.viana.model.Prazo;
 import com.viana.model.Processo;
 import com.viana.model.Publicacao;
 import com.viana.model.PublicacaoHistorico;
@@ -29,8 +31,13 @@ import com.viana.repository.EventoJuridicoRepository;
 import com.viana.repository.PublicacaoHistoricoRepository;
 import com.viana.repository.ProcessoRepository;
 import com.viana.repository.PublicacaoRepository;
+import com.viana.repository.PrazoRepository;
 import com.viana.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,13 +48,18 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class PublicacaoService {
 
@@ -56,6 +68,7 @@ public class PublicacaoService {
     private final UsuarioRepository usuarioRepository;
     private final PublicacaoHistoricoRepository publicacaoHistoricoRepository;
     private final EventoJuridicoRepository eventoJuridicoRepository;
+    private final PrazoRepository prazoRepository;
     private final PublicacaoTriagemInteligenteService triagemInteligenteService;
     private final NotificacaoService notificacaoService;
     private final PrazoService prazoService;
@@ -66,6 +79,7 @@ public class PublicacaoService {
             String busca,
             Boolean somenteRiscoPrazo,
             String statusFluxo,
+            Boolean somenteHoje,
             Boolean minhas,
             String usuarioEmail
     ) {
@@ -73,17 +87,68 @@ public class PublicacaoService {
         StatusFluxoPublicacao statusFluxoPublicacao = parseStatusFluxo(statusFluxo);
         String buscaNormalizada = normalizarBusca(busca);
         UUID usuarioResponsavelId = Boolean.TRUE.equals(minhas) ? getUsuarioByEmail(usuarioEmail).getId() : null;
+        IntervaloData intervalo = resolverIntervaloHoje(somenteHoje);
         List<Publicacao> publicacoes = publicacaoRepository.buscarParaTriagem(
                 statusTratamento,
                 buscaNormalizada,
                 somenteRiscoPrazo,
                 statusFluxoPublicacao,
+                intervalo.inicio(),
+                intervalo.fim(),
                 usuarioResponsavelId
         );
 
+        Map<UUID, List<PublicacaoAtividadeResponse>> atividadesPorPublicacao = buscarAtividadesPorPublicacao(publicacoes);
         return publicacoes.stream()
-                .map(this::toResponse)
+                .map(publicacao -> toResponse(
+                        publicacao,
+                        atividadesPorPublicacao.getOrDefault(publicacao.getId(), List.of())
+                ))
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<PublicacaoResponse> listarPaginado(
+            String status,
+            String busca,
+            Boolean somenteRiscoPrazo,
+            String statusFluxo,
+            Boolean somenteHoje,
+            Boolean minhas,
+            String usuarioEmail,
+            Pageable pageable
+    ) {
+        StatusTratamento statusTratamento = parseStatus(status);
+        StatusFluxoPublicacao statusFluxoPublicacao = parseStatusFluxo(statusFluxo);
+        String buscaNormalizada = normalizarBusca(busca);
+        UUID usuarioResponsavelId = Boolean.TRUE.equals(minhas) ? getUsuarioByEmail(usuarioEmail).getId() : null;
+        IntervaloData intervalo = resolverIntervaloHoje(somenteHoje);
+        Page<Publicacao> pagina = publicacaoRepository.buscarParaTriagemPaginada(
+                statusTratamento,
+                buscaNormalizada,
+                somenteRiscoPrazo,
+                statusFluxoPublicacao,
+                intervalo.inicio(),
+                intervalo.fim(),
+                usuarioResponsavelId,
+                pageable
+        );
+
+        Map<UUID, List<PublicacaoAtividadeResponse>> atividadesPorPublicacao = buscarAtividadesPorPublicacao(pagina.getContent());
+        List<PublicacaoResponse> respostas = pagina.getContent().stream()
+                .map(publicacao -> toResponse(
+                        publicacao,
+                        atividadesPorPublicacao.getOrDefault(publicacao.getId(), List.of())
+                ))
+                .toList();
+        return new PageImpl<>(respostas, pageable, pagina.getTotalElements());
+    }
+
+    @Transactional(readOnly = true)
+    public PublicacaoResponse buscar(UUID id) {
+        Publicacao publicacao = publicacaoRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Publicacao nao encontrada"));
+        return toResponse(publicacao);
     }
 
     @Transactional(readOnly = true)
@@ -168,6 +233,7 @@ public class PublicacaoService {
 
         Publicacao salva = publicacaoRepository.save(publicacao);
         registrarHistorico(salva, AcaoHistoricoPublicacao.CAPTURADA, usuario, atribuidaPara, observacaoHistorico);
+        gerarTarefaTriagemAutomatica(salva, usuario, atribuidaPara);
         notificarNovaPublicacao(salva, request);
         return toResponse(salva);
     }
@@ -216,6 +282,7 @@ public class PublicacaoService {
 
         Publicacao salva = publicacaoRepository.save(publicacao);
         registrarHistorico(salva, AcaoHistoricoPublicacao.CAPTURADA, null, responsavel, "Publicacao derivada de movimentacao DataJud segura.");
+        gerarTarefaTriagemAutomatica(salva, null, responsavel);
         return true;
     }
 
@@ -531,6 +598,10 @@ public class PublicacaoService {
     }
 
     private PublicacaoResponse toResponse(Publicacao publicacao) {
+        return toResponse(publicacao, buscarAtividadesPorPublicacao(publicacao));
+    }
+
+    private PublicacaoResponse toResponse(Publicacao publicacao, List<PublicacaoAtividadeResponse> atividadesVinculadas) {
         Processo processo = publicacao.getProcesso();
         Usuario responsavelProcesso = publicacao.getResponsavelProcesso();
         Usuario atribuidaPara = publicacao.getAtribuidaPara();
@@ -574,6 +645,54 @@ public class PublicacaoService {
                 .iaConfianca(publicacao.getIaConfianca())
                 .iaTrechosRelevantes(publicacao.getIaTrechosRelevantes())
                 .ladoProcessualEstimado(publicacao.getLadoProcessualEstimado() != null ? publicacao.getLadoProcessualEstimado().name() : null)
+                .atividadesVinculadas(atividadesVinculadas)
+                .build();
+    }
+
+    private List<PublicacaoAtividadeResponse> buscarAtividadesPorPublicacao(Publicacao publicacao) {
+        if (publicacao == null || publicacao.getId() == null) {
+            return List.of();
+        }
+        return buscarAtividadesPorPublicacao(List.of(publicacao))
+                .getOrDefault(publicacao.getId(), List.of());
+    }
+
+    private Map<UUID, List<PublicacaoAtividadeResponse>> buscarAtividadesPorPublicacao(List<Publicacao> publicacoes) {
+        List<UUID> publicacaoIds = publicacoes.stream()
+                .map(Publicacao::getId)
+                .filter(Objects::nonNull)
+                .toList();
+        if (publicacaoIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return prazoRepository.findByEventoJuridicoPublicacaoIdInOrderByDossie(publicacaoIds)
+                .stream()
+                .filter(prazo -> prazo.getEventoJuridico() != null
+                        && prazo.getEventoJuridico().getPublicacao() != null
+                        && prazo.getEventoJuridico().getPublicacao().getId() != null)
+                .collect(Collectors.groupingBy(
+                        prazo -> prazo.getEventoJuridico().getPublicacao().getId(),
+                        LinkedHashMap::new,
+                        Collectors.mapping(this::toAtividadeResponse, Collectors.toList())
+                ));
+    }
+
+    private PublicacaoAtividadeResponse toAtividadeResponse(Prazo prazo) {
+        Usuario advogado = prazo.getAdvogado();
+        EventoJuridico eventoJuridico = prazo.getEventoJuridico();
+        return PublicacaoAtividadeResponse.builder()
+                .id(prazo.getId() != null ? prazo.getId().toString() : null)
+                .titulo(prazo.getTitulo())
+                .tipo(prazo.getTipo() != null ? prazo.getTipo().name() : null)
+                .data(prazo.getData() != null ? prazo.getData().toString() : null)
+                .hora(prazo.getHora() != null ? prazo.getHora().toString() : null)
+                .prioridade(prazo.getPrioridade() != null ? prazo.getPrioridade().name() : null)
+                .etapa(prazo.getEtapa() != null ? prazo.getEtapa().name() : null)
+                .concluido(prazo.getConcluido())
+                .advogadoId(toId(advogado))
+                .advogadoNome(advogado != null ? advogado.getNome() : null)
+                .eventoJuridicoId(eventoJuridico != null && eventoJuridico.getId() != null ? eventoJuridico.getId().toString() : null)
                 .build();
     }
 
@@ -629,6 +748,14 @@ public class PublicacaoService {
             return null;
         }
         return busca.trim();
+    }
+
+    private IntervaloData resolverIntervaloHoje(Boolean somenteHoje) {
+        if (!Boolean.TRUE.equals(somenteHoje)) {
+            return new IntervaloData(null, null);
+        }
+        LocalDate hoje = LocalDate.now();
+        return new IntervaloData(hoje.atStartOfDay(), hoje.plusDays(1).atStartOfDay());
     }
 
     private String normalizarOpcional(String value) {
@@ -822,6 +949,31 @@ public class PublicacaoService {
                 + ". Processo: " + numero + "." + captadaEmNome;
     }
 
+    private void gerarTarefaTriagemAutomatica(Publicacao publicacao, Usuario usuario, Usuario responsavelDestino) {
+        if (publicacao == null || publicacao.getId() == null || publicacao.getStatusTratamento() != StatusTratamento.PENDENTE) {
+            return;
+        }
+        Usuario responsavel = resolverResponsavelPublicacao(publicacao);
+        if (responsavel == null) {
+            return;
+        }
+
+        try {
+            EventoJuridico evento = getOrCreateEventoPublicacao(publicacao);
+            if (prazoService.gerarTarefaTriagemAutomatica(evento)) {
+                registrarHistorico(
+                        publicacao,
+                        AcaoHistoricoPublicacao.TAREFA_CRIADA,
+                        usuario,
+                        responsavelDestino != null ? responsavelDestino : responsavel,
+                        "Tarefa automatica de triagem criada para a publicacao capturada."
+                );
+            }
+        } catch (RuntimeException ex) {
+            log.warn("Nao foi possivel gerar tarefa automatica de triagem para publicacao {}.", publicacao.getId(), ex);
+        }
+    }
+
     private String toId(Usuario usuario) {
         return usuario != null && usuario.getId() != null ? usuario.getId().toString() : null;
     }
@@ -842,5 +994,8 @@ public class PublicacaoService {
         } catch (NoSuchAlgorithmException ex) {
             throw new BusinessException("Nao foi possivel gerar hash de deduplicacao da publicacao.");
         }
+    }
+
+    private record IntervaloData(LocalDateTime inicio, LocalDateTime fim) {
     }
 }

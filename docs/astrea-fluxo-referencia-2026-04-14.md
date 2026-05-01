@@ -333,6 +333,16 @@ O Juris Harmony atual ja cobre boa parte do miolo juridico-operacional. O que ai
 - indicadores gerenciais
 - produto externo para cliente final
 
+## Atualizacao do modulo de publicacoes
+
+O Juris Harmony passou a tratar a publicacao como origem operacional rastreavel. A publicacao capturada pode gerar tarefa, prazo ou audiencia sem trocar de tela. O backend cria ou reutiliza um evento juridico de origem `PUBLICACAO`, cria a atividade em `prazos`, marca a publicacao como tratada e retorna a lista de `atividadesVinculadas`.
+
+Essa evolucao aproxima o fluxo do comportamento esperado em um sistema tipo Astrea: a captura nao fica parada como alerta; ela vira trabalho atribuido, com historico e responsavel.
+
+Documento tecnico complementar:
+
+- `docs/publicacoes-sistema-completo.md`
+
 ## Referencias internas consultadas
 
 - `docs/roadmap-integracoes-juridicas.md`

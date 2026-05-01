@@ -452,20 +452,20 @@ public class PrazoService {
     }
 
     @Transactional
-    public void gerarTarefaTriagemAutomatica(EventoJuridico evento) {
+    public boolean gerarTarefaTriagemAutomatica(EventoJuridico evento) {
         if (evento == null || evento.getId() == null) {
-            return;
+            return false;
         }
         if (evento.getTipo() == TipoEventoJuridico.MOVIMENTACAO) {
-            return;
+            return false;
         }
         if (prazoRepository.existsByEventoJuridicoIdAndTipo(evento.getId(), TipoPrazo.TAREFA_INTERNA)) {
-            return;
+            return false;
         }
 
         Usuario responsavel = resolveResponsavelEvento(evento);
         if (responsavel == null) {
-            return;
+            return false;
         }
 
         Processo processo = evento.getProcesso();
@@ -487,6 +487,7 @@ public class PrazoService {
 
         prazoRepository.save(prazo);
         atualizarProximoPrazoProcesso(processo);
+        return true;
     }
 
     @Transactional
