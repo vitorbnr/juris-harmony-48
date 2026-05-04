@@ -39,8 +39,8 @@ export const clientes: Cliente[] = [
 export const processos: Processo[] = [
   {
     id: "p1", numero: "0012345-67.2024.8.26.0100", clienteId: "c1", clienteNome: "Maria Oliveira",
-    tipo: "Trabalhista", vara: "2ª Vara do Trabalho", tribunal: "TRT-5",
-    advogadoId: "u2", advogadoNome: "Dra. Camila Ferreira", status: "Urgente",
+    tipo: "TRABALHISTA", vara: "2ª Vara do Trabalho", tribunal: "TRT-5",
+    advogadoId: "u2", advogadoNome: "Dra. Camila Ferreira", status: "URGENTE",
     dataDistribuicao: "2024-01-15", ultimaMovimentacao: "2024-11-10", proximoPrazo: "2024-03-22",
     valorCausa: "R$ 45.000,00", unidadeId: "u_car",
     descricao: "Reclamação trabalhista por verbas rescisórias não pagas.",
@@ -52,8 +52,8 @@ export const processos: Processo[] = [
   },
   {
     id: "p2", numero: "0098765-43.2024.8.26.0200", clienteId: "c2", clienteNome: "João Santos",
-    tipo: "Cível", vara: "3ª Vara Cível", tribunal: "TJBA",
-    advogadoId: "u3", advogadoNome: "Dr. Gustavo Mendes", status: "Em andamento",
+    tipo: "CIVEL", vara: "3ª Vara Cível", tribunal: "TJBA",
+    advogadoId: "u3", advogadoNome: "Dr. Gustavo Mendes", status: "EM_ANDAMENTO",
     dataDistribuicao: "2024-03-08", ultimaMovimentacao: "2024-11-05", proximoPrazo: "2024-03-25",
     valorCausa: "R$ 32.000,00", unidadeId: "u_car",
     movimentacoes: [
@@ -63,8 +63,8 @@ export const processos: Processo[] = [
   },
   {
     id: "p3", numero: "0055432-12.2023.8.26.0300", clienteId: "c3", clienteNome: "Ana Costa",
-    tipo: "Família", vara: "1ª Vara de Família", tribunal: "TJBA",
-    advogadoId: "u1", advogadoNome: "Dr. Rafael Viana", status: "Em andamento",
+    tipo: "FAMILIA", vara: "1ª Vara de Família", tribunal: "TJBA",
+    advogadoId: "u1", advogadoNome: "Dr. Rafael Viana", status: "EM_ANDAMENTO",
     dataDistribuicao: "2023-09-22", ultimaMovimentacao: "2024-10-28", proximoPrazo: "2024-04-10",
     valorCausa: "R$ 28.500,00", unidadeId: "u_coc",
     movimentacoes: [
@@ -74,8 +74,8 @@ export const processos: Processo[] = [
   },
   {
     id: "p4", numero: "0011223-44.2023.8.26.0400", clienteId: "c4", clienteNome: "Pedro Lima",
-    tipo: "Previdenciário", vara: "Juizado Especial Federal", tribunal: "TRF-1",
-    advogadoId: "u2", advogadoNome: "Dra. Camila Ferreira", status: "Aguardando",
+    tipo: "PREVIDENCIARIO", vara: "Juizado Especial Federal", tribunal: "TRF-1",
+    advogadoId: "u2", advogadoNome: "Dra. Camila Ferreira", status: "AGUARDANDO",
     dataDistribuicao: "2023-06-14", ultimaMovimentacao: "2024-10-15", proximoPrazo: "2024-04-05",
     valorCausa: "R$ 15.000,00", unidadeId: "u_coc",
     movimentacoes: [
@@ -85,8 +85,8 @@ export const processos: Processo[] = [
   },
   {
     id: "p5", numero: "0033456-78.2022.8.26.0500", clienteId: "c5", clienteNome: "Carla Souza",
-    tipo: "Cível", vara: "4ª Vara Cível", tribunal: "TJBA",
-    advogadoId: "u3", advogadoNome: "Dr. Gustavo Mendes", status: "Concluído",
+    tipo: "CIVEL", vara: "4ª Vara Cível", tribunal: "TJBA",
+    advogadoId: "u3", advogadoNome: "Dr. Gustavo Mendes", status: "CONCLUIDO",
     dataDistribuicao: "2022-04-03", ultimaMovimentacao: "2024-09-20",
     valorCausa: "R$ 8.200,00", unidadeId: "u_car",
     movimentacoes: [
@@ -96,8 +96,8 @@ export const processos: Processo[] = [
   },
   {
     id: "p6", numero: "0077889-55.2024.8.26.0600", clienteId: "c6", clienteNome: "Construtora Alfa Ltda.",
-    tipo: "Empresarial", vara: "2ª Vara Empresarial", tribunal: "TJBA",
-    advogadoId: "u1", advogadoNome: "Dr. Rafael Viana", status: "Urgente",
+    tipo: "EMPRESARIAL", vara: "2ª Vara Empresarial", tribunal: "TJBA",
+    advogadoId: "u1", advogadoNome: "Dr. Rafael Viana", status: "URGENTE",
     dataDistribuicao: "2024-02-14", ultimaMovimentacao: "2024-11-08", proximoPrazo: "2024-03-24",
     valorCausa: "R$ 180.000,00", unidadeId: "u_car",
     movimentacoes: [
@@ -107,8 +107,8 @@ export const processos: Processo[] = [
   },
   {
     id: "p7", numero: "0047382-90.2023.8.26.0700", clienteId: "c7", clienteNome: "Farmácia Bem Estar ME",
-    tipo: "Tributário", vara: "Vara de Fazenda Pública", tribunal: "TJBA",
-    advogadoId: "u3", advogadoNome: "Dr. Gustavo Mendes", status: "Em andamento",
+    tipo: "TRIBUTARIO", vara: "Vara de Fazenda Pública", tribunal: "TJBA",
+    advogadoId: "u3", advogadoNome: "Dr. Gustavo Mendes", status: "EM_ANDAMENTO",
     dataDistribuicao: "2023-11-22", ultimaMovimentacao: "2024-10-30", proximoPrazo: "2024-03-28",
     valorCausa: "R$ 52.000,00", unidadeId: "u_coc",
     movimentacoes: [
@@ -117,8 +117,8 @@ export const processos: Processo[] = [
   },
   {
     id: "p8", numero: "0067890-21.2022.8.26.0800", clienteId: "c6", clienteNome: "Construtora Alfa Ltda.",
-    tipo: "Trabalhista", vara: "1ª Vara do Trabalho", tribunal: "TRT-5",
-    advogadoId: "u2", advogadoNome: "Dra. Camila Ferreira", status: "Suspenso",
+    tipo: "TRABALHISTA", vara: "1ª Vara do Trabalho", tribunal: "TRT-5",
+    advogadoId: "u2", advogadoNome: "Dra. Camila Ferreira", status: "SUSPENSO",
     dataDistribuicao: "2022-07-18", ultimaMovimentacao: "2024-08-15",
     valorCausa: "R$ 38.000,00", unidadeId: "u_car",
     movimentacoes: [
@@ -157,20 +157,20 @@ export const pastas: Pasta[] = [
 ];
 
 export const documentos: Documento[] = [
-  { id: "d1",  nome: "Petição Inicial — Maria Oliveira.pdf", tipo: "pdf",  categoria: "peticao",    tamanho: "245 KB", clienteId: "c1", clienteNome: "Maria Oliveira",       processoId: "p1", pastaId: "pasta_c1_p1", dataUpload: "2024-01-16", uploadadoPor: "Dra. Camila Ferreira" },
-  { id: "d2",  nome: "Procuração — Maria Oliveira.pdf",      tipo: "pdf",  categoria: "procuracao", tamanho: "89 KB",  clienteId: "c1", clienteNome: "Maria Oliveira",       processoId: "p1", pastaId: "pasta_c1_p1", dataUpload: "2024-01-16", uploadadoPor: "Patrícia Alves" },
-  { id: "d3",  nome: "Contrato de Serviços.docx",            tipo: "docx", categoria: "contrato",   tamanho: "132 KB", clienteId: "c1", clienteNome: "Maria Oliveira",       pastaId: "pasta_c1",    dataUpload: "2024-01-10", uploadadoPor: "Patrícia Alves" },
-  { id: "d4",  nome: "Contestação — João Santos.pdf",        tipo: "pdf",  categoria: "peticao",    tamanho: "318 KB", clienteId: "c2", clienteNome: "João Santos",          processoId: "p2", pastaId: "pasta_c2_p2", dataUpload: "2024-04-13", uploadadoPor: "Dr. Gustavo Mendes" },
-  { id: "d5",  nome: "Procuração — João Santos.pdf",         tipo: "pdf",  categoria: "procuracao", tamanho: "78 KB",  clienteId: "c2", clienteNome: "João Santos",          pastaId: "pasta_c2",    dataUpload: "2024-03-09", uploadadoPor: "Patrícia Alves" },
-  { id: "d6",  nome: "Documentos RG + CPF.pdf",              tipo: "pdf",  categoria: "comprovante",tamanho: "210 KB", clienteId: "c2", clienteNome: "João Santos",          processoId: "p2", pastaId: "pasta_c2_p2", dataUpload: "2024-03-09", uploadadoPor: "Patrícia Alves" },
-  { id: "d7",  nome: "Acordo de Divórcio — Minuta.docx",     tipo: "docx", categoria: "contrato",   tamanho: "156 KB", clienteId: "c3", clienteNome: "Ana Costa",            processoId: "p3", pastaId: "pasta_c3",    dataUpload: "2024-01-16", uploadadoPor: "Dr. Rafael Viana" },
-  { id: "d8",  nome: "Laudo Pericial.pdf",                   tipo: "pdf",  categoria: "comprovante",tamanho: "890 KB", clienteId: "c3", clienteNome: "Ana Costa",            processoId: "p3", pastaId: "pasta_c3",    dataUpload: "2024-02-28", uploadadoPor: "Dr. Rafael Viana" },
-  { id: "d9",  nome: "Contrato Social — Construtora Alfa.pdf",tipo: "pdf", categoria: "contrato",   tamanho: "1.2 MB", clienteId: "c6", clienteNome: "Construtora Alfa Ltda.",pastaId: "pasta_c6",    dataUpload: "2023-09-10", uploadadoPor: "Dr. Rafael Viana" },
-  { id: "d10", nome: "Petição Inicial Empresarial.docx",     tipo: "docx", categoria: "peticao",    tamanho: "245 KB", clienteId: "c6", clienteNome: "Construtora Alfa Ltda.",processoId: "p6", pastaId: "pasta_c6_p6", dataUpload: "2024-02-15", uploadadoPor: "Dr. Rafael Viana" },
-  { id: "d11", nome: "Tutela Antecipada Deferida.pdf",       tipo: "pdf",  categoria: "sentenca",   tamanho: "320 KB", clienteId: "c6", clienteNome: "Construtora Alfa Ltda.",processoId: "p6", pastaId: "pasta_c6_p6", dataUpload: "2024-03-19", uploadadoPor: "Dr. Rafael Viana" },
-  { id: "d12", nome: "Planilha de Custas.xlsx",              tipo: "xlsx", categoria: "comprovante",tamanho: "48 KB",  clienteId: "c6", clienteNome: "Construtora Alfa Ltda.",pastaId: "pasta_c6",    dataUpload: "2024-03-01", uploadadoPor: "Patrícia Alves" },
-  { id: "d13", nome: "Memorial de Cálculos.docx",            tipo: "docx", categoria: "peticao",    tamanho: "87 KB",  clienteId: "c5", clienteNome: "Carla Souza",           processoId: "p5", pastaId: "pasta_c1",    dataUpload: "2023-10-12", uploadadoPor: "Dr. Gustavo Mendes" },
-  { id: "d14", nome: "Sentença Procedente.pdf",              tipo: "pdf",  categoria: "sentenca",   tamanho: "412 KB", clienteId: "c5", clienteNome: "Carla Souza",           processoId: "p5", pastaId: "pasta_c1",    dataUpload: "2023-11-15", uploadadoPor: "Dr. Gustavo Mendes" },
+  { id: "d1",  nome: "Petição Inicial — Maria Oliveira.pdf", tipo: "pdf",  categoria: "peticao",    tamanho: "245 KB", clienteId: "c1", clienteNome: "Maria Oliveira",       processoId: "p1", pastaId: "pasta_c1_p1", dataUpload: "2024-01-16", uploadedPor: "Dra. Camila Ferreira" },
+  { id: "d2",  nome: "Procuração — Maria Oliveira.pdf",      tipo: "pdf",  categoria: "procuracao", tamanho: "89 KB",  clienteId: "c1", clienteNome: "Maria Oliveira",       processoId: "p1", pastaId: "pasta_c1_p1", dataUpload: "2024-01-16", uploadedPor: "Patrícia Alves" },
+  { id: "d3",  nome: "Contrato de Serviços.docx",            tipo: "docx", categoria: "contrato",   tamanho: "132 KB", clienteId: "c1", clienteNome: "Maria Oliveira",       pastaId: "pasta_c1",    dataUpload: "2024-01-10", uploadedPor: "Patrícia Alves" },
+  { id: "d4",  nome: "Contestação — João Santos.pdf",        tipo: "pdf",  categoria: "peticao",    tamanho: "318 KB", clienteId: "c2", clienteNome: "João Santos",          processoId: "p2", pastaId: "pasta_c2_p2", dataUpload: "2024-04-13", uploadedPor: "Dr. Gustavo Mendes" },
+  { id: "d5",  nome: "Procuração — João Santos.pdf",         tipo: "pdf",  categoria: "procuracao", tamanho: "78 KB",  clienteId: "c2", clienteNome: "João Santos",          pastaId: "pasta_c2",    dataUpload: "2024-03-09", uploadedPor: "Patrícia Alves" },
+  { id: "d6",  nome: "Documentos RG + CPF.pdf",              tipo: "pdf",  categoria: "comprovante",tamanho: "210 KB", clienteId: "c2", clienteNome: "João Santos",          processoId: "p2", pastaId: "pasta_c2_p2", dataUpload: "2024-03-09", uploadedPor: "Patrícia Alves" },
+  { id: "d7",  nome: "Acordo de Divórcio — Minuta.docx",     tipo: "docx", categoria: "contrato",   tamanho: "156 KB", clienteId: "c3", clienteNome: "Ana Costa",            processoId: "p3", pastaId: "pasta_c3",    dataUpload: "2024-01-16", uploadedPor: "Dr. Rafael Viana" },
+  { id: "d8",  nome: "Laudo Pericial.pdf",                   tipo: "pdf",  categoria: "comprovante",tamanho: "890 KB", clienteId: "c3", clienteNome: "Ana Costa",            processoId: "p3", pastaId: "pasta_c3",    dataUpload: "2024-02-28", uploadedPor: "Dr. Rafael Viana" },
+  { id: "d9",  nome: "Contrato Social — Construtora Alfa.pdf",tipo: "pdf", categoria: "contrato",   tamanho: "1.2 MB", clienteId: "c6", clienteNome: "Construtora Alfa Ltda.",pastaId: "pasta_c6",    dataUpload: "2023-09-10", uploadedPor: "Dr. Rafael Viana" },
+  { id: "d10", nome: "Petição Inicial Empresarial.docx",     tipo: "docx", categoria: "peticao",    tamanho: "245 KB", clienteId: "c6", clienteNome: "Construtora Alfa Ltda.",processoId: "p6", pastaId: "pasta_c6_p6", dataUpload: "2024-02-15", uploadedPor: "Dr. Rafael Viana" },
+  { id: "d11", nome: "Tutela Antecipada Deferida.pdf",       tipo: "pdf",  categoria: "sentenca",   tamanho: "320 KB", clienteId: "c6", clienteNome: "Construtora Alfa Ltda.",processoId: "p6", pastaId: "pasta_c6_p6", dataUpload: "2024-03-19", uploadedPor: "Dr. Rafael Viana" },
+  { id: "d12", nome: "Planilha de Custas.xlsx",              tipo: "xlsx", categoria: "comprovante",tamanho: "48 KB",  clienteId: "c6", clienteNome: "Construtora Alfa Ltda.",pastaId: "pasta_c6",    dataUpload: "2024-03-01", uploadedPor: "Patrícia Alves" },
+  { id: "d13", nome: "Memorial de Cálculos.docx",            tipo: "docx", categoria: "peticao",    tamanho: "87 KB",  clienteId: "c5", clienteNome: "Carla Souza",           processoId: "p5", pastaId: "pasta_c1",    dataUpload: "2023-10-12", uploadedPor: "Dr. Gustavo Mendes" },
+  { id: "d14", nome: "Sentença Procedente.pdf",              tipo: "pdf",  categoria: "sentenca",   tamanho: "412 KB", clienteId: "c5", clienteNome: "Carla Souza",           processoId: "p5", pastaId: "pasta_c1",    dataUpload: "2023-11-15", uploadedPor: "Dr. Gustavo Mendes" },
 ];
 
 // ─── Financeiro ──────────────────────────────────────────────────────────────
@@ -211,11 +211,11 @@ export const lancamentos: LancamentoFinanceiro[] = [
 // ─── Notificações ─────────────────────────────────────────────────────────────
 
 export const notificacoes: Notificacao[] = [
-  { id: "n1", titulo: "Prazo urgente amanhã", descricao: "Contestação de Maria Oliveira vence em 22/03", tipo: "prazo", lida: false, data: "2024-03-21", hora: "08:00", link: "gestao-kanban" },
-  { id: "n2", titulo: "Honorário em atraso", descricao: "Pedro Lima — honorário venceu em 15/03 (R$ 3.500)", tipo: "financeiro", lida: false, data: "2024-03-21", hora: "07:30", link: "dashboard" },
-  { id: "n3", titulo: "Novo documento disponível", descricao: "Tutela antecipada juntada no processo da Construtora Alfa", tipo: "documento", lida: false, data: "2024-03-20", hora: "16:45", link: "documentos" },
-  { id: "n4", titulo: "Audiência amanhã — João Santos", descricao: "Audiência de conciliação às 14h no TJ-BA", tipo: "prazo", lida: true, data: "2024-03-20", hora: "09:00", link: "gestao-kanban" },
-  { id: "n5", titulo: "Prazo crítico em 3 dias", descricao: "Contestação da Construtora Alfa vence em 24/03", tipo: "prazo", lida: true, data: "2024-03-19", hora: "10:00", link: "gestao-kanban" },
+  { id: "n1", titulo: "Prazo urgente amanhã", descricao: "Contestação de Maria Oliveira vence em 22/03", tipo: "prazo", lida: false, criadaEm: "2024-03-21T08:00:00Z", link: "gestao-kanban" },
+  { id: "n2", titulo: "Honorário em atraso", descricao: "Pedro Lima — honorário venceu em 15/03 (R$ 3.500)", tipo: "financeiro", lida: false, criadaEm: "2024-03-21T07:30:00Z", link: "dashboard" },
+  { id: "n3", titulo: "Novo documento disponível", descricao: "Tutela antecipada juntada no processo da Construtora Alfa", tipo: "documento", lida: false, criadaEm: "2024-03-20T16:45:00Z", link: "documentos" },
+  { id: "n4", titulo: "Audiência amanhã — João Santos", descricao: "Audiência de conciliação às 14h no TJ-BA", tipo: "prazo", lida: true, criadaEm: "2024-03-20T09:00:00Z", link: "gestao-kanban" },
+  { id: "n5", titulo: "Prazo crítico em 3 dias", descricao: "Contestação da Construtora Alfa vence em 24/03", tipo: "prazo", lida: true, criadaEm: "2024-03-19T10:00:00Z", link: "gestao-kanban" },
 ];
 
 // ─── Logs de Auditoria ───────────────────────────────────────────────────────

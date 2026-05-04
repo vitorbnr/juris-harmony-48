@@ -119,7 +119,7 @@ const formatarAcaoSugerida = (value?: string | null) => {
     DESCARTAR: "Descartar",
   };
 
-  return labels[value] ?? value.replaceAll("_", " ").toLowerCase();
+  return labels[value] ?? value.replace(/_/g, " ").toLowerCase();
 };
 
 const formatarLadoProcessual = (value?: string | null) => {
@@ -144,7 +144,7 @@ const formatarStatusFluxo = (value?: string | null) => {
     DESCARTADA: "Descartada",
   };
 
-  return value ? labels[value] ?? value.replaceAll("_", " ") : "Nao classificada";
+  return value ? labels[value] ?? value.replace(/_/g, " ") : "Nao classificada";
 };
 
 const formatarTipoAtividade = (value?: string | null) => {
@@ -155,7 +155,7 @@ const formatarTipoAtividade = (value?: string | null) => {
     REUNIAO: "Reuniao",
   };
 
-  return value ? labels[value] ?? value.replaceAll("_", " ") : "Atividade";
+  return value ? labels[value] ?? value.replace(/_/g, " ") : "Atividade";
 };
 
 const formatarAcaoHistorico = (value?: string | null) => {
@@ -173,7 +173,7 @@ const formatarAcaoHistorico = (value?: string | null) => {
     REABERTA: "Reaberta",
   };
 
-  return value ? labels[value] ?? value.replaceAll("_", " ") : "Evento registrado";
+  return value ? labels[value] ?? value.replace(/_/g, " ") : "Evento registrado";
 };
 
 const prioridadeConfig = (score = 0) => {
