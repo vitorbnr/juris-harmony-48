@@ -5,6 +5,7 @@ import type {
   PublicacaoDjenSync,
   PublicacaoDiarioOficial,
   PublicacaoFonteMonitorada,
+  PublicacaoFonteSyncExecucao,
   PublicacaoHistorico,
   PublicacaoMetricas,
   PublicacaoMonitoramento,
@@ -737,6 +738,14 @@ export const publicacoesApi = {
   alterarAtivoFonteMonitorada: (id: string, ativo: boolean) =>
     api.patch(`/publicacoes/fontes-monitoradas/${id}/ativo`, { ativo })
       .then(r => r.data as PublicacaoFonteMonitorada),
+
+  executarBackfillFonte: (id: string, params: { dataInicio: string; dataFim: string; cadernoTipo?: string }) =>
+    api.post(`/publicacoes/fontes-monitoradas/${id}/backfill-djen`, null, { params: cleanParams(params) })
+      .then(r => r.data as PublicacaoDjenSync),
+
+  agendarBackfillFonte: (id: string, params: { dataInicio: string; dataFim: string; cadernoTipo?: string }) =>
+    api.post(`/publicacoes/fontes-monitoradas/${id}/backfill-djen/async`, null, { params: cleanParams(params) })
+      .then(r => r.data as PublicacaoFonteSyncExecucao),
 
   listarDiariosOficiais: (params?: { apenasSemScraping?: boolean; uf?: string }) =>
     api.get("/publicacoes/diarios-oficiais", { params: cleanParams(params) })

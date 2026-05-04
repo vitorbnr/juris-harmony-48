@@ -5,25 +5,30 @@ import com.viana.dto.request.CriarFontePublicacaoMonitoradaRequest;
 import com.viana.dto.response.PublicacaoDestinatarioResponse;
 import com.viana.dto.response.PublicacaoDiarioOficialResponse;
 import com.viana.dto.response.PublicacaoFonteMonitoradaResponse;
+import com.viana.dto.response.PublicacaoFonteSyncExecucaoResponse;
 import com.viana.exception.BusinessException;
 import com.viana.exception.ResourceNotFoundException;
 import com.viana.model.PublicacaoDiarioOficial;
 import com.viana.model.PublicacaoFonteMonitorada;
+import com.viana.model.PublicacaoFonteSyncExecucao;
 import com.viana.model.Usuario;
 import com.viana.model.enums.EstrategiaColetaPublicacao;
 import com.viana.model.enums.StatusDiarioOficialPublicacao;
 import com.viana.model.enums.TipoFontePublicacaoMonitorada;
 import com.viana.repository.PublicacaoDiarioOficialRepository;
 import com.viana.repository.PublicacaoFonteMonitoradaRepository;
+import com.viana.repository.PublicacaoFonteSyncExecucaoRepository;
 import com.viana.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -34,6 +39,7 @@ public class PublicacaoFonteMonitoradaService {
     private final PublicacaoFonteMonitoradaRepository repository;
     private final UsuarioRepository usuarioRepository;
     private final PublicacaoDiarioOficialRepository diarioOficialRepository;
+    private final PublicacaoFonteSyncExecucaoRepository fonteSyncExecucaoRepository;
 
     @Transactional(readOnly = true)
     public List<PublicacaoFonteMonitoradaResponse> listar(Boolean apenasAtivas) {
@@ -41,7 +47,17 @@ public class PublicacaoFonteMonitoradaService {
                 ? repository.findByAtivoTrueOrderByNomeExibicaoAsc()
                 : repository.findAllByOrderByNomeExibicaoAsc();
 
-        return fontes.stream().map(this::toResponse).toList();
+        Map<UUID, PublicacaoFonteSyncExecucao> ultimasCapturas = buscarUltimasExecucoes(
+                fontes,
+                PublicacaoFonteSyncExecucaoService.TIPO_CAPTURA_DJEN
+        );
+        Map<UUID, PublicacaoFonteSyncExecucao> ultimosBackfills = buscarUltimasExecucoes(
+                fontes,
+                PublicacaoFonteSyncExecucaoService.TIPO_BACKFILL_DJEN
+        );
+        return fontes.stream()
+                .map(fonte -> toResponse(fonte, ultimasCapturas.get(fonte.getId()), ultimosBackfills.get(fonte.getId())))
+                .toList();
     }
 
     @Transactional
@@ -114,6 +130,30 @@ public class PublicacaoFonteMonitoradaService {
     }
 
     private PublicacaoFonteMonitoradaResponse toResponse(PublicacaoFonteMonitorada fonte) {
+        PublicacaoFonteSyncExecucao ultimaCaptura = fonte.getId() == null
+                ? null
+                : fonteSyncExecucaoRepository
+                .findTopByFonteMonitoradaIdAndTipoExecucaoOrderByIniciadoEmDesc(
+                        fonte.getId(),
+                        PublicacaoFonteSyncExecucaoService.TIPO_CAPTURA_DJEN
+                )
+                .orElse(null);
+        PublicacaoFonteSyncExecucao ultimoBackfill = fonte.getId() == null
+                ? null
+                : fonteSyncExecucaoRepository
+                .findTopByFonteMonitoradaIdAndTipoExecucaoOrderByIniciadoEmDesc(
+                        fonte.getId(),
+                        PublicacaoFonteSyncExecucaoService.TIPO_BACKFILL_DJEN
+                )
+                .orElse(null);
+        return toResponse(fonte, ultimaCaptura, ultimoBackfill);
+    }
+
+    private PublicacaoFonteMonitoradaResponse toResponse(
+            PublicacaoFonteMonitorada fonte,
+            PublicacaoFonteSyncExecucao ultimaCaptura,
+            PublicacaoFonteSyncExecucao ultimoBackfill
+    ) {
         Usuario criadoPor = fonte.getCriadoPor();
         return PublicacaoFonteMonitoradaResponse.builder()
                 .id(fonte.getId() != null ? fonte.getId().toString() : null)
@@ -130,6 +170,54 @@ public class PublicacaoFonteMonitoradaService {
                 .criadoPorUsuarioNome(criadoPor != null ? criadoPor.getNome() : null)
                 .dataCriacao(fonte.getDataCriacao() != null ? fonte.getDataCriacao().toString() : null)
                 .dataAtualizacao(fonte.getDataAtualizacao() != null ? fonte.getDataAtualizacao().toString() : null)
+                .ultimaCapturaDjen(toSyncResponse(ultimaCaptura))
+                .ultimoBackfillDjen(toSyncResponse(ultimoBackfill))
+                .build();
+    }
+
+    private Map<UUID, PublicacaoFonteSyncExecucao> buscarUltimasExecucoes(
+            List<PublicacaoFonteMonitorada> fontes,
+            String tipoExecucao
+    ) {
+        List<UUID> ids = fontes.stream()
+                .map(PublicacaoFonteMonitorada::getId)
+                .filter(id -> id != null)
+                .toList();
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<UUID, PublicacaoFonteSyncExecucao> result = new HashMap<>();
+        fonteSyncExecucaoRepository
+                .findUltimasPorFonteAndTipoExecucao(ids, tipoExecucao)
+                .forEach(execucao -> {
+                    if (execucao.getFonteMonitorada() != null && execucao.getFonteMonitorada().getId() != null) {
+                        result.put(execucao.getFonteMonitorada().getId(), execucao);
+                    }
+                });
+        return result;
+    }
+
+    private PublicacaoFonteSyncExecucaoResponse toSyncResponse(PublicacaoFonteSyncExecucao execucao) {
+        if (execucao == null) {
+            return null;
+        }
+        return PublicacaoFonteSyncExecucaoResponse.builder()
+                .id(execucao.getId() != null ? execucao.getId().toString() : null)
+                .tipoExecucao(execucao.getTipoExecucao())
+                .status(execucao.getStatus())
+                .dataInicio(execucao.getDataInicio() != null ? execucao.getDataInicio().toString() : null)
+                .dataFim(execucao.getDataFim() != null ? execucao.getDataFim().toString() : null)
+                .cadernosConsultados(execucao.getCadernosConsultados())
+                .cadernosBaixados(execucao.getCadernosBaixados())
+                .publicacoesLidas(execucao.getPublicacoesLidas())
+                .publicacoesImportadas(execucao.getPublicacoesImportadas())
+                .falhas(execucao.getFalhas())
+                .mensagem(execucao.getMensagem())
+                .iniciadoEm(execucao.getIniciadoEm() != null ? execucao.getIniciadoEm().toString() : null)
+                .finalizadoEm(execucao.getFinalizadoEm() != null ? execucao.getFinalizadoEm().toString() : null)
+                .proximaExecucaoEm(execucao.getProximaExecucaoEm() != null ? execucao.getProximaExecucaoEm().toString() : null)
+                .duracaoMs(execucao.getDuracaoMs())
                 .build();
     }
 

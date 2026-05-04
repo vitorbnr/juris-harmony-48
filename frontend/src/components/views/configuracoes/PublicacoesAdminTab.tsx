@@ -101,6 +101,10 @@ function dataInicialBackfillPadrao() {
   return formatarDataInput(date);
 }
 
+function aguardar(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 function fonteTipoTabela(tipo: TipoFontePublicacaoMonitorada) {
   return tipo === "NOME" ? "PE" : tipo;
 }
@@ -178,6 +182,7 @@ function formatarStatusFonte(status?: string | null) {
 function formatarStatusExecucao(status?: string | null) {
   const labels: Record<string, string> = {
     ERRO: "Erro",
+    IGNORADO: "Ignorado",
     PENDENTE: "Pendente",
     SUCESSO: "Sucesso",
   };
@@ -191,6 +196,9 @@ function statusExecucaoClassName(status?: string | null) {
   }
   if (status === "ERRO") {
     return "border-rose-500/25 bg-rose-500/10 text-rose-400";
+  }
+  if (status === "IGNORADO") {
+    return "border-border bg-muted text-muted-foreground";
   }
   return "border-amber-500/25 bg-amber-500/10 text-amber-400";
 }
@@ -279,6 +287,20 @@ function formatarDataHora(value?: string | null) {
   });
 }
 
+function formatarDataCurta(value?: string | null) {
+  if (!value) return null;
+  const [ano, mes, dia] = value.split("-");
+  if (!ano || !mes || !dia) return value;
+  return `${dia}/${mes}/${ano}`;
+}
+
+function formatarPeriodoBackfill(dataInicio?: string | null, dataFim?: string | null) {
+  const inicio = formatarDataCurta(dataInicio);
+  const fim = formatarDataCurta(dataFim);
+  if (inicio && fim) return `${inicio} a ${fim}`;
+  return inicio ?? fim ?? "Periodo nao informado";
+}
+
 function ordenarDiarios(diarios: PublicacaoDiarioOficial[]) {
   return [...diarios].sort((a, b) => {
     const grupoA = a.uf ?? "ZZ";
@@ -330,6 +352,17 @@ function agruparDiarios(diarios: PublicacaoDiarioOficial[]) {
 
 function contarColetaveis(diarios: PublicacaoDiarioOficial[]) {
   return diarios.filter(isDiarioMonitoravel).filter(isDiarioColetavelAgora).length;
+}
+
+function permiteBackfillInicial(fonte: PublicacaoFonteMonitorada) {
+  if (!fonte.ativo) return false;
+  if (fonte.tipo === "OAB") {
+    return (fonte.valorMonitorado ?? "").replace(/\D/g, "").length >= 4;
+  }
+  if (fonte.tipo === "NOME") {
+    return (fonte.valorMonitorado ?? "").trim().length >= 5;
+  }
+  return false;
 }
 
 function DiariosMonitoradosDialog({
@@ -409,6 +442,7 @@ export function PublicacoesAdminTab() {
   const [coletandoDjen, setColetandoDjen] = useState(false);
   const [coletandoReplayDjen, setColetandoReplayDjen] = useState(false);
   const [coletandoBackfillDjen, setColetandoBackfillDjen] = useState(false);
+  const [backfillFonteId, setBackfillFonteId] = useState<string | null>(null);
   const [reprocessandoCapturaId, setReprocessandoCapturaId] = useState<string | null>(null);
   const [alterandoId, setAlterandoId] = useState<string | null>(null);
   const [fonteEdicaoId, setFonteEdicaoId] = useState<string | null>(null);
@@ -554,6 +588,80 @@ export function PublicacoesAdminTab() {
     });
   };
 
+  const executarBackfillFonte = async (
+    fonte: PublicacaoFonteMonitorada,
+    options?: { dataInicio?: string; dataFim?: string; automatico?: boolean },
+  ) => {
+    if (!permiteBackfillInicial(fonte)) {
+      if (!options?.automatico) {
+        toast.info("Backfill inicial por fonte esta disponivel apenas para pesquisas por nome ou OAB.");
+      }
+      return;
+    }
+
+    const dataInicio = options?.dataInicio ?? dataInicialBackfillPadrao();
+    const dataFim = options?.dataFim ?? formatarDataInput();
+    setBackfillFonteId(fonte.id);
+    try {
+      const execucao = await publicacoesApi.agendarBackfillFonte(fonte.id, { dataInicio, dataFim });
+      toast.success(
+        options?.automatico
+          ? "Pesquisa cadastrada. Backfill inicial foi agendado."
+          : "Backfill da pesquisa foi agendado.",
+      );
+      await carregar();
+      void acompanharBackfillFonte(fonte.id, execucao.id, options?.automatico === true);
+    } catch (error) {
+      console.error("Erro ao executar backfill da fonte:", error);
+      toast.error(
+        options?.automatico
+          ? "Pesquisa cadastrada, mas o backfill inicial nao foi agendado."
+          : "Nao foi possivel agendar o backfill da pesquisa.",
+      );
+      setBackfillFonteId(null);
+    }
+  };
+
+  const acompanharBackfillFonte = async (fonteId: string, execucaoId: string, automatico: boolean) => {
+    try {
+      for (let tentativa = 0; tentativa < 40; tentativa += 1) {
+        await aguardar(3000);
+        const fontesAtualizadas = await publicacoesApi.listarFontesMonitoradas();
+        if (Array.isArray(fontesAtualizadas)) {
+          setFontes(fontesAtualizadas);
+        }
+        const fonteAtualizada = Array.isArray(fontesAtualizadas)
+          ? fontesAtualizadas.find((item) => item.id === fonteId)
+          : null;
+        const execucaoAtual = fonteAtualizada?.ultimoBackfillDjen;
+        if (!execucaoAtual || execucaoAtual.id !== execucaoId || execucaoAtual.status === "PENDENTE") {
+          continue;
+        }
+
+        if (execucaoAtual.status === "ERRO") {
+          toast.warning(execucaoAtual.mensagem ?? "Backfill da pesquisa finalizado com falhas.");
+        } else if (execucaoAtual.status === "IGNORADO") {
+          toast.info(execucaoAtual.mensagem ?? "Backfill da pesquisa foi ignorado.");
+        } else {
+          toast.success(
+            automatico
+              ? "Backfill inicial da pesquisa finalizado."
+              : "Backfill da pesquisa finalizado.",
+          );
+        }
+        await carregar();
+        return;
+      }
+      toast.info("Backfill continua em execucao. Acompanhe o status na tabela.");
+      await carregar();
+    } catch (error) {
+      console.error("Erro ao acompanhar backfill da fonte:", error);
+      toast.error("Nao foi possivel acompanhar o progresso do backfill.");
+    } finally {
+      setBackfillFonteId(null);
+    }
+  };
+
   const salvarFonte = async () => {
     const valor = valorMonitorado.trim();
     const nome = nomeExibicao.trim() || valor;
@@ -592,8 +700,9 @@ export function PublicacoesAdminTab() {
         await publicacoesApi.atualizarFonteMonitorada(fonteEdicaoId, payload);
         toast.success("Pesquisa monitorada atualizada.");
       } else {
-        await publicacoesApi.criarFonteMonitorada(payload);
+        const fonteCriada = await publicacoesApi.criarFonteMonitorada(payload);
         toast.success("Pesquisa monitorada cadastrada.");
+        void executarBackfillFonte(fonteCriada, { automatico: true });
       }
 
       limparFormulario();
@@ -784,7 +893,7 @@ export function PublicacoesAdminTab() {
                   type="button"
                   className="gap-2"
                   onClick={() => void coletarDjen()}
-                  disabled={coletandoDjen || coletandoReplayDjen || coletandoBackfillDjen || fontesAtivas === 0 || diariosColetaveisAgora.length === 0}
+                  disabled={coletandoDjen || coletandoReplayDjen || coletandoBackfillDjen || Boolean(backfillFonteId) || fontesAtivas === 0 || diariosColetaveisAgora.length === 0}
                 >
                   {coletandoDjen ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
                   Capturar DJEN
@@ -811,7 +920,7 @@ export function PublicacoesAdminTab() {
                     variant="secondary"
                     className="mt-2 w-full gap-2"
                     onClick={() => void coletarDjen({ dataInicio: backfillDataInicio, dataFim: backfillDataFim })}
-                    disabled={coletandoDjen || coletandoReplayDjen || coletandoBackfillDjen || fontesAtivas === 0 || !backfillDataInicio || !backfillDataFim}
+                    disabled={coletandoDjen || coletandoReplayDjen || coletandoBackfillDjen || Boolean(backfillFonteId) || fontesAtivas === 0 || !backfillDataInicio || !backfillDataFim}
                   >
                     {coletandoBackfillDjen ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                     Rodar backfill do periodo
@@ -843,7 +952,7 @@ export function PublicacoesAdminTab() {
                     variant="outline"
                     className="mt-2 w-full gap-2"
                     onClick={() => void coletarDjen({ tribunal: replayTribunal, data: replayData })}
-                    disabled={coletandoDjen || coletandoReplayDjen || coletandoBackfillDjen || fontesAtivas === 0 || !replayTribunal || !replayData}
+                    disabled={coletandoDjen || coletandoReplayDjen || coletandoBackfillDjen || Boolean(backfillFonteId) || fontesAtivas === 0 || !replayTribunal || !replayData}
                   >
                     {coletandoReplayDjen ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
                     Reprocessar tribunal/data
@@ -1270,7 +1379,7 @@ export function PublicacoesAdminTab() {
 
           <div className="overflow-hidden rounded-2xl border border-border bg-card">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[980px] text-left text-sm">
+              <table className="w-full min-w-[1240px] text-left text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/30 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     <th className="px-5 py-4">Tipo</th>
@@ -1278,6 +1387,8 @@ export function PublicacoesAdminTab() {
                     <th className="px-5 py-4">Diario de justica</th>
                     <th className="px-5 py-4">Quem recebe</th>
                     <th className="px-5 py-4">Status</th>
+                    <th className="px-5 py-4">Captura automatica</th>
+                    <th className="px-5 py-4">Ultimo backfill</th>
                     <th className="px-5 py-4">Diarios oficiais monitorados</th>
                     <th className="px-5 py-4" />
                   </tr>
@@ -1285,82 +1396,171 @@ export function PublicacoesAdminTab() {
                 <tbody>
                   {fontesFiltradas.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-5 py-12 text-center text-muted-foreground">
+                      <td colSpan={9} className="px-5 py-12 text-center text-muted-foreground">
                         Nenhuma pesquisa monitorada encontrada.
                       </td>
                     </tr>
                   ) : (
-                    fontesFiltradas.map((fonte) => (
-                      <tr key={fonte.id} className="border-b border-border/60 last:border-0 hover:bg-muted/20">
-                        <td className="px-5 py-4 align-top">
-                          <span className="font-medium text-foreground">{fonteTipoTabela(fonte.tipo)}</span>
-                        </td>
-                        <td className="px-5 py-4 align-top">
-                          <p className="font-medium text-foreground">{formatarNomePesquisa(fonte)}</p>
-                          {fonte.nomeExibicao && fonte.nomeExibicao !== fonte.valorMonitorado ? (
-                            <p className="mt-1 text-xs text-muted-foreground">{fonte.nomeExibicao}</p>
-                          ) : null}
-                        </td>
-                        <td className="px-5 py-4 align-top text-foreground/90">
-                          <p>{formatarResumoDiarios(fonte.diariosMonitorados)}</p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {contarColetaveis(fonte.diariosMonitorados ?? [])} com captura automatica
-                          </p>
-                        </td>
-                        <td className="px-5 py-4 align-top">
-                          <div className="max-w-[240px] text-foreground/90">
-                            {fonte.destinatarios?.length
-                              ? fonte.destinatarios.map((destinatario) => destinatario.nome).join(", ")
-                              : "Sem responsavel"}
-                          </div>
-                        </td>
-                        <td className="px-5 py-4 align-top">
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              "rounded-full",
-                              fonte.ativo
-                                ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-400"
-                                : "border-border bg-muted text-muted-foreground",
-                            )}
-                          >
-                            {fonte.ativo ? "Ativo" : "Pausado"}
-                          </Badge>
-                        </td>
-                        <td className="px-5 py-4 align-top">
-                          <button
-                            type="button"
-                            className="text-left text-primary hover:underline"
-                            onClick={() => setDiariosDialogFonte(fonte)}
-                          >
-                            Visualizar lista de diarios monitorados
-                          </button>
-                        </td>
-                        <td className="px-5 py-4 align-top">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => iniciarEdicao(fonte)}
-                              disabled={alterandoId === fonte.id}
-                              title="Editar pesquisa"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            {alterandoId === fonte.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    fontesFiltradas.map((fonte) => {
+                      const ultimaCaptura = fonte.ultimaCapturaDjen;
+                      const ultimoBackfill = fonte.ultimoBackfillDjen;
+
+                      return (
+                        <tr key={fonte.id} className="border-b border-border/60 last:border-0 hover:bg-muted/20">
+                          <td className="px-5 py-4 align-top">
+                            <span className="font-medium text-foreground">{fonteTipoTabela(fonte.tipo)}</span>
+                          </td>
+                          <td className="px-5 py-4 align-top">
+                            <p className="font-medium text-foreground">{formatarNomePesquisa(fonte)}</p>
+                            {fonte.nomeExibicao && fonte.nomeExibicao !== fonte.valorMonitorado ? (
+                              <p className="mt-1 text-xs text-muted-foreground">{fonte.nomeExibicao}</p>
                             ) : null}
-                            <Switch
-                              checked={fonte.ativo}
-                              disabled={alterandoId === fonte.id}
-                              onCheckedChange={(checked) => void alternarFonte(fonte, checked)}
-                            />
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                          </td>
+                          <td className="px-5 py-4 align-top text-foreground/90">
+                            <p>{formatarResumoDiarios(fonte.diariosMonitorados)}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {contarColetaveis(fonte.diariosMonitorados ?? [])} com captura automatica
+                            </p>
+                          </td>
+                          <td className="px-5 py-4 align-top">
+                            <div className="max-w-[240px] text-foreground/90">
+                              {fonte.destinatarios?.length
+                                ? fonte.destinatarios.map((destinatario) => destinatario.nome).join(", ")
+                                : "Sem responsavel"}
+                            </div>
+                          </td>
+                          <td className="px-5 py-4 align-top">
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "rounded-full",
+                                fonte.ativo
+                                  ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-400"
+                                  : "border-border bg-muted text-muted-foreground",
+                              )}
+                            >
+                              {fonte.ativo ? "Ativo" : "Pausado"}
+                            </Badge>
+                          </td>
+                          <td className="px-5 py-4 align-top">
+                            {ultimaCaptura ? (
+                              <div className="space-y-1.5">
+                                <Badge
+                                  variant="outline"
+                                  className={cn("w-fit rounded-full", statusExecucaoClassName(ultimaCaptura.status))}
+                                >
+                                  {formatarStatusExecucao(ultimaCaptura.status)}
+                                </Badge>
+                                <p className="text-xs text-muted-foreground">
+                                  {formatarPeriodoBackfill(ultimaCaptura.dataInicio, ultimaCaptura.dataFim)}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {ultimaCaptura.publicacoesImportadas ?? 0} importada(s) de{" "}
+                                  {ultimaCaptura.publicacoesLidas ?? 0} lida(s)
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  Ultima: {formatarDataHora(ultimaCaptura.finalizadoEm ?? ultimaCaptura.iniciadoEm)}
+                                </p>
+                                {ultimaCaptura.proximaExecucaoEm ? (
+                                  <p className="text-xs text-muted-foreground">
+                                    Proxima: {formatarDataHora(ultimaCaptura.proximaExecucaoEm)}
+                                  </p>
+                                ) : null}
+                              </div>
+                            ) : (
+                              <div className="space-y-1.5">
+                                <Badge variant="outline" className="w-fit rounded-full border-border bg-muted text-muted-foreground">
+                                  Aguardando
+                                </Badge>
+                                <p className="text-xs text-muted-foreground">Sem captura recorrente registrada.</p>
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-5 py-4 align-top">
+                            {ultimoBackfill ? (
+                              <div className="space-y-1.5">
+                                <Badge
+                                  variant="outline"
+                                  className={cn("w-fit rounded-full", statusExecucaoClassName(ultimoBackfill.status))}
+                                >
+                                  {formatarStatusExecucao(ultimoBackfill.status)}
+                                </Badge>
+                                <p className="text-xs text-muted-foreground">
+                                  {formatarPeriodoBackfill(ultimoBackfill.dataInicio, ultimoBackfill.dataFim)}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {ultimoBackfill.publicacoesImportadas ?? 0} importada(s) de{" "}
+                                  {ultimoBackfill.publicacoesLidas ?? 0} lida(s)
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {formatarDataHora(ultimoBackfill.finalizadoEm ?? ultimoBackfill.iniciadoEm)}
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="space-y-1.5">
+                                <Badge variant="outline" className="w-fit rounded-full border-border bg-muted text-muted-foreground">
+                                  Nunca executado
+                                </Badge>
+                                <p className="text-xs text-muted-foreground">Backfill inicial ainda nao registrado.</p>
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-5 py-4 align-top">
+                            <button
+                              type="button"
+                              className="text-left text-primary hover:underline"
+                              onClick={() => setDiariosDialogFonte(fonte)}
+                            >
+                              Visualizar lista de diarios monitorados
+                            </button>
+                          </td>
+                          <td className="px-5 py-4 align-top">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => void executarBackfillFonte(fonte)}
+                                disabled={
+                                  Boolean(backfillFonteId)
+                                  || coletandoDjen
+                                  || coletandoReplayDjen
+                                  || coletandoBackfillDjen
+                                  || !permiteBackfillInicial(fonte)
+                                }
+                                title="Rodar backfill inicial desta pesquisa"
+                              >
+                                {backfillFonteId === fonte.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Search className="h-4 w-4" />
+                                )}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => iniciarEdicao(fonte)}
+                                disabled={alterandoId === fonte.id}
+                                title="Editar pesquisa"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              {alterandoId === fonte.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                              ) : null}
+                              <Switch
+                                checked={fonte.ativo}
+                                disabled={alterandoId === fonte.id}
+                                onCheckedChange={(checked) => void alternarFonte(fonte, checked)}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>

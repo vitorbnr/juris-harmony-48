@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -19,6 +20,10 @@ public interface PublicacaoFonteMonitoradaRepository extends JpaRepository<Publi
 
     @EntityGraph(attributePaths = {"destinatarios", "diariosMonitorados"})
     List<PublicacaoFonteMonitorada> findByAtivoTrueOrderByNomeExibicaoAsc();
+
+    @EntityGraph(attributePaths = {"destinatarios", "diariosMonitorados"})
+    @Query("SELECT f FROM PublicacaoFonteMonitorada f WHERE f.id = :id")
+    Optional<PublicacaoFonteMonitorada> findDetalhadaById(@Param("id") UUID id);
 
     long countByAtivoTrue();
 

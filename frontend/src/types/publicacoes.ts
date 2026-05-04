@@ -103,6 +103,26 @@ export interface PublicacaoFonteMonitorada {
   criadoPorUsuarioNome?: string | null;
   dataCriacao?: string | null;
   dataAtualizacao?: string | null;
+  ultimaCapturaDjen?: PublicacaoFonteSyncExecucao | null;
+  ultimoBackfillDjen?: PublicacaoFonteSyncExecucao | null;
+}
+
+export interface PublicacaoFonteSyncExecucao {
+  id: string;
+  tipoExecucao?: string | null;
+  status?: string | null;
+  dataInicio?: string | null;
+  dataFim?: string | null;
+  cadernosConsultados?: number | null;
+  cadernosBaixados?: number | null;
+  publicacoesLidas?: number | null;
+  publicacoesImportadas?: number | null;
+  falhas?: number | null;
+  mensagem?: string | null;
+  iniciadoEm?: string | null;
+  finalizadoEm?: string | null;
+  proximaExecucaoEm?: string | null;
+  duracaoMs?: number | null;
 }
 
 export interface PublicacaoDestinatario {

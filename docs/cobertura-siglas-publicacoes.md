@@ -10,7 +10,8 @@ Resultado operacional:
 
 - Para publicacoes judiciais por OAB/nome, o Comunica/DJEN deve ser a fonte principal.
 - Para movimentacoes e capa de processos, DataJud complementa o DJEN.
-- Para intimacoes pessoais/institucionais, Domicilio Judicial e paineis autenticados entram depois.
+- Domicilio Judicial Eletronico fica congelado fora do plano ativo neste momento.
+- Para intimacoes pessoais/institucionais fora do DJEN, paineis autenticados entram apenas em fase futura.
 - Para diarios administrativos fora do Judiciario, teremos perda em relacao ao catalogo amplo do Astrea se nao implementarmos conectores especificos.
 
 ## Comunica/DJEN oficial consultado
@@ -269,6 +270,6 @@ Politica recomendada:
 
 1. DJEN/Comunica como core.
 2. DataJud como enriquecimento.
-3. Domicilio Judicial read-only como proxima fonte sensivel.
+3. Domicilio Judicial Eletronico congelado fora do plano ativo.
 4. PJe/e-SAJ/Projudi/Eproc autenticados como fase posterior.
 5. Fora do Judiciario somente opt-in, por demanda comprovada.

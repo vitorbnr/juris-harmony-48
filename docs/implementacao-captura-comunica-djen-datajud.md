@@ -2,6 +2,8 @@
 
 Data: 30/04/2026
 
+Checklist ativo: `docs/checklist-publicacoes-automatizadas.md`
+
 ## Objetivo
 
 Construir uma esteira automatizada de publicacoes judiciais com o menor custo operacional possivel, usando fontes oficiais e evitando scraping como caminho padrao.
@@ -15,7 +17,8 @@ O fluxo alvo e:
 5. vincular ao processo ja cadastrado
 6. enriquecer o processo com DataJud em rotina propria
 7. gerar tarefa de triagem segura para o responsavel
-8. alertar falhas, atrasos e publicacoes novas
+8. tratar a publicacao com IA assistiva, sem acao juridica automatica definitiva
+9. alertar falhas, atrasos e publicacoes novas
 
 ## Descoberta da carteira sem planilha
 
@@ -48,9 +51,10 @@ Limite importante: esse metodo descobre processos que tiveram comunicacao/public
 
 - O Comunica/DJEN e a fonte principal para publicacoes judiciais destinadas a advogados.
 - O DataJud nao substitui o DJEN. Ele complementa com capa e movimentacoes publicas do processo.
-- O Domicilio Judicial deve operar apenas em modo read-only e sem ciencia automatica.
+- O Domicilio Judicial Eletronico esta congelado fora do plano ativo atual.
 - DOU/INLABS nao faz parte do core de publicacoes judiciais.
 - Diarios administrativos, municipais, executivos, legislativos, MP, defensoria, TCs, OAB, INPI, CVM e BCB ficam fora do MVP automatico.
+- IA entra como apoio ao tratamento de publicacoes, sempre assistiva e auditavel.
 
 ## Cobertura oficial considerada
 
@@ -196,11 +200,12 @@ Responsabilidades:
 ## Guardrails
 
 - Nao ha ciencia automatica.
-- Nao ha abertura automatica de comunicacao sensivel do Domicilio Judicial.
+- Domicilio Judicial Eletronico esta congelado; se for retomado no futuro, nao podera haver abertura automatica de comunicacao sensivel.
 - Nao ha criacao automatica de prazo fatal definitivo.
 - A ingestao pode criar tarefa interna de triagem.
 - Toda publicacao importada deve manter hash de deduplicacao e origem.
 - Falhas de coleta devem ficar visiveis no painel administrativo.
+- IA pode resumir, classificar e sugerir a acao, mas a confirmacao juridica continua humana.
 
 ## Plano de homologacao
 
@@ -226,6 +231,22 @@ POST /api/publicacoes/coleta/djen?dataInicio=2026-04-01&dataFim=2026-04-30
 
 Por padrao, o backfill fica limitado por `DJEN_BACKFILL_MAX_DAYS=31` por execucao para evitar abuso da API publica, estouro de rate limit e execucoes longas demais. Para historico maior, rodar em janelas mensais.
 
+Backfill inicial por uma pesquisa monitorada especifica:
+
+```http
+POST /api/publicacoes/fontes-monitoradas/{fonteId}/backfill-djen?dataInicio=2026-04-01&dataFim=2026-04-30
+```
+
+Esse caminho e usado pela interface logo apos cadastrar uma nova fonte `NOME` ou `OAB`. Ele pesquisa somente aquela fonte, sem cair para caderno por tribunal, para evitar uma varredura pesada e imprecisa em CPF/CNPJ. O objetivo e trazer rapidamente publicacoes recentes e processos candidatos sem depender de planilha.
+
+A interface administrativa usa o modo assincrono para nao travar a tela durante a coleta:
+
+```http
+POST /api/publicacoes/fontes-monitoradas/{fonteId}/backfill-djen/async?dataInicio=2026-04-01&dataFim=2026-04-30
+```
+
+Esse endpoint cria uma execucao `PENDENTE` em `publicacoes_fontes_sync_execucoes`, executa o backfill em background e permite acompanhar status, periodo, lidas, importadas e falhas na propria linha da fonte monitorada.
+
 4. Conferir:
 
 - publicacoes lidas
@@ -248,8 +269,9 @@ DJEN_SYNC_ENABLED=true
 ## Pendencias
 
 - Enriquecimento automatico de sugestao de partes a partir do texto da publicacao/DataJud.
+- Contrato e servico de IA assistiva para resumo, classificacao, prazo, responsavel e acao sugerida.
 - Mapa automatico de siglas legadas do catalogo Astrea para siglas oficiais do Comunica.
 - Sincronizacao periodica do endpoint `/api/v1/comunicacao/tribunal` para medir cobertura e atraso por tribunal.
 - Homologacao com dados reais do escritorio.
-- Domicilio Judicial read-only com credenciais reais.
+- Domicilio Judicial Eletronico congelado fora do plano ativo.
 - PJe/PDPJ autenticado somente apos confirmacao de escopo e credenciais.

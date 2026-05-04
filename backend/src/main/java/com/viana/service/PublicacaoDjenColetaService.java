@@ -2,7 +2,9 @@ package com.viana.service;
 
 import com.viana.dto.request.IngestarPublicacaoRequest;
 import com.viana.dto.response.PublicacaoDjenSyncResponse;
+import com.viana.dto.response.PublicacaoFonteSyncExecucaoResponse;
 import com.viana.exception.BusinessException;
+import com.viana.exception.ResourceNotFoundException;
 import com.viana.model.PublicacaoCapturaExecucao;
 import com.viana.model.PublicacaoDiarioOficial;
 import com.viana.model.PublicacaoFonteMonitorada;
@@ -18,7 +20,9 @@ import com.viana.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Service;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.util.DigestUtils;
 import org.springframework.web.client.RestClientResponseException;
 
@@ -26,6 +30,7 @@ import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -56,12 +61,17 @@ public class PublicacaoDjenColetaService {
     private final PublicacaoService publicacaoService;
     private final FonteSyncService fonteSyncService;
     private final PublicacaoCapturaExecucaoService capturaExecucaoService;
+    private final PublicacaoFonteSyncExecucaoService fonteSyncExecucaoService;
     private final PublicacaoJobLockService jobLockService;
     private final NotificacaoService notificacaoService;
     private final UsuarioRepository usuarioRepository;
+    private final TaskExecutor taskExecutor;
 
     @Value("${app.sync.djen.enabled:false}")
     private boolean enabled;
+
+    @Value("${app.sync.djen.cron:0 30 6 * * *}")
+    private String cronExpression;
 
     @Value("${app.sync.djen.tribunais:}")
     private String tribunaisConfig;
@@ -133,7 +143,11 @@ public class PublicacaoDjenColetaService {
     }
 
     private PublicacaoDjenSyncResponse executarSincronizacao(List<PublicacaoFonteMonitorada> fontes, List<String> tribunais) {
+        LocalDateTime iniciadoEm = LocalDateTime.now();
         int diasAvaliados = Math.max(1, lookbackDays);
+        LocalDate dataFim = LocalDate.now();
+        LocalDate dataInicio = dataFim.minusDays(diasAvaliados - 1L);
+        Map<UUID, FonteColetaStats> statsPorFonte = iniciarStatsFontes(fontes, dataInicio, dataFim);
         int cadernosConsultados = 0;
         int cadernosBaixados = 0;
         int publicacoesLidas = 0;
@@ -147,7 +161,7 @@ public class PublicacaoDjenColetaService {
             ResultadoColetaCaderno resultadoGlobal = null;
 
             if (comunicacaoEnabled) {
-                resultadoGlobal = coletarComunicacoes(null, data, cadernoTipo, fontes);
+                resultadoGlobal = coletarComunicacoes(null, data, cadernoTipo, fontes, statsPorFonte);
                 cadernosConsultados++;
                 cadernosBaixados += resultadoGlobal.cadernosBaixados();
                 publicacoesLidas += resultadoGlobal.publicacoesLidas();
@@ -158,7 +172,7 @@ public class PublicacaoDjenColetaService {
             }
 
             if (deveExecutarFallbackCaderno(resultadoGlobal, fontes) && !tribunais.isEmpty()) {
-                ResultadoAgregadoTribunais resultadoTribunais = coletarCadernosTribunais(tribunais, data, cadernoTipo, fontes);
+                ResultadoAgregadoTribunais resultadoTribunais = coletarCadernosTribunais(tribunais, data, cadernoTipo, fontes, statsPorFonte);
                 cadernosConsultados += resultadoTribunais.cadernosConsultados();
                 cadernosBaixados += resultadoTribunais.resultado().cadernosBaixados();
                 publicacoesLidas += resultadoTribunais.resultado().publicacoesLidas();
@@ -175,6 +189,8 @@ public class PublicacaoDjenColetaService {
             notificarAdministradoresFalha(cadernosConsultados, falhas);
         }
 
+        registrarStatsCapturaFontes(statsPorFonte, iniciadoEm, LocalDateTime.now());
+
         return PublicacaoDjenSyncResponse.builder()
                 .enabled(enabled)
                 .tribunais(tribunais)
@@ -189,22 +205,7 @@ public class PublicacaoDjenColetaService {
     }
 
     public PublicacaoDjenSyncResponse sincronizarPeriodo(LocalDate dataInicio, LocalDate dataFim, String tipoCaderno) {
-        if (dataInicio == null || dataFim == null) {
-            throw new BusinessException("Data inicial e data final sao obrigatorias para backfill DJEN.");
-        }
-        if (dataInicio.isAfter(dataFim)) {
-            throw new BusinessException("Data inicial nao pode ser posterior a data final.");
-        }
-        if (dataFim.isAfter(LocalDate.now())) {
-            throw new BusinessException("Data final do backfill DJEN nao pode ser futura.");
-        }
-
-        long diasSolicitados = ChronoUnit.DAYS.between(dataInicio, dataFim) + 1;
-        int limiteDias = Math.max(1, backfillMaxDays);
-        if (diasSolicitados > limiteDias) {
-            throw new BusinessException("Backfill DJEN limitado a " + limiteDias + " dia(s) por execucao.");
-        }
-
+        int diasSolicitados = validarPeriodoBackfill(dataInicio, dataFim);
         List<PublicacaoFonteMonitorada> fontes = fonteMonitoradaRepository.findByAtivoTrueOrderByNomeExibicaoAsc();
         List<String> tribunais = parseTribunais(fontes);
         boolean temBuscaDireta = comunicacaoEnabled && fontes.stream().anyMatch(this::permiteBuscaDiretaComunicacao);
@@ -226,9 +227,171 @@ public class PublicacaoDjenColetaService {
                     .build();
         }
 
-        String caderno = tipoCaderno == null || tipoCaderno.isBlank()
-                ? cadernoTipo
-                : tipoCaderno.trim().toUpperCase(Locale.ROOT);
+        String caderno = resolverTipoCaderno(tipoCaderno);
+
+        return executarBackfillPeriodo(
+                fontes,
+                tribunais,
+                dataInicio,
+                dataFim,
+                diasSolicitados,
+                caderno,
+                true,
+                "Backfill DJEN finalizado. Publicacoes com CNJ sem processo cadastrado ficam na fila sem vinculo."
+        );
+    }
+
+    public PublicacaoDjenSyncResponse sincronizarPeriodoFonte(UUID fonteId, LocalDate dataInicio, LocalDate dataFim, String tipoCaderno) {
+        int diasSolicitados = validarPeriodoBackfill(dataInicio, dataFim);
+        PublicacaoFonteMonitorada fonte = fonteMonitoradaRepository.findDetalhadaById(fonteId)
+                .orElseThrow(() -> new ResourceNotFoundException("Fonte monitorada nao encontrada"));
+        List<PublicacaoFonteMonitorada> fontes = List.of(fonte);
+        List<String> tribunais = parseTribunais(fontes);
+
+        if (!Boolean.TRUE.equals(fonte.getAtivo())) {
+            String mensagem = "Backfill DJEN ignorado: fonte monitorada esta inativa.";
+            fonteSyncExecucaoService.registrarBackfillIgnorado(fonte, dataInicio, dataFim, mensagem);
+            return PublicacaoDjenSyncResponse.builder()
+                    .enabled(enabled)
+                    .tribunais(tribunais)
+                    .diasAvaliados(diasSolicitados)
+                    .mensagem(mensagem)
+                    .build();
+        }
+        if (!comunicacaoEnabled) {
+            String mensagem = "Backfill por fonte exige busca direta DJEN/Comunica habilitada.";
+            fonteSyncExecucaoService.registrarBackfillIgnorado(fonte, dataInicio, dataFim, mensagem);
+            return PublicacaoDjenSyncResponse.builder()
+                    .enabled(enabled)
+                    .tribunais(tribunais)
+                    .diasAvaliados(diasSolicitados)
+                    .mensagem(mensagem)
+                    .build();
+        }
+        if (!permiteBuscaDiretaComunicacao(fonte)) {
+            String mensagem = "Backfill inicial automatico esta disponivel apenas para fontes NOME ou OAB.";
+            fonteSyncExecucaoService.registrarBackfillIgnorado(fonte, dataInicio, dataFim, mensagem);
+            return PublicacaoDjenSyncResponse.builder()
+                    .enabled(enabled)
+                    .tribunais(tribunais)
+                    .diasAvaliados(diasSolicitados)
+                    .mensagem(mensagem)
+                    .build();
+        }
+
+        String caderno = resolverTipoCaderno(tipoCaderno);
+        UUID execucaoFonteId = fonteSyncExecucaoService.iniciarBackfillDjen(fonte, dataInicio, dataFim);
+        try {
+            PublicacaoDjenSyncResponse resultado = executarBackfillPeriodo(
+                    fontes,
+                    tribunais,
+                    dataInicio,
+                    dataFim,
+                    diasSolicitados,
+                    caderno,
+                    false,
+                    "Backfill DJEN da fonte finalizado. Publicacoes sem processo ficam na fila sem vinculo."
+            );
+            fonteSyncExecucaoService.concluir(execucaoFonteId, resultado);
+            return resultado;
+        } catch (RuntimeException ex) {
+            fonteSyncExecucaoService.concluirErro(execucaoFonteId, ex);
+            throw ex;
+        }
+    }
+
+    public PublicacaoFonteSyncExecucaoResponse agendarBackfillPeriodoFonte(
+            UUID fonteId,
+            LocalDate dataInicio,
+            LocalDate dataFim,
+            String tipoCaderno
+    ) {
+        validarPeriodoBackfill(dataInicio, dataFim);
+        PublicacaoFonteMonitorada fonte = fonteMonitoradaRepository.findDetalhadaById(fonteId)
+                .orElseThrow(() -> new ResourceNotFoundException("Fonte monitorada nao encontrada"));
+
+        String mensagemIgnorada = validarFonteParaBackfillDireto(fonte);
+        if (mensagemIgnorada != null) {
+            UUID execucaoIgnoradaId = fonteSyncExecucaoService.registrarBackfillIgnorado(
+                    fonte,
+                    dataInicio,
+                    dataFim,
+                    mensagemIgnorada
+            );
+            return fonteSyncExecucaoService.buscarResponse(execucaoIgnoradaId);
+        }
+
+        UUID execucaoId = fonteSyncExecucaoService.iniciarBackfillDjen(fonte, dataInicio, dataFim);
+        try {
+            taskExecutor.execute(() -> executarBackfillFonteAgendado(execucaoId, fonteId, dataInicio, dataFim, tipoCaderno));
+        } catch (RuntimeException ex) {
+            fonteSyncExecucaoService.concluirErro(execucaoId, ex);
+            throw ex;
+        }
+
+        return fonteSyncExecucaoService.buscarResponse(execucaoId);
+    }
+
+    private void executarBackfillFonteAgendado(
+            UUID execucaoId,
+            UUID fonteId,
+            LocalDate dataInicio,
+            LocalDate dataFim,
+            String tipoCaderno
+    ) {
+        try {
+            PublicacaoFonteMonitorada fonte = fonteMonitoradaRepository.findDetalhadaById(fonteId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Fonte monitorada nao encontrada"));
+            String mensagemIgnorada = validarFonteParaBackfillDireto(fonte);
+            if (mensagemIgnorada != null) {
+                fonteSyncExecucaoService.concluirIgnorado(execucaoId, mensagemIgnorada);
+                return;
+            }
+
+            List<PublicacaoFonteMonitorada> fontes = List.of(fonte);
+            List<String> tribunais = parseTribunais(fontes);
+            int diasSolicitados = validarPeriodoBackfill(dataInicio, dataFim);
+            String caderno = resolverTipoCaderno(tipoCaderno);
+            PublicacaoDjenSyncResponse resultado = executarBackfillPeriodo(
+                    fontes,
+                    tribunais,
+                    dataInicio,
+                    dataFim,
+                    diasSolicitados,
+                    caderno,
+                    false,
+                    "Backfill DJEN da fonte finalizado. Publicacoes sem processo ficam na fila sem vinculo."
+            );
+            fonteSyncExecucaoService.concluir(execucaoId, resultado);
+        } catch (RuntimeException ex) {
+            fonteSyncExecucaoService.concluirErro(execucaoId, ex);
+            log.warn("[DJEN_BACKFILL_FONTE_ASYNC] Falha na execucao {}: {}", execucaoId, ex.getMessage());
+        }
+    }
+
+    private String validarFonteParaBackfillDireto(PublicacaoFonteMonitorada fonte) {
+        if (!Boolean.TRUE.equals(fonte.getAtivo())) {
+            return "Backfill DJEN ignorado: fonte monitorada esta inativa.";
+        }
+        if (!comunicacaoEnabled) {
+            return "Backfill por fonte exige busca direta DJEN/Comunica habilitada.";
+        }
+        if (!permiteBuscaDiretaComunicacao(fonte)) {
+            return "Backfill inicial automatico esta disponivel apenas para fontes NOME ou OAB.";
+        }
+        return null;
+    }
+
+    private PublicacaoDjenSyncResponse executarBackfillPeriodo(
+            List<PublicacaoFonteMonitorada> fontes,
+            List<String> tribunais,
+            LocalDate dataInicio,
+            LocalDate dataFim,
+            int diasSolicitados,
+            String caderno,
+            boolean permitirFallbackCaderno,
+            String mensagemSucesso
+    ) {
 
         Optional<PublicacaoJobLockService.JobLockHandle> lock = jobLockService.tentarAdquirir(DJEN_LOCK_NAME, ttlLock());
         if (lock.isEmpty()) {
@@ -264,7 +427,7 @@ public class PublicacaoDjenColetaService {
                     importadasGlobal += resultadoGlobal.publicacoesImportadas();
                 }
 
-                if (deveExecutarFallbackCaderno(resultadoGlobal, fontes) && !tribunais.isEmpty()) {
+                if (permitirFallbackCaderno && deveExecutarFallbackCaderno(resultadoGlobal, fontes) && !tribunais.isEmpty()) {
                     ResultadoAgregadoTribunais resultadoTribunais = coletarCadernosTribunais(tribunais, data, caderno, fontes);
                     cadernosConsultados += resultadoTribunais.cadernosConsultados();
                     cadernosBaixados += resultadoTribunais.resultado().cadernosBaixados();
@@ -295,11 +458,36 @@ public class PublicacaoDjenColetaService {
                     .publicacoesLidas(publicacoesLidas)
                     .publicacoesImportadas(publicacoesImportadas)
                     .falhas(falhas)
-                    .mensagem("Backfill DJEN finalizado. Publicacoes com CNJ sem processo cadastrado ficam na fila sem vinculo.")
+                    .mensagem(mensagemSucesso)
                     .build();
         } finally {
             jobLockService.liberar(lock.get());
         }
+    }
+
+    private int validarPeriodoBackfill(LocalDate dataInicio, LocalDate dataFim) {
+        if (dataInicio == null || dataFim == null) {
+            throw new BusinessException("Data inicial e data final sao obrigatorias para backfill DJEN.");
+        }
+        if (dataInicio.isAfter(dataFim)) {
+            throw new BusinessException("Data inicial nao pode ser posterior a data final.");
+        }
+        if (dataFim.isAfter(LocalDate.now())) {
+            throw new BusinessException("Data final do backfill DJEN nao pode ser futura.");
+        }
+
+        long diasSolicitados = ChronoUnit.DAYS.between(dataInicio, dataFim) + 1;
+        int limiteDias = Math.max(1, backfillMaxDays);
+        if (diasSolicitados > limiteDias) {
+            throw new BusinessException("Backfill DJEN limitado a " + limiteDias + " dia(s) por execucao.");
+        }
+        return (int) diasSolicitados;
+    }
+
+    private String resolverTipoCaderno(String tipoCaderno) {
+        return tipoCaderno == null || tipoCaderno.isBlank()
+                ? cadernoTipo
+                : tipoCaderno.trim().toUpperCase(Locale.ROOT);
     }
 
     public PublicacaoDjenSyncResponse sincronizarReplay(String tribunal, LocalDate data, String tipoCaderno) {
@@ -392,6 +580,144 @@ public class PublicacaoDjenColetaService {
         }
         referencias.addAll(tribunais);
         return referencias.stream().distinct().toList();
+    }
+
+    private Map<UUID, FonteColetaStats> iniciarStatsFontes(
+            List<PublicacaoFonteMonitorada> fontes,
+            LocalDate dataInicio,
+            LocalDate dataFim
+    ) {
+        Map<UUID, FonteColetaStats> stats = new LinkedHashMap<>();
+        for (PublicacaoFonteMonitorada fonte : fontes) {
+            if (fonte.getId() != null) {
+                stats.put(fonte.getId(), new FonteColetaStats(fonte, dataInicio, dataFim));
+            }
+        }
+        return stats;
+    }
+
+    private void registrarConsultaDiretaFonte(
+            Map<UUID, FonteColetaStats> statsPorFonte,
+            PublicacaoFonteMonitorada fonte,
+            int publicacoesLidas
+    ) {
+        FonteColetaStats stats = getStats(statsPorFonte, fonte);
+        if (stats == null) {
+            return;
+        }
+        stats.cadernosConsultados++;
+        stats.publicacoesLidas += Math.max(0, publicacoesLidas);
+    }
+
+    private void registrarCadernoConsultadoFontes(
+            Map<UUID, FonteColetaStats> statsPorFonte,
+            List<PublicacaoFonteMonitorada> fontes,
+            boolean baixado
+    ) {
+        if (statsPorFonte == null || fontes == null) {
+            return;
+        }
+        for (PublicacaoFonteMonitorada fonte : fontes) {
+            FonteColetaStats stats = getStats(statsPorFonte, fonte);
+            if (stats != null) {
+                stats.cadernosConsultados++;
+                if (baixado) {
+                    stats.cadernosBaixados++;
+                }
+            }
+        }
+    }
+
+    private void registrarMatchFontes(
+            Map<UUID, FonteColetaStats> statsPorFonte,
+            List<PublicacaoFonteMonitorada> fontes,
+            boolean contarLida,
+            boolean importada
+    ) {
+        if (statsPorFonte == null || fontes == null) {
+            return;
+        }
+        for (PublicacaoFonteMonitorada fonte : fontes) {
+            FonteColetaStats stats = getStats(statsPorFonte, fonte);
+            if (stats != null) {
+                if (contarLida) {
+                    stats.publicacoesLidas++;
+                }
+                if (importada) {
+                    stats.publicacoesImportadas++;
+                }
+            }
+        }
+    }
+
+    private void registrarFalhaFontes(
+            Map<UUID, FonteColetaStats> statsPorFonte,
+            List<PublicacaoFonteMonitorada> fontes
+    ) {
+        if (statsPorFonte == null || fontes == null) {
+            return;
+        }
+        for (PublicacaoFonteMonitorada fonte : fontes) {
+            FonteColetaStats stats = getStats(statsPorFonte, fonte);
+            if (stats != null) {
+                stats.falhas++;
+            }
+        }
+    }
+
+    private FonteColetaStats getStats(Map<UUID, FonteColetaStats> statsPorFonte, PublicacaoFonteMonitorada fonte) {
+        if (statsPorFonte == null || fonte == null || fonte.getId() == null) {
+            return null;
+        }
+        return statsPorFonte.get(fonte.getId());
+    }
+
+    private void registrarStatsCapturaFontes(
+            Map<UUID, FonteColetaStats> statsPorFonte,
+            LocalDateTime iniciadoEm,
+            LocalDateTime finalizadoEm
+    ) {
+        if (statsPorFonte == null || statsPorFonte.isEmpty()) {
+            return;
+        }
+        LocalDateTime proximaExecucao = calcularProximaExecucaoDjen(finalizadoEm);
+        statsPorFonte.values().forEach(stats -> fonteSyncExecucaoService.registrarCapturaDjen(
+                stats.fonte,
+                stats.dataInicio,
+                stats.dataFim,
+                stats.cadernosConsultados,
+                stats.cadernosBaixados,
+                stats.publicacoesLidas,
+                stats.publicacoesImportadas,
+                stats.falhas,
+                mensagemStatsFonte(stats),
+                iniciadoEm,
+                finalizadoEm,
+                proximaExecucao
+        ));
+    }
+
+    private String mensagemStatsFonte(FonteColetaStats stats) {
+        if (stats.falhas > 0) {
+            return "Captura recorrente DJEN finalizada com falha(s) para esta pesquisa.";
+        }
+        if (stats.publicacoesImportadas > 0) {
+            return "Captura recorrente DJEN encontrou e importou publicacao(oes) para esta pesquisa.";
+        }
+        if (stats.publicacoesLidas > 0) {
+            return "Captura recorrente DJEN encontrou publicacao(oes), mas nenhuma nova foi importada para esta pesquisa.";
+        }
+        return "Captura recorrente DJEN executada sem publicacoes novas para esta pesquisa.";
+    }
+
+    private LocalDateTime calcularProximaExecucaoDjen(LocalDateTime base) {
+        LocalDateTime referencia = base != null ? base : LocalDateTime.now();
+        try {
+            return CronExpression.parse(cronExpression).next(referencia);
+        } catch (Exception ex) {
+            log.warn("[DJEN_SYNC] Nao foi possivel calcular proxima execucao pelo cron '{}': {}", cronExpression, ex.getMessage());
+            return referencia.plusDays(1);
+        }
     }
 
     private Duration ttlLock() {
@@ -487,11 +813,21 @@ public class PublicacaoDjenColetaService {
             String tipoCaderno,
             List<PublicacaoFonteMonitorada> fontes
     ) {
+        return coletarCadernosTribunais(tribunais, data, tipoCaderno, fontes, null);
+    }
+
+    private ResultadoAgregadoTribunais coletarCadernosTribunais(
+            List<String> tribunais,
+            LocalDate data,
+            String tipoCaderno,
+            List<PublicacaoFonteMonitorada> fontes,
+            Map<UUID, FonteColetaStats> statsPorFonte
+    ) {
         int cadernosConsultados = 0;
         ResultadoColetaCaderno acumulado = new ResultadoColetaCaderno(0, 0, 0, 0, "Fallback por caderno nao executado.");
 
         for (String tribunal : tribunais) {
-            ResultadoColetaCaderno resultado = coletarCaderno(tribunal, data, tipoCaderno, fontes);
+            ResultadoColetaCaderno resultado = coletarCaderno(tribunal, data, tipoCaderno, fontes, statsPorFonte);
             cadernosConsultados++;
             acumulado = acumulado.somar(resultado, resultado.mensagem());
             if (resultado.falhas() == 0) {
@@ -543,14 +879,23 @@ public class PublicacaoDjenColetaService {
             String tipoCaderno,
             List<PublicacaoFonteMonitorada> fontes
     ) {
+        return coletarComunicacoes(tribunal, data, tipoCaderno, fontes, null);
+    }
+
+    private ResultadoColetaCaderno coletarComunicacoes(
+            String tribunal,
+            LocalDate data,
+            String tipoCaderno,
+            List<PublicacaoFonteMonitorada> fontes,
+            Map<UUID, FonteColetaStats> statsPorFonte
+    ) {
         String codigoCaptura = tribunal == null || tribunal.isBlank() ? "COMUNICA" : tribunal;
         UUID execucaoId = capturaExecucaoService.iniciar(FonteIntegracao.DJEN, codigoCaptura, data);
+        List<PublicacaoFonteMonitorada> fontesDiretas = fontes.stream()
+                .filter(fonte -> fonteMonitoraTribunal(fonte, tribunal))
+                .filter(this::permiteBuscaDiretaComunicacao)
+                .toList();
         try {
-            List<PublicacaoFonteMonitorada> fontesDiretas = fontes.stream()
-                    .filter(fonte -> fonteMonitoraTribunal(fonte, tribunal))
-                    .filter(this::permiteBuscaDiretaComunicacao)
-                    .toList();
-
             if (fontesDiretas.isEmpty()) {
                 String mensagem = "Busca direta DJEN ignorada: nenhuma fonte monitorada compativel com nome/OAB.";
                 capturaExecucaoService.concluirSucesso(execucaoId, 0, 0, 0, 0, mensagem);
@@ -575,6 +920,7 @@ public class PublicacaoDjenColetaService {
                 DjenComunicacaoClientService.DjenComunicacaoResultado resultado =
                         djenComunicacaoClientService.buscarComunicacoes(consulta);
                 consultasExecutadas++;
+                registrarConsultaDiretaFonte(statsPorFonte, fonte, resultado.publicacoes().size());
                 if (resultado.limiteDeclarado()) {
                     consultasLimitadas++;
                 }
@@ -589,7 +935,9 @@ public class PublicacaoDjenColetaService {
                 if (fontesEncontradas.isEmpty()) {
                     continue;
                 }
-                if (ingestarPublicacaoDjen(publicacao, tribunal, fontesEncontradas)) {
+                boolean importada = ingestarPublicacaoDjen(publicacao, tribunal, fontesEncontradas);
+                registrarMatchFontes(statsPorFonte, fontesEncontradas, false, importada);
+                if (importada) {
                     importadas++;
                 }
             }
@@ -620,6 +968,7 @@ public class PublicacaoDjenColetaService {
                     detalheErro(ex)
             );
             fonteSyncService.registrarErroDjen(codigoCaptura, ex.getMessage());
+            registrarFalhaFontes(statsPorFonte, fontesDiretas);
             log.warn("[DJEN_COMUNICACAO_SYNC] Falha ao coletar tribunal={} data={}: {}", tribunal, data, ex.getMessage());
             return new ResultadoColetaCaderno(0, 0, 0, 1, ex.getMessage());
         }
@@ -631,11 +980,26 @@ public class PublicacaoDjenColetaService {
             String tipoCaderno,
             List<PublicacaoFonteMonitorada> fontes
     ) {
+        return coletarCaderno(tribunal, data, tipoCaderno, fontes, null);
+    }
+
+    private ResultadoColetaCaderno coletarCaderno(
+            String tribunal,
+            LocalDate data,
+            String tipoCaderno,
+            List<PublicacaoFonteMonitorada> fontes,
+            Map<UUID, FonteColetaStats> statsPorFonte
+    ) {
         UUID execucaoId = capturaExecucaoService.iniciar(FonteIntegracao.DJEN, tribunal, data);
         try {
             DjenCadernoClientService.DjenCadernoResultado resultadoCaderno =
                     djenCadernoClientService.baixarCadernoDetalhado(tribunal, data, tipoCaderno);
             List<DjenCadernoClientService.DjenPublicacaoCapturada> publicacoes = resultadoCaderno.publicacoes();
+            registrarCadernoConsultadoFontes(
+                    statsPorFonte,
+                    fontes.stream().filter(fonte -> fonteMonitoraTribunal(fonte, tribunal)).toList(),
+                    resultadoCaderno.zipBaixado()
+            );
 
             int importadasCaderno = 0;
             for (DjenCadernoClientService.DjenPublicacaoCapturada publicacao : publicacoes) {
@@ -643,7 +1007,9 @@ public class PublicacaoDjenColetaService {
                 if (fontesEncontradas.isEmpty()) {
                     continue;
                 }
-                if (ingestarPublicacaoDjen(publicacao, tribunal, fontesEncontradas)) {
+                boolean importada = ingestarPublicacaoDjen(publicacao, tribunal, fontesEncontradas);
+                registrarMatchFontes(statsPorFonte, fontesEncontradas, true, importada);
+                if (importada) {
                     importadasCaderno++;
                 }
             }
@@ -673,6 +1039,9 @@ public class PublicacaoDjenColetaService {
                     detalheErro(ex)
             );
             fonteSyncService.registrarErroDjen(tribunal, ex.getMessage());
+            registrarFalhaFontes(statsPorFonte, fontes.stream()
+                    .filter(fonte -> fonteMonitoraTribunal(fonte, tribunal))
+                    .toList());
             log.warn("[DJEN_SYNC] Falha ao coletar tribunal={} data={}: {}", tribunal, data, ex.getMessage());
             return new ResultadoColetaCaderno(0, 0, 0, 1, ex.getMessage());
         }
@@ -1129,6 +1498,23 @@ public class PublicacaoDjenColetaService {
                     .replaceAll("\\s+", " ")
                     .trim();
             return normalized.isBlank() ? null : normalized;
+        }
+    }
+
+    private static class FonteColetaStats {
+        private final PublicacaoFonteMonitorada fonte;
+        private final LocalDate dataInicio;
+        private final LocalDate dataFim;
+        private int cadernosConsultados;
+        private int cadernosBaixados;
+        private int publicacoesLidas;
+        private int publicacoesImportadas;
+        private int falhas;
+
+        private FonteColetaStats(PublicacaoFonteMonitorada fonte, LocalDate dataInicio, LocalDate dataFim) {
+            this.fonte = fonte;
+            this.dataInicio = dataInicio;
+            this.dataFim = dataFim;
         }
     }
 

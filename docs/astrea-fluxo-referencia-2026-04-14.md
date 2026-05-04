@@ -2,6 +2,8 @@
 
 Data: 14/04/2026
 
+Atualizacao de escopo em 04/05/2026: este documento continua como referencia comparativa do Astrea. O plano ativo atual esta no checklist `docs/checklist-publicacoes-automatizadas.md`; Domicilio Judicial Eletronico esta congelado e tratamento de publicacoes com IA assistiva entrou no roadmap.
+
 ## Objetivo
 
 Este documento traduz o checklist de planos e precos do Astrea para uma visao de fluxo de produto. A ideia nao e copiar tela por tela, mas entender como o software organiza a operacao de um escritorio de advocacia e quais modulos precisam existir para entregar valor equivalente.
@@ -244,7 +246,7 @@ Analise feita a partir do codigo do frontend, backend e docs internos do projeto
 - acervo de documentos por cliente, processo e pastas internas
 - configuracao de usuarios e papeis
 - logs de auditoria
-- base de integracao com Domicilio
+- base de integracao com Domicilio, congelada fora do plano ativo atual
 - dashboard com contadores operacionais
 
 ### Existe parcialmente

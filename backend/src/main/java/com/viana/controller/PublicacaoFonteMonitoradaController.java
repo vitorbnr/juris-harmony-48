@@ -3,10 +3,14 @@ package com.viana.controller;
 import com.viana.dto.request.AtualizarAtivoFontePublicacaoRequest;
 import com.viana.dto.request.AtualizarFontePublicacaoMonitoradaRequest;
 import com.viana.dto.request.CriarFontePublicacaoMonitoradaRequest;
+import com.viana.dto.response.PublicacaoDjenSyncResponse;
 import com.viana.dto.response.PublicacaoFonteMonitoradaResponse;
+import com.viana.dto.response.PublicacaoFonteSyncExecucaoResponse;
+import com.viana.service.PublicacaoDjenColetaService;
 import com.viana.service.PublicacaoFonteMonitoradaService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,6 +25,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -30,6 +35,7 @@ import java.util.UUID;
 public class PublicacaoFonteMonitoradaController {
 
     private final PublicacaoFonteMonitoradaService service;
+    private final PublicacaoDjenColetaService publicacaoDjenColetaService;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADVOGADO')")
@@ -64,5 +70,29 @@ public class PublicacaoFonteMonitoradaController {
             @Valid @RequestBody AtualizarFontePublicacaoMonitoradaRequest request
     ) {
         return ResponseEntity.ok(service.atualizar(id, request));
+    }
+
+    @PostMapping("/{id}/backfill-djen")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    public ResponseEntity<PublicacaoDjenSyncResponse> executarBackfillFonte(
+            @PathVariable UUID id,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataInicio,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataFim,
+            @RequestParam(required = false) String cadernoTipo
+    ) {
+        return ResponseEntity.ok(publicacaoDjenColetaService.sincronizarPeriodoFonte(id, dataInicio, dataFim, cadernoTipo));
+    }
+
+    @PostMapping("/{id}/backfill-djen/async")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    public ResponseEntity<PublicacaoFonteSyncExecucaoResponse> agendarBackfillFonte(
+            @PathVariable UUID id,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataInicio,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataFim,
+            @RequestParam(required = false) String cadernoTipo
+    ) {
+        return ResponseEntity.accepted().body(
+                publicacaoDjenColetaService.agendarBackfillPeriodoFonte(id, dataInicio, dataFim, cadernoTipo)
+        );
     }
 }

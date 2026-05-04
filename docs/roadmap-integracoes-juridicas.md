@@ -1,8 +1,10 @@
-# Roadmap de Integracoes Juridicas Sem IA
+# Roadmap de Integracoes Juridicas com IA Assistiva
 
 ## Objetivo
 
 Construir no Juris Harmony uma base gratuita e segura para monitoramento juridico continuo, sem automatizar atos que possam registrar ciencia ou iniciar prazo.
+
+Checklist ativo: `docs/checklist-publicacoes-automatizadas.md`
 
 ## Regra critica
 
@@ -40,13 +42,13 @@ Construir no Juris Harmony uma base gratuita e segura para monitoramento juridic
 - Registro centralizado de publicacoes, intimacoes e movimentacoes.
 - Estrutura de partes e representantes para cenarios com multiplos polos e varios advogados por parte.
 
-## Fase 3
+## Fase 3 - congelada
 
-- Integracao com Domicilio Judicial Eletronico.
-- Triagem segura de comunicacoes, sem ciencia automatica.
-- Auditoria de visualizacao e confirmacao manual.
+- [congelado] Integracao com Domicilio Judicial Eletronico.
+- Esta fase nao faz parte do plano ativo atual.
+- Pode ser retomada futuramente somente com decisao explicita, credenciais institucionais e homologacao propria.
 
-### Fundacao implementada
+### Fundacao existente, mas fora do plano ativo
 
 - Configuracao segura do Domicilio via variaveis de ambiente.
 - Cliente read-only para autenticacao OAuth e consulta de comunicacoes.
@@ -84,14 +86,20 @@ Construir no Juris Harmony uma base gratuita e segura para monitoramento juridic
 - DOU/INLABS foi removido do core de publicacoes; a fonte principal de diario judicial permanece DJEN/Comunica PJe.
 - A coleta DJEN passou a priorizar `GET /api/v1/comunicacao` por OAB/nome do advogado em modo global por data, mantendo caderno DJEN como fallback quando a busca direta falha ou quando houver fonte sem suporte direto.
 - Foi adicionado backfill global por periodo em `POST /api/publicacoes/coleta/djen?dataInicio=YYYY-MM-DD&dataFim=YYYY-MM-DD` para descoberta inicial de publicacoes/processos candidatos sem depender de planilha.
+- Foi adicionado backfill inicial por fonte em `POST /api/publicacoes/fontes-monitoradas/{id}/backfill-djen`, disparado pela interface ao cadastrar uma pesquisa por `NOME` ou `OAB`.
 - Foi adicionado `POST /api/publicacoes/{id}/processo` para criar processo a partir de publicacao `SEM_VINCULO`, validar o CNJ capturado e vincular a publicacao na mesma operacao.
+- Foi adicionado historico de backfill DJEN por fonte monitorada, com exibicao de status, periodo, publicacoes lidas, importadas e falhas na tela administrativa.
+- A captura recorrente DJEN passou a registrar status por fonte monitorada, incluindo ultima execucao, periodo avaliado, publicacoes lidas/importadas, falhas e proxima execucao estimada.
+- Foi adicionado backfill DJEN por fonte em modo assincrono, com execucao `PENDENTE`, processamento em background e acompanhamento automatico pela tela administrativa.
 - Foi criado o documento `docs/implementacao-captura-comunica-djen-datajud.md` com arquitetura, configuracoes, guardrails e plano de homologacao.
 - Foi criado o documento `docs/cobertura-siglas-publicacoes.md` com a matriz de siglas, cobertura DJEN e perdas esperadas fora do Judiciario.
+- Foi criado o documento `docs/checklist-publicacoes-automatizadas.md` como fonte de verdade do plano ativo e dos checks de implementacao/teste.
 
 ## Fase 5
 
 - Kanban juridico.
 - Calculo de prazos com regras do escritorio.
-- Preparacao da base historica para IA futura.
+- Tratamento de publicacoes com IA assistiva.
+- Resumo, classificacao, prazo sugerido, responsavel sugerido e explicacao auditavel.
 - Disponibilidade historica por diario/tribunal DJEN e comparativo de volume esperado.
 - Homologacao de PJe/PDPJ somente apos confirmacao de credenciais e escopo real.

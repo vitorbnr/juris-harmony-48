@@ -26,4 +26,6 @@ public class PublicacaoFonteMonitoradaResponse {
     private String criadoPorUsuarioNome;
     private String dataCriacao;
     private String dataAtualizacao;
+    private PublicacaoFonteSyncExecucaoResponse ultimaCapturaDjen;
+    private PublicacaoFonteSyncExecucaoResponse ultimoBackfillDjen;
 }

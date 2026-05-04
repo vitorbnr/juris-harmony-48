@@ -2,6 +2,8 @@
 
 Data: 30/04/2026
 
+Checklist ativo: `docs/checklist-publicacoes-automatizadas.md`
+
 ## Premissa de produto
 
 O modulo de publicacoes existe para reduzir consulta manual em diarios e transformar captura juridica em trabalho operacional rastreavel. Ele nao deve ser apenas uma tela de alertas. A cadeia correta e:
@@ -21,14 +23,16 @@ O foco atual e reproduzir o valor pratico do fluxo de publicacoes do Astrea, mas
 - monitoramento por nomes/OAB/CPF/CNPJ do escritorio
 - DJEN/Comunica PJe como fonte primaria coletavel
 - DataJud como fonte auxiliar de movimentacoes publicas e validacao de contexto
-- Domicilio Judicial em modo read-only, sem ciencia automatica
 - triagem operacional dentro do sistema
+- tratamento de publicacoes com IA assistiva, sem ato automatico definitivo
 - criacao de tarefas, prazos e audiencias a partir da publicacao
 - historico e rastreabilidade da origem
 
 ## Fora do core
 
 DOU/INLABS fica fora do plano principal. Para o objetivo do escritorio, ele agrega pouco na captura de publicacoes judiciais por advogado/escritorio e aumenta ruido operacional. Se um dia houver necessidade especifica de atos administrativos federais, deve entrar como modulo separado e opt-in, nao como fonte padrao.
+
+Domicilio Judicial Eletronico tambem fica congelado fora do plano ativo neste momento. A decisao pode ser reavaliada no futuro, mas a prioridade atual e fechar DJEN/Comunica, DataJud, descoberta de carteira e tratamento de publicacoes com IA assistiva.
 
 ## Fontes e finalidade
 
@@ -56,17 +60,17 @@ O que agrega:
 - contexto para triagem
 - possivel apoio para detectar publicacoes/movimentos relevantes
 
-### Domicilio Judicial Eletronico
+### Domicilio Judicial Eletronico - congelado
 
-Fonte institucional sensivel. Deve operar em modo read-only. O sistema pode importar metadados para triagem, mas nao pode abrir inteiro teor sensivel nem registrar ciencia automaticamente.
+Fonte institucional sensivel. Nao faz parte do plano ativo atual.
 
-O que agrega:
+Motivo da decisao:
 
-- comunicacoes institucionais
-- citacoes/intimacoes pessoais
-- reducao de risco de esquecimento
+- exige credenciais institucionais e validacao operacional propria
+- pode envolver comunicacoes sensiveis e risco de ciencia/abertura indevida
+- nao e necessario para fechar o primeiro nucleo automatizado de publicacoes judiciais por OAB/nome
 
-Restricao permanente:
+Restricao permanente se for retomado no futuro:
 
 - sem ciencia automatica
 - sem aceite automatico
@@ -152,6 +156,12 @@ Ele serve para descoberta inicial de carteira quando nao ha planilha. O sistema 
 
 Na interface administrativa, o bloco `Descobrir carteira` em Configuracoes > Publicacoes executa esse endpoint por intervalo de datas, sem exigir chamada manual de API.
 
+Ao cadastrar uma nova pesquisa por `NOME` ou `OAB`, a interface dispara automaticamente um backfill inicial daquela fonte nos ultimos 30 dias:
+
+- `POST /api/publicacoes/fontes-monitoradas/{id}/backfill-djen?dataInicio=YYYY-MM-DD&dataFim=YYYY-MM-DD`
+
+Cada linha da tabela tambem possui acao para repetir esse backfill por fonte. Esse endpoint e propositalmente limitado a busca direta DJEN/Comunica e nao executa fallback por caderno, para evitar uma carga excessiva quando a fonte e especifica.
+
 Para tratar uma publicacao sem vinculo e criar o processo na mesma operacao:
 
 - `POST /api/publicacoes/{id}/processo`
@@ -167,7 +177,7 @@ Esse endpoint reusa tribunal e data da execucao com erro, mantendo o mesmo lock 
 ## Guardrails operacionais
 
 - Captura automatica e permitida para DJEN porque e fonte publica de diario.
-- Domicilio continua read-only e sem ciencia automatica.
+- Domicilio Judicial esta congelado fora do plano ativo.
 - O sistema nunca deve criar prazo fatal automaticamente sem decisao humana.
 - A triagem pode sugerir risco e acao, mas a criacao definitiva de tarefa/prazo/audiencia e ato do usuario.
 - Toda publicacao descartada exige motivo.
@@ -214,6 +224,21 @@ Regras ja cobertas:
 Guardrail: a triagem sugere; ela nao cria prazo, tarefa ou audiencia automaticamente. A criacao continua sendo ato humano na tela de Publicacoes.
 
 Excecao segura: o sistema pode criar automaticamente uma `TAREFA_INTERNA` de triagem, porque ela nao registra ciencia, nao aceita comunicacao e nao define prazo fatal. Essa tarefa serve apenas para obrigar revisao humana.
+
+## Tratamento com IA assistiva
+
+O tratamento com IA entra no plano ativo como camada de apoio sobre a triagem atual. A IA deve resumir, classificar e sugerir a acao operacional, mas nao pode praticar ato juridico definitivo.
+
+O que a IA deve agregar:
+
+- resumo juridico-operacional da publicacao
+- classificacao do ato processual
+- identificacao de prazo mencionado e risco de prazo
+- sugestao de tarefa, prazo, audiencia, vinculo, descarte ou revisao
+- sugestao de responsavel, cliente provavel e parte contraria quando houver contexto suficiente
+- explicacao da sugestao com trechos relevantes do texto
+
+Guardrail: a IA nao cria prazo fatal, nao descarta publicacao, nao vincula processo e nao registra ciencia automaticamente. Ela prepara uma sugestao auditavel para confirmacao humana.
 
 ## Fila e escala
 
@@ -349,6 +374,7 @@ O painel tambem mostra historico diario DJEN por data de referencia, agregando e
 - `V37__publicacoes_jobs_locks.sql`
 - `V38__publicacoes_capturas_erro_detalhado.sql`
 - `V39__eventos_juridicos_vincular_publicacao.sql`
+- `V40__publicacoes_fontes_sync_execucoes.sql`
 
 ## O que ja esta pronto
 
@@ -372,6 +398,10 @@ O painel tambem mostra historico diario DJEN por data de referencia, agregando e
 - alerta automatico para diario DJEN com erro ou atrasado pelo SLA
 - backfill global por periodo para descoberta de publicacoes e processos candidatos sem depender de planilha inicial
 - criacao assistida de processo a partir de publicacao `SEM_VINCULO`, com pre-preenchimento por CNJ/DataJud e vinculacao automatica apos salvar
+- backfill inicial automatico por fonte `NOME`/`OAB` logo apos cadastro da pesquisa monitorada
+- historico de backfill DJEN por fonte monitorada, com status, periodo, lidas, importadas, falhas e mensagem
+- status de captura recorrente DJEN por fonte monitorada, com ultima execucao, importadas, falhas e proxima execucao estimada pelo cron
+- endpoint assincrono de backfill por fonte, com execucao `PENDENTE` e acompanhamento pela tela administrativa
 - lock contra execucao concorrente
 - auditoria detalhada de capturas
 - tratamento operacional por tarefa, prazo, audiencia e descarte
@@ -404,8 +434,8 @@ O painel tambem mostra historico diario DJEN por data de referencia, agregando e
 ### Integracoes futuras
 
 - PJe/PDPJ com credenciais reais e escopo definido
-- Domicilio read-only homologado com credenciais institucionais
 - validacoes cruzadas com DataJud quando houver CNJ
+- Domicilio Judicial permanece congelado ate decisao futura explicita
 
 ## Padrao para implementar novas fontes
 
@@ -425,7 +455,9 @@ Toda nova fonte deve seguir este contrato:
 
 1. Homologar DJEN em ambiente real com alguns tribunais prioritarios.
 2. Calibrar a triagem automatica com exemplos reais de publicacoes capturadas.
-3. Evoluir criacao assistida com sugestao estruturada de partes e cliente provavel.
-4. Evoluir o historico para disponibilidade por diario/tribunal e comparativo de volume esperado.
-5. Integrar Domicilio Judicial com credenciais reais mantendo modo read-only.
-5. Mapear PDPJ/PJe apenas depois de confirmar escopo e credenciais do escritorio.
+3. Adicionar retry/retomada para backfill por fonte.
+4. Implementar alertas por fonte monitorada.
+5. Implementar tratamento de publicacoes com IA assistiva.
+6. Evoluir criacao assistida com sugestao estruturada de partes e cliente provavel.
+7. Evoluir o historico para disponibilidade por diario/tribunal e comparativo de volume esperado.
+8. Mapear PDPJ/PJe apenas depois de confirmar escopo e credenciais do escritorio.

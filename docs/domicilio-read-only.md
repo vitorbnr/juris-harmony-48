@@ -1,5 +1,9 @@
 # Integracao Domicilio Judicial Eletronico (Read-only)
 
+Status: congelado fora do plano ativo em 04/05/2026.
+
+Este documento fica preservado apenas como referencia tecnica futura. A prioridade atual e fechar DJEN/Comunica, DataJud, descoberta de carteira e tratamento de publicacoes com IA assistiva.
+
 ## Objetivo
 
 Preparar o Juris Harmony para importar comunicacoes do Domicilio Judicial Eletronico para a Inbox Juridica sem automatizar qualquer ato que possa registrar ciencia ou iniciar prazo.

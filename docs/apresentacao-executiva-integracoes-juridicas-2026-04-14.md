@@ -2,17 +2,19 @@
 
 Data: 14/04/2026
 
+Atualizacao de escopo em 04/05/2026: Domicilio Judicial Eletronico foi congelado fora do plano ativo. O plano ativo passa a priorizar DJEN/Comunica, DataJud, descoberta de carteira e tratamento de publicacoes com IA assistiva.
+
 ## 1. Objetivo
 
 Este documento resume, para avaliacao interna do escritorio, o estado atual das integracoes juridicas do Juris Harmony, o que ja esta operacional, o que ainda falta e quais credenciais sao necessarias.
 
 ## 2. Resumo executivo
 
-O Juris Harmony esta sendo estruturado para operar com tres frentes complementares:
+O Juris Harmony esta sendo estruturado para operar com tres frentes ativas:
 
 - `Datajud` para capa processual e movimentacoes publicas
-- `Domicilio Judicial Eletronico` para comunicacoes institucionais, citacoes e intimacoes pessoais
-- `DJEN / Jus.br`, no futuro, para publicacoes e intimacoes de advogado
+- `DJEN / Comunica PJe` para publicacoes judiciais por OAB/nome
+- `IA assistiva` para resumo, classificacao e sugestao de tratamento de publicacoes
 
 O sistema segue uma regra critica: `nao automatizar ciencia, aceite ou abertura sensivel que possa iniciar prazo`.
 
@@ -27,7 +29,7 @@ O sistema segue uma regra critica: `nao automatizar ciencia, aceite ou abertura 
 - reprocessamento manual
 - notificacoes internas para os responsaveis
 
-### Domicilio Judicial Eletronico
+### Domicilio Judicial Eletronico - congelado
 
 - autenticacao do backend por `client_credentials`
 - resolucao de `tenantId`
@@ -36,6 +38,7 @@ O sistema segue uma regra critica: `nao automatizar ciencia, aceite ou abertura 
 - teste de conexao
 - sincronizacao manual e automatica
 - importacao para a Inbox Juridica em modo `read-only`
+- fora do plano ativo desde 04/05/2026
 
 ### Operacao interna
 
@@ -46,10 +49,9 @@ O sistema segue uma regra critica: `nao automatizar ciencia, aceite ou abertura 
 
 ## 4. O que ainda falta
 
-- credenciais reais do `Domicilio Judicial Eletronico`
-- definicao do operador institucional principal e reserva
 - preenchimento consistente de `CPF` e `OAB` dos advogados
-- confirmacao do caminho oficial de automacao do `DJEN / Jus.br`
+- homologacao do DJEN/Comunica com OABs reais do escritorio
+- implementacao do tratamento de publicacoes com IA assistiva
 - homologacao final no ambiente real do escritorio
 
 ## 5. Quais credenciais precisamos
@@ -58,13 +60,6 @@ O sistema segue uma regra critica: `nao automatizar ciencia, aceite ou abertura 
 
 - `DATAJUD_API_KEY`
 - `api.datajud.base-url`
-
-### Do escritorio
-
-- `DOMICILIO_CLIENT_ID`
-- `DOMICILIO_CLIENT_SECRET`
-- confirmacao do `tenantId`
-- definicao do operador institucional
 
 ### Dos advogados
 
