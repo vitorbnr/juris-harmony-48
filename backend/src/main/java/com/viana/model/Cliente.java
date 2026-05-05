@@ -52,7 +52,7 @@ public class Cliente {
     @Column(length = 20)
     private String telefone;
 
-    @Column(length = 100)
+    @Column(nullable = true, length = 100)
     private String cidade;
 
     @Column(length = 2)
